@@ -10,7 +10,9 @@ import {
   getRunDirectoryPath,
   getRunStateFilePath,
   transitionDeliveryRunState,
+  recordDevRunResult,
   type DeliveryRunStateRecord,
+  type DevRunResult,
   type RepositoryRef,
   type TicketRef
 } from '../src/index.js';
@@ -66,6 +68,7 @@ test('createDeliveryRunStateRecord creates the initial discoverable run state', 
     pullRequests: [],
     stagingDeployments: [],
     qualityReports: [],
+    devRuns: [],
     timestamps: {
       createdAt,
       updatedAt: createdAt
@@ -130,3 +133,81 @@ test('transitionDeliveryRunState round-trips through stable JSON formatting', as
   const resumed = await store.read(ticket.key, 'run-1');
   assert.deepEqual(resumed, transitionedState);
 });
+
+test('recordDevRunResult appends passed implementation results without completing the run', () => {
+  const createdAt = '2026-06-03T10:00:00.000Z';
+  const updatedAt = '2026-06-03T10:05:00.000Z';
+  const initialState = createDeliveryRunStateRecord({
+    runId: 'run-1',
+    ticket,
+    targetRepositories: [repository],
+    timestamps: {
+      createdAt,
+      updatedAt: createdAt
+    }
+  });
+  const result = createDevRunResult('passed');
+  const state = recordDevRunResult(initialState, result, updatedAt);
+
+  assert.equal(state.state, 'IMPLEMENTING');
+  assert.equal(state.timestamps.updatedAt, updatedAt);
+  assert.equal(state.timestamps.completedAt, undefined);
+  assert.deepEqual(state.devRuns, [result]);
+});
+
+test('recordDevRunResult turns failed implementation results into actionable failed state', () => {
+  const createdAt = '2026-06-03T10:00:00.000Z';
+  const failedAt = '2026-06-03T10:05:00.000Z';
+  const initialState = createDeliveryRunStateRecord({
+    runId: 'run-1',
+    ticket,
+    targetRepositories: [repository],
+    timestamps: {
+      createdAt,
+      updatedAt: createdAt
+    }
+  });
+  const result = createDevRunResult('failed');
+  const state = recordDevRunResult(initialState, result, failedAt);
+
+  assert.equal(state.state, 'FAILED');
+  assert.equal(state.timestamps.completedAt, failedAt);
+  assert.equal(state.failure?.state, 'IMPLEMENTING');
+  assert.match(state.failure?.reason ?? '', /runs\/AD-123\/run-1\/implementation-log\.md/u);
+  assert.match(state.failure?.reason ?? '', /exit code: 2/u);
+  assert.deepEqual(state.devRuns, [result]);
+});
+
+function createDevRunResult(status: 'passed' | 'failed'): DevRunResult {
+  const exitCode = status === 'passed' ? 0 : 2;
+
+  return {
+    provider: 'opencode',
+    ticketKey: ticket.key,
+    runId: 'run-1',
+    repository,
+    branchName: 'agent/AD-123-dev-runner',
+    baseBranch: 'develop',
+    command: 'node mock-opencode.js',
+    workingDirectory: '/repo',
+    implementationLogPath: 'runs/AD-123/run-1/implementation-log.md',
+    startedAt: '2026-06-03T10:01:00.000Z',
+    finishedAt: '2026-06-03T10:02:00.000Z',
+    durationMs: 60000,
+    attempts: [
+      {
+        attempt: 1,
+        command: 'node mock-opencode.js',
+        workingDirectory: '/repo',
+        startedAt: '2026-06-03T10:01:00.000Z',
+        finishedAt: '2026-06-03T10:02:00.000Z',
+        durationMs: 60000,
+        exitCode,
+        status,
+        summary: status === 'passed' ? 'Attempt 1 passed.' : 'Attempt 1 failed with exit code 2.'
+      }
+    ],
+    status,
+    summary: status === 'passed' ? 'OpenCode implementation passed after 1 attempt(s).' : 'OpenCode implementation failed after 1 attempt(s); last exit code 2.'
+  };
+}

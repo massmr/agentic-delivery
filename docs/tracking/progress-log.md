@@ -55,3 +55,12 @@ Completed Milestone E quality gates:
 - Added tests for optional skip warnings, required configuration failure, Markdown report writing, CLI help, passing quality runs, and required-gate fail-fast behavior.
 - Verified `pnpm test`: 32 passing tests.
 - Verified `pnpm typecheck` and `pnpm build`.
+
+Completed Milestone F OpenCode runner contract:
+
+- Added typed dev runner domain models and persisted `devRuns` on run state records.
+- Added state helper behavior for recording passed implementation runs at `IMPLEMENTING` and failed implementation runs at `FAILED` with actionable implementation log and exit-code context.
+- Added deterministic OpenCode prompt builder covering ticket, repository, branch, quality policy, definition of done, and local/mock-only guardrails.
+- Added OpenCode-compatible subprocess runner with prompt stdin, implementation log capture at `runs/<ticket-key>/<run-id>/implementation-log.md`, and retry attempt sections.
+- Added stateful implementation wrapper that writes `IMPLEMENTING`, runs the typed runner, appends dev run results, and persists failed outcomes.
+- Added harmless `process.execPath -e` mock-command tests for prompt rendering, runner success, runner failure, retry logging, and stateful failure persistence.

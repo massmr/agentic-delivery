@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import type { DevRunResult } from '../domain/dev-runner.js';
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
 
 export interface CreateDeliveryRunStateRecordInput {
@@ -34,9 +35,37 @@ export function createDeliveryRunStateRecord(input: CreateDeliveryRunStateRecord
     pullRequests: [],
     stagingDeployments: [],
     qualityReports: [],
+    devRuns: [],
     timestamps: input.timestamps,
     ...(input.ticketAnalysis === undefined ? {} : { ticketAnalysis: input.ticketAnalysis })
   };
+}
+
+export function recordDevRunResult(state: DeliveryRunStateRecord, result: DevRunResult, updatedAt: string): DeliveryRunStateRecord {
+  const stateWithResult: DeliveryRunStateRecord = {
+    ...state,
+    devRuns: [...state.devRuns, result]
+  };
+
+  if (result.status === 'passed') {
+    return transitionDeliveryRunState(stateWithResult, 'IMPLEMENTING', updatedAt);
+  }
+
+  return {
+    ...transitionDeliveryRunState(stateWithResult, 'FAILED', updatedAt),
+    failure: {
+      state: 'IMPLEMENTING',
+      reason: summarizeDevRunFailure(result),
+      occurredAt: updatedAt
+    }
+  };
+}
+
+function summarizeDevRunFailure(result: DevRunResult): string {
+  const lastAttempt = result.attempts[result.attempts.length - 1];
+  const exitCode = lastAttempt === undefined ? 'unknown' : String(lastAttempt.exitCode);
+
+  return `OpenCode implementation failed; review ${result.implementationLogPath} for details. Last exit code: ${exitCode}.`;
 }
 
 export function transitionDeliveryRunState(

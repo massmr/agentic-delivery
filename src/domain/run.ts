@@ -1,4 +1,5 @@
 import type { DeploymentResult } from './deployment.js';
+import type { DevRunResult } from './dev-runner.js';
 import type { PullRequestRef } from './pull-request.js';
 import type { QualityReport } from './quality.js';
 import type { RepositoryRef } from './repository.js';
@@ -58,6 +59,7 @@ export interface DeliveryRunStateRecord {
   readonly pullRequests: readonly PullRequestRef[];
   readonly stagingDeployments: readonly DeploymentResult[];
   readonly qualityReports: readonly QualityReport[];
+  readonly devRuns: readonly DevRunResult[];
   readonly timestamps: RunTimestamps;
   readonly ticketAnalysis?: TicketAnalysis;
   readonly failure?: DeliveryRunFailure;

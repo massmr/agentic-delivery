@@ -32,11 +32,13 @@ export {
   parseRepositoryQualityConfig
 } from './quality/index.js';
 export { MarkdownReportWriter, renderQualityReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
+export { OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
 export {
   JsonRunStateStore,
   createDeliveryRunStateRecord,
   getRunDirectoryPath,
   getRunStateFilePath,
+  recordDevRunResult,
   transitionDeliveryRunState
 } from './state/index.js';
 export type {
@@ -46,6 +48,12 @@ export type {
   DeliveryRunFailure,
   DeliveryRunState,
   DeliveryRunStateRecord,
+  DevRunAttemptResult,
+  DevRunInput,
+  DevRunProvider,
+  DevRunResult,
+  DevRunStatus,
+  DevRunner,
   DeliveryTicket,
   DeploymentEnvironment,
   DeploymentProvider,
@@ -79,4 +87,5 @@ export type {
 export type { JiraConnector } from './connectors/jira/index.js';
 export type { TicketPlan } from './planning/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
+export type { OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';
 export type { CreateDeliveryRunStateRecordInput, RunStateStore } from './state/index.js';

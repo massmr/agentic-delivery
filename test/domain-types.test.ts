@@ -127,6 +127,7 @@ const deliveryRun = {
   pullRequests: [stagingPullRequest],
   stagingDeployments: [deployment],
   qualityReports: [qualityReport],
+  devRuns: [],
   timestamps: {
     createdAt: '2026-06-03T10:00:00.000Z',
     updatedAt: '2026-06-03T10:42:00.000Z'

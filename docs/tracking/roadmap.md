@@ -41,10 +41,10 @@ Status legend:
 
 ## Development Runner
 
-- `[ ]` OpenCode prompt builder
-- `[ ]` OpenCode subprocess runner
-- `[ ]` Log capture
-- `[ ]` Retry policy
+- `[x]` OpenCode prompt builder
+- `[x]` OpenCode subprocess runner
+- `[x]` Log capture
+- `[x]` Retry policy
 
 ## Quality
 

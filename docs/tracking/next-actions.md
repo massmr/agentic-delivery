@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Implement Milestone F: OpenCode prompt builder and subprocess runner contract.
-2. Add harmless mock-command tests for the OpenCode runner and log capture.
-3. Implement Milestone G: local git adapter and mock GitHub PR handoff after the runner contract is stable.
+1. Implement Milestone G: local git adapter and GitHub interface contract.
+2. Add deterministic branch-name and PR body tests using mock-only fixtures.
+3. Add mock GitHub PR handoff after the local git adapter contract is stable.
 
 ## OpenCode Prompt
 
@@ -16,4 +16,4 @@ Read AGENTS.md, then execute docs/prompts/opencode-next-step.md.
 
 ## After Milestone A
 
-Completed through Milestone E. Start Milestone F with the OpenCode runner contract while preserving local/mock-only behavior.
+Completed through Milestone F. Start Milestone G with local git and mock GitHub handoff interfaces while preserving local/mock-only behavior.
