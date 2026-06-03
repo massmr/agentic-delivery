@@ -34,6 +34,7 @@ Status legend:
 - `[x]` Backlog scan command
 - `[x]` Ticket planning command
 - `[x]` Repository resolver
+- `[x]` Multi-repo safety guard
 
 ## Delivery
 

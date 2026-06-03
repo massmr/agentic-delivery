@@ -29,10 +29,10 @@ export interface EndToEndMockDeliveryResult {
   readonly runId: string;
   readonly runDirectoryPath: string;
   readonly planReportPath: string;
-  readonly implementationLogPath: string;
-  readonly qualityReportPath: string;
-  readonly stagingReportPath: string;
-  readonly finalReportPath: string;
+  readonly implementationLogPath?: string;
+  readonly qualityReportPath?: string;
+  readonly stagingReportPath?: string;
+  readonly finalReportPath?: string;
 }
 
 export interface RunEndToEndMockDeliveryInput {
@@ -73,6 +73,29 @@ export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInpu
   await stateStore.write(initialState);
 
   const planReportPath = await reportWriter.writePlan(runId, plan);
+
+  if (plan.selectedRepositories.length > 1) {
+    const reason = `Planning selected multiple repositories (${plan.selectedRepositories
+      .map((repository) => `${repository.owner}/${repository.name}`)
+      .join(', ')}). Multi-repo sub-runs are not implemented yet; choose one repository or split the Jira ticket before running.`;
+    const needsHumanState: DeliveryRunStateRecord = {
+      ...transitionDeliveryRunState(initialState, 'NEEDS_HUMAN', now().toISOString()),
+      humanActionNeeded: {
+        reason,
+        requestedAt: now().toISOString()
+      }
+    };
+
+    await stateStore.write(needsHumanState);
+
+    return {
+      state: needsHumanState,
+      runId,
+      runDirectoryPath: getRunDirectoryPath(ticket.ref.key, runId),
+      planReportPath
+    };
+  }
+
   const plannedState = transitionDeliveryRunState(initialState, 'PLANNED', now().toISOString());
   await stateStore.write(plannedState);
 

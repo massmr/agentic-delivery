@@ -117,3 +117,11 @@ Completed Milestone K resume guard:
 - Blocked automatic resume from `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE` with explicit error reasons.
 - Documented the resume policy in README and advanced next actions to Milestone L.
 - Added tests for every delivery run state and blocked-state error reasons.
+
+Completed Milestone L multi-repo safety guard:
+
+- Added a guard in `agentic run <ticket-key>` that stops before branch creation or implementation when planning selects multiple repositories.
+- Persisted `NEEDS_HUMAN` with a clear reason that multi-repo sub-runs are not implemented yet.
+- Preserved the single-repo mock run path through `PRODUCTION_PR_OPENED`.
+- Documented the multi-repo guard in README and advanced next actions to Milestone M.
+- Added tests for single-repo completion and multi-repo safe stop behavior.

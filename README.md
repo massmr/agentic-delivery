@@ -23,7 +23,7 @@ Jira backlog
 
 ## Current Phase
 
-This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, and resume guard policy for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, identify automatically resumable states, and write resumable run state without provider credentials.
+This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, and multi-repo safety guard for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, and write resumable run state without provider credentials.
 
 The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command now executes one deterministic mock ticket run through production PR preparation for human approval.
 
@@ -132,6 +132,8 @@ runs/<ticket-key>/<run-id>/
 
 The final report summarizes the selected repositories, branch refs, implementation log path, quality outcome, develop PR, staging deployment and smoke checks, production PR, final state, and the mock-only/human approval note.
 
+If mock planning selects more than one repository, `agentic run <ticket-key>` stops before branch creation or implementation, persists `NEEDS_HUMAN`, writes the plan report, and exits non-zero with a reason. Multi-repo sub-runs are not implemented yet; split the Jira ticket or choose one repository before continuing.
+
 `agentic status <ticket-key> [--run-id <run-id>]` reads existing local `runs/<ticket-key>/<run-id>/state.json` files without provider credentials. When `--run-id` is omitted, it lists known runs for the ticket and selects the latest run by persisted `updatedAt` timestamp. The status output summarizes state, next action, repositories, branches, PRs, quality, staging, failures, and required human action.
 
 Resume policy is currently exposed as library helpers only: `canResumeState(state)` and `assertStateResumable(state)`. Automatic resume is allowed for active lifecycle states from `DISCOVERED` through `STAGING_VERIFIED`. It is blocked for terminal or human-gated states: `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE`. The guard has no side effects and does not call providers, rerun commands, merge production, or trigger a resume command.
@@ -158,6 +160,8 @@ Milestone I adds the public mock `agentic run <ticket-key>` path, deterministic 
 Milestone J adds the public local `agentic status <ticket-key> [--run-id <run-id>]` path, run-state lookup/listing/latest-selection helpers, concise Markdown status rendering, and deterministic `getNextActionForState(...)` guidance for every delivery lifecycle state. It does not resume or trigger side effects; resumability policy is reserved for Milestone K.
 
 Milestone K adds the resume guard policy with `canResumeState(...)` and `assertStateResumable(...)`. The policy covers every delivery lifecycle state and prevents automatic continuation from `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE`. No resume command or live provider action is added in this milestone.
+
+Milestone L adds the multi-repo safety guard for `agentic run <ticket-key>`. Single-repo mock runs still complete to `PRODUCTION_PR_OPENED`; tickets that resolve to multiple repositories persist `NEEDS_HUMAN` with a clear reason and do not proceed to implementation, quality, staging, or production PR preparation.
 
 Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
 

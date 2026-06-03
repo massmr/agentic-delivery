@@ -23,9 +23,17 @@ export async function runRunCommand(ticketKey: string, options: RunCommandOption
     now: options.now
   });
 
+  if (result.state.state === 'NEEDS_HUMAN') {
+    options.io.stdout(`Run ${ticketKey} needs human input as ${result.runId}.\n`);
+    options.io.stdout(`State: ${result.state.state}\n`);
+    options.io.stdout(`Plan Report: ${result.planReportPath}\n`);
+    options.io.stdout(`Reason: ${result.state.humanActionNeeded?.reason ?? 'Human input required.'}\n`);
+    return 2;
+  }
+
   options.io.stdout(`Run ${ticketKey} completed as ${result.runId}.\n`);
   options.io.stdout(`Final State: ${result.state.state}\n`);
-  options.io.stdout(`Final Report: ${result.finalReportPath}\n`);
+  options.io.stdout(`Final Report: ${result.finalReportPath ?? 'n/a'}\n`);
 
   return 0;
 }

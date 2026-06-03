@@ -299,6 +299,43 @@ test('agentic run creates complete mock run folder and reaches PRODUCTION_PR_OPE
   assert.match(finalReport, /Production merge remains human-only/u);
 });
 
+test('agentic run stops safely with NEEDS_HUMAN when planning selects multiple repositories', async (t) => {
+  const workspacePath = await createTempRoot(t, 'agentic-cli-run-multi-repo-');
+  const captured = createCapturedIO();
+
+  await mkdir(join(workspacePath, 'config'));
+  await writeFile(join(workspacePath, 'config', 'workspace.yml'), multiRepoWorkspaceConfigYaml(), 'utf8');
+
+  const exitCode = await createCliProgram({ cwd: workspacePath, configPath: 'config/workspace.yml', io: captured.io }).run([
+    'node',
+    'agentic',
+    'run',
+    'LK-101',
+    '--run-id',
+    'multi-repo-run'
+  ]);
+
+  assert.equal(exitCode, 2);
+  assert.match(captured.stdout, /Run LK-101 needs human input as multi-repo-run/u);
+  assert.match(captured.stdout, /State: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Multi-repo sub-runs are not implemented yet/u);
+  assert.equal(captured.stderr, '');
+
+  const runRoot = join(workspacePath, 'runs', 'LK-101', 'multi-repo-run');
+  const state = JSON.parse(await readFile(join(workspacePath, getRunStateFilePath('LK-101', 'multi-repo-run')), 'utf8')) as DeliveryRunStateRecord;
+  const planReport = await readFile(join(runRoot, 'plan.md'), 'utf8');
+
+  assert.equal(state.state, 'NEEDS_HUMAN');
+  assert.equal(state.targetRepositories.length, 2);
+  assert.match(state.humanActionNeeded?.reason ?? '', /agentic\/frontend/u);
+  assert.match(state.humanActionNeeded?.reason ?? '', /agentic\/marketing/u);
+  assert.match(planReport, /agentic\/frontend/u);
+  assert.match(planReport, /agentic\/marketing/u);
+  await assert.rejects(stat(join(runRoot, 'implementation-log.md')), /ENOENT/u);
+  await assert.rejects(stat(join(runRoot, 'quality-report.md')), /ENOENT/u);
+  await assert.rejects(stat(join(runRoot, 'final-report.md')), /ENOENT/u);
+});
+
 async function createTempRoot(t: TestContext, prefix: string): Promise<string> {
   const rootPath = await mkdtemp(join(tmpdir(), prefix));
 
@@ -428,6 +465,59 @@ function workspaceConfigYaml(): string {
     '    hints:',
     '      - frontend',
     '      - ui',
+    '      - web',
+    '    staging_smoke_urls:',
+    '      - /health',
+    ''
+  ].join('\n');
+}
+
+function multiRepoWorkspaceConfigYaml(): string {
+  return [
+    'workspace:',
+    '  name: test-workspace',
+    '  autonomy: full_until_production_pr',
+    '  staging_branch: develop',
+    '  production_branch: main',
+    '  max_concurrent_tickets: 1',
+    'jira:',
+    '  mode: mock',
+    '  base_url: https://jira.example.test',
+    '  project_keys:',
+    '    - LK',
+    'github:',
+    '  mode: mock',
+    '  organization: agentic',
+    'railway:',
+    '  mode: mock',
+    '  staging_branch: develop',
+    '  production_branch: main',
+    'dev_runner:',
+    '  provider: opencode',
+    '  command: opencode',
+    '  max_attempts: 2',
+    'quality:',
+    '  default_profile: node',
+    'repos:',
+    '  - name: frontend',
+    '    url: https://github.com/agentic/frontend',
+    '    local_path: ./frontend',
+    '    default_branch: develop',
+    '    production_branch: main',
+    '    quality_profile: node',
+    '    hints:',
+    '      - frontend',
+    '      - ui',
+    '    staging_smoke_urls:',
+    '      - /health',
+    '  - name: marketing',
+    '    url: https://github.com/agentic/marketing',
+    '    local_path: ./marketing',
+    '    default_branch: develop',
+    '    production_branch: main',
+    '    quality_profile: node',
+    '    hints:',
+    '      - frontend',
     '      - web',
     '    staging_smoke_urls:',
     '      - /health',
