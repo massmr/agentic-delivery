@@ -9,7 +9,9 @@ export type {
   DevRunnerProvider,
   DevRunnerWorkspaceConfig,
   GitHubWorkspaceConfig,
+  JiraMcpToolNameConfig,
   JiraWorkspaceConfig,
+  JiraProviderMode,
   ProviderMode,
   QualityWorkspaceConfig,
   RailwayWorkspaceConfig,
@@ -22,7 +24,7 @@ export type {
 export { createCliProgram } from './cli/program.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
 export { MockGitHubConnector, buildDevelopPullRequestBody, buildProductionPullRequestBody } from './connectors/github/index.js';
-export { MockJiraConnector } from './connectors/jira/index.js';
+export { JiraMcpTicketPort, MockJiraConnector, defaultJiraMcpToolNames } from './connectors/jira/index.js';
 export { MockRailwayConnector } from './connectors/railway/index.js';
 export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
 export { runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
@@ -61,6 +63,7 @@ export { MarkdownReportWriter, renderFinalReportMarkdown, renderQualityReportMar
 export { MockOpenCodeRunner, OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
 export {
   ProviderCredentialError,
+  ProviderMcpClientError,
   RealProviderAdapterUnavailableError,
   createDevRunner,
   createGitHubConnector,
@@ -137,7 +140,8 @@ export type {
   PullRequestInput,
   PushGitHubBranchInput
 } from './connectors/github/index.js';
-export type { JiraConnector } from './connectors/jira/index.js';
+export type { JiraConnector, JiraMcpAuditSink, JiraMcpTicketPortOptions, JiraMcpToolNames } from './connectors/jira/index.js';
+export type { TicketPort } from './ports/index.js';
 export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
 export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
 export type { DevelopPullRequestHandoffInput, EndToEndMockDeliveryResult, RunEndToEndMockDeliveryInput, RunProductionPullRequestPreparationInput, RunStagingVerificationInput } from './delivery/index.js';

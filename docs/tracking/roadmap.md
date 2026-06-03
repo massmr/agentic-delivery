@@ -28,12 +28,15 @@ Status legend:
 - `[x]` Provider mode and adapter factory design
 - `[x]` MCP-first business port architecture
 - `[x]` MCP client foundation
+- `[x]` Jira MCP TicketPort
 - `[x]` Markdown report writer
 
 ## Planning
 
 - `[x]` Jira connector interface
+- `[x]` TicketPort boundary
 - `[x]` Mock Jira connector
+- `[x]` MCP Jira ticket adapter
 - `[x]` Backlog scan command
 - `[x]` Ticket planning command
 - `[x]` Repository resolver

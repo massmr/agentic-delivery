@@ -2,8 +2,19 @@ import { readFile } from 'node:fs/promises';
 
 import { parseDocument } from 'yaml';
 
+import type { McpServerConfig, McpServerTransport } from '../mcp/index.js';
+import { defaultMcpToolTimeoutMs } from '../mcp/index.js';
+import { validateJiraProjectKeys } from '../connectors/jira/jira-project-key-validation.js';
+
 export type ProviderMode = 'mock' | 'real';
+export type JiraProviderMode = ProviderMode | 'mcp';
 export type DevRunnerProvider = 'opencode';
+
+export interface JiraMcpToolNameConfig {
+  readonly listBacklog: string;
+  readonly getTicket: string;
+  readonly comment: string;
+}
 
 export interface WorkspaceConfigIssue {
   readonly path: string;
@@ -28,6 +39,7 @@ export interface WorkspaceConfig {
   readonly railway: RailwayWorkspaceConfig;
   readonly devRunner: DevRunnerWorkspaceConfig;
   readonly quality: QualityWorkspaceConfig;
+  readonly mcpServers: readonly McpServerConfig[];
   readonly repos: readonly WorkspaceRepositoryConfig[];
 }
 
@@ -40,9 +52,11 @@ export interface WorkspaceSettings {
 }
 
 export interface JiraWorkspaceConfig {
-  readonly mode: ProviderMode;
+  readonly mode: JiraProviderMode;
   readonly baseUrl: string;
   readonly projectKeys: readonly string[];
+  readonly mcpServerId?: string | undefined;
+  readonly mcpToolNames: JiraMcpToolNameConfig;
 }
 
 export interface GitHubWorkspaceConfig {
@@ -87,6 +101,11 @@ type StringField = {
 type WorkspaceConfigInput = Record<string, unknown>;
 
 const requiredTopLevelSections = ['workspace', 'jira', 'github', 'railway', 'dev_runner', 'quality', 'repos'] as const;
+const defaultJiraMcpToolNames: JiraMcpToolNameConfig = {
+  listBacklog: 'searchJiraIssuesUsingJql',
+  getTicket: 'getJiraIssue',
+  comment: 'addCommentToJiraIssue'
+};
 
 export async function loadWorkspaceConfig(filePath: string): Promise<WorkspaceConfig> {
   const source = await readFile(filePath, 'utf8');
@@ -158,6 +177,7 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
   const railway = readSection(input, 'railway', issues);
   const devRunner = readSection(input, 'dev_runner', issues);
   const quality = readSection(input, 'quality', issues);
+  const mcpServers = readOptionalSection(input, 'mcp_servers', issues);
   const reposValue = input.repos;
 
   const parsedWorkspace = workspace === undefined ? undefined : parseWorkspaceSettings(workspace, issues);
@@ -166,7 +186,12 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
   const parsedRailway = railway === undefined ? undefined : parseRailwayConfig(railway, issues);
   const parsedDevRunner = devRunner === undefined ? undefined : parseDevRunnerConfig(devRunner, issues);
   const parsedQuality = quality === undefined ? undefined : parseQualityConfig(quality, issues);
+  const parsedMcpServers = mcpServers === undefined ? [] : parseMcpServers(mcpServers, issues);
   const parsedRepos = parseRepositoryList(reposValue, issues);
+
+  if (parsedJira !== undefined && parsedMcpServers !== undefined) {
+    validateJiraMcpServerReference(parsedJira, parsedMcpServers, issues);
+  }
 
   if (
     issues.length > 0 ||
@@ -176,6 +201,7 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
     parsedRailway === undefined ||
     parsedDevRunner === undefined ||
     parsedQuality === undefined ||
+    parsedMcpServers === undefined ||
     parsedRepos === undefined
   ) {
     return { valid: false, issues };
@@ -191,6 +217,7 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
       railway: parsedRailway,
       devRunner: parsedDevRunner,
       quality: parsedQuality,
+      mcpServers: parsedMcpServers,
       repos: parsedRepos
     }
   };
@@ -233,15 +260,54 @@ function parseWorkspaceSettings(section: WorkspaceConfigInput, issues: Workspace
 }
 
 function parseJiraConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): JiraWorkspaceConfig | undefined {
-  const mode = readProviderMode(section, 'jira', issues);
+  const mode = readJiraProviderMode(section, issues);
   const baseUrl = readNonEmptyString(section, 'jira.base_url', 'Set jira.base_url to the Jira workspace URL.', issues);
   const projectKeys = readNonEmptyStringArray(section.project_keys, 'jira.project_keys', 'Add at least one Jira project key.', issues);
+  const mcpServerId = mode === 'mcp'
+    ? readNonEmptyString(section, 'jira.mcp_server', 'Set jira.mcp_server to the id of a configured top-level mcp_servers entry.', issues)
+    : readOptionalNonEmptyString(section.mcp_server, 'jira.mcp_server', 'Remove jira.mcp_server unless jira.mode is mcp, or set it to a non-empty MCP server id.', issues);
+  const mcpToolNames = parseJiraMcpToolNames(section.mcp_tools, issues);
 
-  if (mode === undefined || baseUrl === undefined || projectKeys === undefined) {
+  if (mode === 'mcp' && projectKeys !== undefined) {
+    validateJiraProjectKeysInWorkspaceConfig(projectKeys, issues);
+  }
+
+  if (mode === undefined || baseUrl === undefined || projectKeys === undefined || (mode === 'mcp' && mcpServerId === undefined)) {
     return undefined;
   }
 
-  return { mode, baseUrl, projectKeys };
+  return { mode, baseUrl, projectKeys, mcpServerId, mcpToolNames };
+}
+
+function parseJiraMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[]): JiraMcpToolNameConfig {
+  if (value === undefined) {
+    return defaultJiraMcpToolNames;
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path: 'jira.mcp_tools',
+      message: 'jira.mcp_tools must be a YAML mapping when provided.',
+      action: 'Set jira.mcp_tools.list_backlog, get_ticket, and comment to MCP tool names, or remove jira.mcp_tools to use defaults.'
+    });
+    return defaultJiraMcpToolNames;
+  }
+
+  return {
+    listBacklog: readOptionalNonEmptyString(value.list_backlog, 'jira.mcp_tools.list_backlog', 'Set jira.mcp_tools.list_backlog to the Jira MCP search tool name.', issues) ?? defaultJiraMcpToolNames.listBacklog,
+    getTicket: readOptionalNonEmptyString(value.get_ticket, 'jira.mcp_tools.get_ticket', 'Set jira.mcp_tools.get_ticket to the Jira MCP issue fetch tool name.', issues) ?? defaultJiraMcpToolNames.getTicket,
+    comment: readOptionalNonEmptyString(value.comment, 'jira.mcp_tools.comment', 'Set jira.mcp_tools.comment to the Jira MCP comment tool name.', issues) ?? defaultJiraMcpToolNames.comment
+  };
+}
+
+function validateJiraProjectKeysInWorkspaceConfig(projectKeys: readonly string[], issues: WorkspaceConfigIssue[]): void {
+  for (const issue of validateJiraProjectKeys(projectKeys)) {
+    issues.push({
+      path: `jira.project_keys[${issue.index}]`,
+      message: issue.message,
+      action: issue.action
+    });
+  }
 }
 
 function parseGitHubConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): GitHubWorkspaceConfig | undefined {
@@ -375,6 +441,83 @@ function parseRepositoryConfig(section: WorkspaceConfigInput, path: string, issu
   };
 }
 
+function parseMcpServers(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): readonly McpServerConfig[] | undefined {
+  const servers: McpServerConfig[] = [];
+
+  for (const [id, value] of Object.entries(section)) {
+    const path = `mcp_servers.${id}`;
+
+    if (!isRecord(value)) {
+      issues.push({
+        path,
+        message: `${path} must be a YAML mapping.`,
+        action: 'Define command/args for stdio MCP servers or url for HTTP MCP servers.'
+      });
+      continue;
+    }
+
+    const server = parseMcpServerConfig(id, value, path, issues);
+
+    if (server !== undefined) {
+      servers.push(server);
+    }
+  }
+
+  return servers.length === Object.keys(section).length ? servers : undefined;
+}
+
+function parseMcpServerConfig(id: string, section: WorkspaceConfigInput, path: string, issues: WorkspaceConfigIssue[]): McpServerConfig | undefined {
+  const displayName = readOptionalNonEmptyString(section.display_name, `${path}.display_name`, 'Set display_name to a non-empty label or omit it.', issues) ?? id;
+  const command = readOptionalNonEmptyString(section.command, `${path}.command`, 'Set command to the MCP stdio executable or omit it for HTTP servers.', issues);
+  const url = readOptionalNonEmptyString(section.url, `${path}.url`, 'Set url to the MCP HTTP endpoint or omit it for stdio servers.', issues);
+  const args = section.args === undefined
+    ? []
+    : readStringArray(section.args, `${path}.args`, 'Set args to an array of command arguments without secrets.', issues);
+  const envVarNames = section.env_var_names === undefined
+    ? []
+    : readStringArray(section.env_var_names, `${path}.env_var_names`, 'Set env_var_names to the names of environment variables, not secret values.', issues);
+  const timeoutMs = section.timeout_ms === undefined ? defaultMcpToolTimeoutMs : readPositiveInteger(section, path, 'timeout_ms', issues);
+  const transport = readOptionalMcpTransport(section.transport, path, issues) ?? (command === undefined ? 'http' : 'stdio');
+
+  if (args === undefined || envVarNames === undefined || timeoutMs === undefined) {
+    return undefined;
+  }
+
+  if (transport === 'stdio') {
+    if (command === undefined) {
+      issues.push({ path: `${path}.command`, message: `${path}.command must be a non-empty string for stdio MCP servers.`, action: 'Set command to the MCP stdio executable.' });
+      return undefined;
+    }
+
+    return { id, displayName, transport, command, args, timeoutMs, envVarNames };
+  }
+
+  if (url === undefined) {
+    issues.push({ path: `${path}.url`, message: `${path}.url must be a non-empty string for HTTP MCP servers.`, action: 'Set url to the MCP HTTP endpoint.' });
+    return undefined;
+  }
+
+  return { id, displayName, transport, url, timeoutMs, envVarNames };
+}
+
+function validateJiraMcpServerReference(jira: JiraWorkspaceConfig, mcpServers: readonly McpServerConfig[], issues: WorkspaceConfigIssue[]): void {
+  if (jira.mode !== 'mcp') {
+    return;
+  }
+
+  const serverId = jira.mcpServerId;
+
+  if (serverId === undefined || mcpServers.some((server) => server.id === serverId)) {
+    return;
+  }
+
+  issues.push({
+    path: 'jira.mcp_server',
+    message: `jira.mcp_server references '${serverId}', but no matching top-level mcp_servers entry exists.`,
+    action: `Add mcp_servers.${serverId} or set jira.mcp_server to a configured MCP server id.`
+  });
+}
+
 function readSection(input: WorkspaceConfigInput, key: string, issues: WorkspaceConfigIssue[]): WorkspaceConfigInput | undefined {
   const value = input[key];
 
@@ -387,6 +530,25 @@ function readSection(input: WorkspaceConfigInput, key: string, issues: Workspace
       path: key,
       message: `${key} must be a YAML mapping.`,
       action: `Replace ${key} with a mapping matching config/workspace.example.yml.`
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function readOptionalSection(input: WorkspaceConfigInput, key: string, issues: WorkspaceConfigIssue[]): WorkspaceConfigInput | undefined {
+  const value = input[key];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path: key,
+      message: `${key} must be a YAML mapping.`,
+      action: `Replace ${key} with a mapping of MCP server ids to server settings.`
     });
     return undefined;
   }
@@ -418,6 +580,23 @@ function readStringFields(
 
 function readNonEmptyString(section: WorkspaceConfigInput, path: string, action: string, issues: WorkspaceConfigIssue[]): string | undefined {
   const value = readPathValue(section, path);
+
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    issues.push({
+      path,
+      message: `${path} must be a non-empty string.`,
+      action
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function readOptionalNonEmptyString(value: unknown, path: string, action: string, issues: WorkspaceConfigIssue[]): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
 
   if (typeof value !== 'string' || value.trim().length === 0) {
     issues.push({
@@ -509,6 +688,38 @@ function readProviderMode(section: WorkspaceConfigInput, sectionPath: 'jira' | '
       path: `${sectionPath}.mode`,
       message: `${sectionPath}.mode must be 'mock' or 'real'.`,
       action: `Set ${sectionPath}.mode to 'mock' for local runs or 'real' only when the matching adapter credentials are available.`
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function readJiraProviderMode(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): JiraProviderMode | undefined {
+  const value = section.mode;
+
+  if (value !== 'mock' && value !== 'real' && value !== 'mcp') {
+    issues.push({
+      path: 'jira.mode',
+      message: "jira.mode must be 'mock', 'real', or 'mcp'.",
+      action: "Set jira.mode to 'mock' for local runs, 'mcp' for an injected MCP-backed Jira adapter, or 'real' only when the matching adapter credentials are available."
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function readOptionalMcpTransport(value: unknown, path: string, issues: WorkspaceConfigIssue[]): McpServerTransport | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value !== 'stdio' && value !== 'http') {
+    issues.push({
+      path: `${path}.transport`,
+      message: `${path}.transport must be 'stdio' or 'http'.`,
+      action: "Set transport to 'stdio' for command-based MCP servers or 'http' for URL-based MCP servers."
     });
     return undefined;
   }

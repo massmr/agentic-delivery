@@ -31,7 +31,7 @@ Jira backlog
 
 ## Current Phase
 
-This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, provider adapter design boundaries, and shared MCP client foundation for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, discover and authorize mock MCP tools, audit MCP tool calls, map MCP timeout/auth/session errors, and write resumable run state without provider credentials.
+This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, provider adapter design boundaries, shared MCP client foundation, and MCP-backed Jira TicketPort for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, discover and authorize mock MCP tools, audit MCP tool calls, map MCP timeout/auth/session errors, map Atlassian MCP Jira search/get/comment tools behind `TicketPort`, and write resumable run state without provider credentials.
 
 The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command now executes one deterministic mock ticket run through production PR preparation for human approval.
 
@@ -113,7 +113,33 @@ node dist/src/cli/index.js quality ./path/to/repo --ticket-key LK-101 --run-id l
 
 `agentic init` copies `config/workspace.example.yml` to `config/workspace.yml`. It creates the `config` directory when needed and refuses to overwrite an existing `config/workspace.yml`.
 
-`config/workspace.yml` is the local workspace file. Provider sections support `mock` and `real` modes, but mock remains the default and the public commands still run without provider credentials. Real Jira, GitHub, and Railway modes currently fail fast in adapter factories when required environment variables are missing and otherwise report that live adapters are reserved for their later milestones.
+`config/workspace.yml` is the local workspace file. Provider sections support `mock` and `real` modes, and Jira also supports `mcp` mode for injected MCP clients. Mock remains the default and the public commands still run without provider credentials. Real Jira, GitHub, and Railway modes currently fail fast in adapter factories when required environment variables are missing and otherwise report that live adapters are reserved for their later milestones. GitHub and Railway do not support `mcp` mode yet.
+
+An Atlassian MCP remote server can be declared without repository secrets like this:
+
+```yaml
+jira:
+  mode: mcp
+  base_url: https://your-domain.atlassian.net
+  project_keys:
+    - LK
+  mcp_server: atlassian
+  mcp_tools:
+    list_backlog: searchJiraIssuesUsingJql
+    get_ticket: getJiraIssue
+    comment: addCommentToJiraIssue
+
+mcp_servers:
+  atlassian:
+    display_name: Atlassian MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.atlassian.com/v1/mcp/authv2
+```
+
+The factory path for `jira.mode: mcp` requires an already-created `McpClient` injected by server id. Jira MCP tool names default to the Atlassian names above and can be overridden with `jira.mcp_tools`. In MCP mode, `jira.project_keys` are validated as uppercase Jira project keys before building JQL. This milestone does not add a live MCP process/session runner, OAuth flow, or Jira REST adapter.
 
 `agentic plan` writes:
 
@@ -174,6 +200,8 @@ Milestone L adds the multi-repo safety guard for `agentic run <ticket-key>`. Sin
 Milestone M adds real provider adapter design boundaries without live calls. Workspace config now accepts `mock` or `real` provider modes, adapter factories keep mock connectors as the default, and real Jira/GitHub/Railway factories fail fast with explicit credential errors before any future live adapter can be constructed. Real Jira, GitHub, and Railway implementations remain future milestones.
 
 Milestone O adds the shared MCP client foundation without live provider calls. The exported `src/mcp` APIs include MCP server config helpers, `McpClient`, deterministic `MockMcpClient`, tool discovery, tool allowlist enforcement for typed port/action pairs, audit record creation, allowed tool-call execution with audit records, and timeout/auth/session error mapping. Tests use only mock MCP clients and do not start OAuth, network, or live MCP server sessions.
+
+Milestone P adds a typed `TicketPort` boundary and a Jira MCP adapter for Atlassian MCP search, issue fetch, and comment capabilities. Raw MCP tool names stay inside the Jira adapter/config layer, can be overridden per workspace, and missing tools raise actionable `McpToolNotFoundError`s. The adapter preserves MCP audit records through an optional typed audit sink, and MCP-mode project keys are validated before JQL construction. Tests use only `MockMcpClient` with no live Jira, OAuth, or MCP server calls. `JiraConnector` remains compatible with `TicketPort` for existing planning and run code.
 
 Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
 

@@ -28,6 +28,15 @@ dev_runner:
 quality:
   default_profile: node
 
+mcp_servers:
+  atlassian:
+    display_name: Atlassian MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.atlassian.com/v1/mcp/authv2
+
 repos:
   - name: frontend
     url: git@github.com:your-org/frontend.git

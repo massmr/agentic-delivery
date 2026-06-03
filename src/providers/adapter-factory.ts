@@ -2,11 +2,14 @@ import type { WorkspaceConfig } from '../config/workspace-config.js';
 import { MockGitHubConnector } from '../connectors/github/mock-github-connector.js';
 import type { GitHubConnector } from '../connectors/github/github-connector.js';
 import { MockJiraConnector } from '../connectors/jira/mock-jira-connector.js';
+import { JiraMcpTicketPort } from '../connectors/jira/jira-mcp-ticket-port.js';
+import type { JiraMcpAuditSink } from '../connectors/jira/jira-mcp-ticket-port.js';
 import type { JiraConnector } from '../connectors/jira/jira-connector.js';
 import { MockRailwayConnector } from '../connectors/railway/mock-railway-connector.js';
 import type { RailwayConnector } from '../connectors/railway/railway-connector.js';
 import type { DeliveryTicket } from '../domain/ticket.js';
 import type { DevRunner } from '../domain/dev-runner.js';
+import type { McpClient } from '../mcp/index.js';
 import { MockOpenCodeRunner } from '../runners/opencode/mock-opencode-runner.js';
 import { OpenCodeSubprocessRunner } from '../runners/opencode/opencode-runner.js';
 
@@ -16,6 +19,8 @@ export interface ProviderFactoryOptions {
   readonly config: WorkspaceConfig;
   readonly environment?: ProviderFactoryEnvironment;
   readonly mockTickets?: readonly DeliveryTicket[];
+  readonly mcpClients?: Readonly<Record<string, McpClient | undefined>> | undefined;
+  readonly jiraMcpAuditSink?: JiraMcpAuditSink | undefined;
 }
 
 export interface WorkspaceAdapters {
@@ -47,6 +52,18 @@ export class RealProviderAdapterUnavailableError extends Error {
   }
 }
 
+export class ProviderMcpClientError extends Error {
+  readonly provider: string;
+  readonly serverId: string;
+
+  constructor(provider: string, serverId: string) {
+    super(`${provider} MCP adapter requires an injected McpClient for server '${serverId}'. Pass mcpClients['${serverId}'] to the provider factory.`);
+    this.name = 'ProviderMcpClientError';
+    this.provider = provider;
+    this.serverId = serverId;
+  }
+}
+
 export function createWorkspaceAdapters(options: ProviderFactoryOptions): WorkspaceAdapters {
   return {
     jira: createJiraConnector(options),
@@ -59,6 +76,27 @@ export function createWorkspaceAdapters(options: ProviderFactoryOptions): Worksp
 export function createJiraConnector(options: ProviderFactoryOptions): JiraConnector {
   if (options.config.jira.mode === 'mock') {
     return new MockJiraConnector(options.config, options.mockTickets);
+  }
+
+  if (options.config.jira.mode === 'mcp') {
+    const serverId = options.config.jira.mcpServerId;
+    const client = serverId === undefined ? undefined : options.mcpClients?.[serverId];
+
+    if (serverId === undefined || client === undefined) {
+      throw new ProviderMcpClientError('Jira', serverId ?? '');
+    }
+
+    const server = options.config.mcpServers.find((candidate) => candidate.id === serverId);
+
+    return new JiraMcpTicketPort({
+      client,
+      serverId,
+      baseUrl: options.config.jira.baseUrl,
+      projectKeys: options.config.jira.projectKeys,
+      timeoutMs: server?.timeoutMs,
+      toolNames: options.config.jira.mcpToolNames,
+      auditSink: options.jiraMcpAuditSink
+    });
   }
 
   requireCredential(options.environment, 'Jira', 'JIRA_EMAIL');

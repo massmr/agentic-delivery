@@ -123,6 +123,112 @@ test('workspace config accepts real provider modes without creating live adapter
   assert.equal(config.devRunner.mode, 'real');
 });
 
+test('workspace config accepts valid Jira MCP project keys', () => {
+  const config = parseWorkspaceConfig(`
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mcp
+  base_url: https://jira.example.test
+  project_keys:
+    - LK
+    - LK2
+    - LK_API
+  mcp_server: atlassian
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  atlassian:
+    display_name: Atlassian MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.atlassian.com/v1/mcp/authv2
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+`);
+
+  assert.deepEqual(config.jira.projectKeys, ['LK', 'LK2', 'LK_API']);
+});
+
+test('workspace config rejects invalid Jira MCP project keys', () => {
+  for (const invalidKey of ['LK) OR status IS NOT EMPTY', 'lk', ' LK', '1LK', 'LK!']) {
+    const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(`
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mcp
+  base_url: https://jira.example.test
+  project_keys:
+    - ${JSON.stringify(invalidKey)}
+  mcp_server: atlassian
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  atlassian:
+    display_name: Atlassian MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.atlassian.com/v1/mcp/authv2
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+`));
+
+  assert.equal(error.issues[0]?.path, 'jira.project_keys[0]');
+  assert.match(error.message, /must start with an uppercase letter and contain only uppercase letters, digits, or underscores/u);
+  assert.match(error.message, /Use keys like LK, LK2, or LK_API/u);
+  }
+});
+
 test('workspace config rejects unknown provider modes', async () => {
   const source = await readFile(exampleConfigPath, 'utf8');
   const invalidProviderSource = source.replace('jira:\n  mode: mock', 'jira:\n  mode: live');
@@ -130,7 +236,7 @@ test('workspace config rejects unknown provider modes', async () => {
   const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(invalidProviderSource));
 
   assert.ok(error.issues.some((issue) => issue.path === 'jira.mode'));
-  assert.match(error.message, /jira\.mode must be 'mock' or 'real'/u);
+  assert.match(error.message, /jira\.mode must be 'mock', 'real', or 'mcp'/u);
 });
 
 test('bad repository entry reports the exact repo field path', async () => {

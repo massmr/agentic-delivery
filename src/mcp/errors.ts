@@ -26,7 +26,7 @@ export class McpToolNotFoundError extends Error {
   readonly toolName: string;
 
   constructor(serverId: string, toolName: string) {
-    super(`MCP tool ${serverId}.${toolName} was not discovered.`);
+    super(`MCP tool ${serverId}.${toolName} was not discovered. Configure or allow the MCP server tool before retrying.`);
     this.name = 'McpToolNotFoundError';
     this.serverId = serverId;
     this.toolName = toolName;

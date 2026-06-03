@@ -1,5 +1,6 @@
 export {
   ProviderCredentialError,
+  ProviderMcpClientError,
   RealProviderAdapterUnavailableError,
   createDevRunner,
   createGitHubConnector,

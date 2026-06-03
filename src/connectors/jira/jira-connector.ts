@@ -1,7 +1,3 @@
-import type { DeliveryTicket } from '../../domain/ticket.js';
+import type { TicketPort } from '../../ports/ticket-port.js';
 
-export interface JiraConnector {
-  listBacklog(): Promise<readonly DeliveryTicket[]>;
-  getTicket(key: string): Promise<DeliveryTicket>;
-  comment(key: string, body: string): Promise<void>;
-}
+export interface JiraConnector extends TicketPort {}

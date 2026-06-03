@@ -147,3 +147,14 @@ Completed Milestone O MCP client foundation:
 - Exported public MCP APIs through `src/mcp/index.ts` and `src/index.ts` so future TicketPort, CodeHostPort, and DeploymentPort MCP adapters can depend on typed interfaces instead of raw tool names in delivery logic.
 - Added mock-only tests for MCP config validation, discovery, missing-tool errors, allowlist enforcement, audit records, allowed tool calls, timeout/error mapping, failed-call audit capture, and no-live-call behavior.
 - Kept provider factories and live Jira/GitHub/Railway/Vercel/Bitbucket integrations untouched; Milestone O adds infrastructure only.
+
+Completed Milestone P Jira MCP TicketPort:
+
+- Added a typed `TicketPort` boundary under `src/ports` and kept `JiraConnector` compatible with that surface.
+- Added `JiraMcpTicketPort`, which maps Atlassian MCP Jira search, issue fetch, and comment capabilities into `listBacklog`, `getTicket`, and `comment` while keeping raw tool names private to the adapter.
+- Extended workspace config with Jira-only `mode: mcp`, optional top-level `mcp_servers`, and an Atlassian `mcp-remote` example without repository secrets.
+- Updated provider factory behavior so mock remains the default, real Jira remains fail-fast/no REST, and MCP Jira requires an injected `McpClient` keyed by configured server id.
+- Added mock-only tests for backlog, ticket fetch, comments, missing MCP tools, Jira-only MCP config, factory selection, and no-live-call behavior.
+- Corrected Milestone P before moving to Milestone Q by preserving MCP audit records through an optional Jira MCP audit sink, allowing configurable Jira MCP tool names with Atlassian defaults, and validating MCP-mode Jira project keys before JQL construction.
+- Tightened the Milestone P Jira MCP acceptance gap by sharing project-key validation between workspace parsing and `JiraMcpTicketPort` construction, rejecting invalid keys before any MCP call while keeping valid uppercase keys like `LK`, `LK2`, and `LK_API` supported.
+- Verified the validation refactor with `pnpm typecheck` and `pnpm test`.
