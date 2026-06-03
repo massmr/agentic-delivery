@@ -6,6 +6,14 @@ The project goal is to connect Jira, GitHub, Railway, and a coding runner such a
 
 The planned system is designed for full autonomy until production. A human validates production pull requests before merge.
 
+## Architecture Direction
+
+Agentic Delivery is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
+
+MCP is the preferred control plane for external SaaS providers such as Jira, GitHub, Railway, Vercel, and Bitbucket. The runtime still owns state, decisions, policies, retries, reports, local quality gates, and production approval.
+
+See [MCP-First Architecture](docs/specs/mcp-first-architecture.md).
+
 ## Core Goal
 
 ```text
@@ -23,7 +31,7 @@ Jira backlog
 
 ## Current Phase
 
-This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, and provider adapter design boundaries for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, and write resumable run state without provider credentials.
+This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, provider adapter design boundaries, and shared MCP client foundation for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, discover and authorize mock MCP tools, audit MCP tool calls, map MCP timeout/auth/session errors, and write resumable run state without provider credentials.
 
 The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command now executes one deterministic mock ticket run through production PR preparation for human approval.
 
@@ -164,6 +172,8 @@ Milestone K adds the resume guard policy with `canResumeState(...)` and `assertS
 Milestone L adds the multi-repo safety guard for `agentic run <ticket-key>`. Single-repo mock runs still complete to `PRODUCTION_PR_OPENED`; tickets that resolve to multiple repositories persist `NEEDS_HUMAN` with a clear reason and do not proceed to implementation, quality, staging, or production PR preparation.
 
 Milestone M adds real provider adapter design boundaries without live calls. Workspace config now accepts `mock` or `real` provider modes, adapter factories keep mock connectors as the default, and real Jira/GitHub/Railway factories fail fast with explicit credential errors before any future live adapter can be constructed. Real Jira, GitHub, and Railway implementations remain future milestones.
+
+Milestone O adds the shared MCP client foundation without live provider calls. The exported `src/mcp` APIs include MCP server config helpers, `McpClient`, deterministic `MockMcpClient`, tool discovery, tool allowlist enforcement for typed port/action pairs, audit record creation, allowed tool-call execution with audit records, and timeout/auth/session error mapping. Tests use only mock MCP clients and do not start OAuth, network, or live MCP server sessions.
 
 Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
 

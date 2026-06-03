@@ -28,6 +28,27 @@ export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js'
 export { runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
 export { LocalGitAdapter, buildWorkingBranchName, runGitCommand } from './git/index.js';
+export {
+  MockMcpClient,
+  McpToolAllowlistError,
+  McpToolCallTimeoutError,
+  McpToolNotFoundError,
+  assertMcpToolAllowed,
+  callAllowedMcpTool,
+  createHttpMcpServerConfig,
+  createMcpToolCallAuditRecord,
+  createMockMcpTool,
+  createStdioMcpServerConfig,
+  defaultMcpToolTimeoutMs,
+  discoverMcpTools,
+  findDiscoveredMcpTool,
+  findMcpToolAllowlistRule,
+  isJsonObject,
+  mapMcpError,
+  requireDiscoveredMcpTool,
+  validateMcpServerConfig,
+  withMcpTimeout
+} from './mcp/index.js';
 export { analyzeTicket, createTicketPlan, resolveRepositoriesForTicket, toRepositoryRef } from './planning/index.js';
 export {
   QualityRunner,
@@ -121,6 +142,34 @@ export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDep
 export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
 export type { DevelopPullRequestHandoffInput, EndToEndMockDeliveryResult, RunEndToEndMockDeliveryInput, RunProductionPullRequestPreparationInput, RunStagingVerificationInput } from './delivery/index.js';
 export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner } from './git/index.js';
+export type {
+  CreateMcpToolCallAuditRecordInput,
+  DiscoveredMcpTool,
+  JsonArray,
+  JsonObject,
+  JsonPrimitive,
+  JsonValue,
+  McpCallToolInput,
+  McpClient,
+  McpListToolsInput,
+  McpMappedError,
+  McpMappedErrorKind,
+  McpServerConfig,
+  McpServerConfigValidationIssue,
+  McpServerTransport,
+  McpToolAllowlistRule,
+  McpToolAuthorization,
+  McpToolCallAuditRecord,
+  McpToolCallAuditStatus,
+  McpToolCallExecutionResult,
+  McpToolCallResult,
+  McpToolCatalog,
+  McpToolDefinition,
+  McpToolPolicyContext,
+  McpToolSafety,
+  MockMcpToolHandler,
+  MockMcpToolRegistration
+} from './mcp/index.js';
 export type { TicketPlan } from './planning/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
 export type { ProviderFactoryEnvironment, ProviderFactoryOptions, WorkspaceAdapters } from './providers/index.js';
