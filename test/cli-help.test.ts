@@ -39,6 +39,7 @@ test('agentic --help prints the mock planning help output', async () => {
   assert.match(captured.stdout, /agentic scan/u);
   assert.match(captured.stdout, /agentic plan <ticket-key>/u);
   assert.match(captured.stdout, /agentic run <ticket-key>/u);
+  assert.match(captured.stdout, /agentic status <ticket-key>/u);
   assert.match(captured.stdout, /agentic quality <repo-path> --ticket-key <ticket-key>/u);
   assert.match(captured.stdout, /Copy config\/workspace\.example\.yml to config\/workspace\.yml/u);
   assert.match(captured.stdout, /Mock mode only/u);
@@ -72,6 +73,7 @@ test('built agentic bin prints help when invoked through a package-manager symli
   assert.match(result.stdout, /Usage:\n  agentic \[--help\]/u);
   assert.match(result.stdout, /agentic init/u);
   assert.match(result.stdout, /agentic run <ticket-key>/u);
+  assert.match(result.stdout, /agentic status <ticket-key>/u);
   assert.match(result.stdout, /agentic quality <repo-path> --ticket-key <ticket-key>/u);
   assert.match(result.stdout, /Mock mode only/u);
 });

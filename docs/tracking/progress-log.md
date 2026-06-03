@@ -18,6 +18,13 @@ Created initial project specifications and OpenCode execution material:
 - `.gitignore`
 - `AGENTS.md`
 
+Added roadmap controls for post-Milestone I autonomy:
+
+- Added `docs/plans/approved-backlog.md`.
+- Updated `AGENTS.md` to forbid unapproved autonomous milestones.
+- Updated `docs/tracking/next-actions.md` to make Milestone J the next approved task.
+- Clarified that real provider adapter work must wait until Milestones J, K, and L are complete.
+
 Added tracking system:
 
 - `docs/tracking/README.md`
@@ -92,4 +99,13 @@ Completed Milestone I end-to-end mock run:
 - Added `runEndToEndMockDelivery(...)` and public `agentic run <ticket-key>` wiring for the mock lifecycle through `PRODUCTION_PR_OPENED`.
 - Added `final-report.md` rendering with ticket, run, repositories, branches, implementation, quality, develop PR, staging, production PR, final state, and human-only production approval note.
 - Added tests for production PR body/state/preparation, final report output, mock OpenCode runner, CLI help, and complete CLI run artifacts.
+- Verified `pnpm typecheck` and `pnpm test` during implementation.
+
+Completed Milestone J status and resume foundation:
+
+- Added run-state lookup helpers for explicit `runs/<ticket-key>/<run-id>/state.json` reads, per-ticket run listing, and latest-run selection by persisted `updatedAt` timestamp.
+- Added deterministic `getNextActionForState(...)` guidance for every delivery lifecycle state without triggering side effects.
+- Added concise status rendering that includes state, repositories, branches, PRs, quality, staging, failures, and human action.
+- Added `agentic status <ticket-key> [--run-id <run-id>]` for local run inspection without provider credentials.
+- Added tests for state lookup, latest-run selection, missing run errors, summary rendering, next-action coverage, CLI help, and CLI status output.
 - Verified `pnpm typecheck` and `pnpm test` during implementation.

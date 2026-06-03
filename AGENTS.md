@@ -14,12 +14,13 @@ Before coding, read:
 2. `docs/specs/product-spec.md`
 3. `docs/specs/technical-architecture.md`
 4. `docs/plans/mvp-plan.md`
-5. `docs/specs/quality-gates.md`
-6. `docs/prompts/opencode-build-orchestrator.md`
-7. `docs/tracking/README.md`
-8. `docs/tracking/next-actions.md`
+5. `docs/plans/approved-backlog.md`
+6. `docs/specs/quality-gates.md`
+7. `docs/prompts/opencode-build-orchestrator.md`
+8. `docs/tracking/README.md`
+9. `docs/tracking/next-actions.md`
 
-Then implement the current milestone from `docs/plans/opencode-autonomy-plan.md`.
+Then implement only the current approved milestone from `docs/tracking/next-actions.md` or `docs/plans/approved-backlog.md`.
 
 ## Autonomy Rules
 
@@ -34,6 +35,8 @@ You may:
 
 You must:
 
+- Only implement tasks listed in `docs/tracking/next-actions.md` or `docs/plans/approved-backlog.md`.
+- If useful work is not listed, add it as a proposal in `docs/tracking/next-actions.md` and stop before implementing it.
 - Keep secrets out of the repository.
 - Preserve production approval as a human-only gate.
 - Persist run state after major transitions.
@@ -44,6 +47,7 @@ You must:
 
 You must not:
 
+- Invent or implement unapproved milestones.
 - Add hidden network calls in tests.
 - Merge to production.
 - Hard-code private workspace credentials.

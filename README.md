@@ -23,7 +23,7 @@ Jira backlog
 
 ## Current Phase
 
-This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, and mock Railway staging verification foundations for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, and write resumable run state without provider credentials.
+This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, and local run-status foundations for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, inspect existing run state, and write resumable run state without provider credentials.
 
 The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command now executes one deterministic mock ticket run through production PR preparation for human approval.
 
@@ -90,6 +90,13 @@ Run one mock ticket end to end:
 node dist/src/cli/index.js run LK-101
 ```
 
+Inspect an existing run state:
+
+```bash
+node dist/src/cli/index.js status LK-101
+node dist/src/cli/index.js status LK-101 --run-id LK-101-20260603-100000000
+```
+
 Run local quality gates for a repository:
 
 ```bash
@@ -125,6 +132,8 @@ runs/<ticket-key>/<run-id>/
 
 The final report summarizes the selected repositories, branch refs, implementation log path, quality outcome, develop PR, staging deployment and smoke checks, production PR, final state, and the mock-only/human approval note.
 
+`agentic status <ticket-key> [--run-id <run-id>]` reads existing local `runs/<ticket-key>/<run-id>/state.json` files without provider credentials. When `--run-id` is omitted, it lists known runs for the ticket and selects the latest run by persisted `updatedAt` timestamp. The status output summarizes state, next action, repositories, branches, PRs, quality, staging, failures, and required human action.
+
 `agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]` reads `.agent-quality.yml` from the target repository or falls back to detected Node package scripts. Required gates without commands fail configuration. Optional gates without commands are recorded as skipped warning results and do not fail the run.
 
 `agentic quality` writes:
@@ -143,6 +152,8 @@ Milestone G adds library interfaces for the future develop PR handoff path witho
 Milestone H adds library interfaces for the future Railway staging verification path without adding a public CLI command. The exported helpers include a future-shaped Railway connector interface, deterministic `MockRailwayConnector`, `SmokeUrlVerifier` interface, deterministic `MockSmokeUrlVerifier`, `runStagingVerification(...)`, staging state helpers for `STAGING_DEPLOYING`, `STAGING_VERIFIED`, and failed staging outcomes, and a production pull request readiness guard that accepts only `STAGING_VERIFIED` runs. Staging verification writes `runs/<ticket-key>/<run-id>/staging-report.md` through `MarkdownReportWriter.writeStaging(...)`.
 
 Milestone I adds the public mock `agentic run <ticket-key>` path, deterministic `MockOpenCodeRunner`, production PR preparation helper, production PR body builder, `PRODUCTION_PR_OPENED` state recording, and final report writer. The command is still mock-only and prepares a production PR ref for human review without real provider calls, remote pushes, production merge, or production deployment.
+
+Milestone J adds the public local `agentic status <ticket-key> [--run-id <run-id>]` path, run-state lookup/listing/latest-selection helpers, concise Markdown status rendering, and deterministic `getNextActionForState(...)` guidance for every delivery lifecycle state. It does not resume or trigger side effects; resumability policy is reserved for Milestone K.
 
 Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
 

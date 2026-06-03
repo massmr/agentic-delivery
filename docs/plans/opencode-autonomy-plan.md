@@ -6,6 +6,10 @@ This plan lets OpenCode work autonomously through the build without waiting for 
 
 The implementation should proceed milestone by milestone. Each milestone must leave the repository in a working state.
 
+After Milestone I, the approved task source is `docs/plans/approved-backlog.md`.
+
+Agents must not invent or implement tasks outside `docs/tracking/next-actions.md` or `docs/plans/approved-backlog.md`.
+
 ## Current Build Strategy
 
 Start with a local CLI and mock connectors. Real Jira, GitHub, Railway, and OpenCode integrations should be added after the core state machine, config, reporting, and quality gate logic are stable.

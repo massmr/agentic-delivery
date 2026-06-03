@@ -3,6 +3,7 @@ import { runPlanCommand } from './commands/plan.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
 import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
 import { runScanCommand } from './commands/scan.js';
+import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
 
 const HELP_TEXT = [
   'Agentic Delivery',
@@ -13,6 +14,7 @@ const HELP_TEXT = [
   '  agentic scan',
   '  agentic plan <ticket-key>',
   '  agentic run <ticket-key> [--run-id <run-id>]',
+  '  agentic status <ticket-key> [--run-id <run-id>]',
   '  agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
   'Commands:',
@@ -20,6 +22,7 @@ const HELP_TEXT = [
   '  scan        List mock Jira backlog tickets.',
   '  plan        Create a local mock plan and run state for one ticket.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
+  '  status      Inspect existing local run state and next action.',
   '  quality     Run local repository quality gates and write a quality report.',
   '',
   'Options:',
@@ -105,6 +108,18 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runRunCommand(parsed.ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runId: parsed.runId });
+      }
+
+      if (args[0] === 'status') {
+        const parsed = parseStatusCommandOptions(args.slice(1));
+
+        if (parsed.ticketKey === undefined || parsed.ticketKey.trim().length === 0) {
+          io.stderr('Missing ticket key for status command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runStatusCommand(parsed.ticketKey, { cwd: options.cwd, io, runId: parsed.runId });
       }
 
       if (args[0] === 'quality') {

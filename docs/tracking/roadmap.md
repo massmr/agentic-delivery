@@ -21,6 +21,9 @@ Status legend:
 - `[x]` Domain models
 - `[x]` State machine
 - `[x]` Local state store
+- `[x]` Run status command
+- `[x]` Run listing and latest-run selection
+- `[x]` Deterministic next-action guidance
 - `[x]` Markdown report writer
 
 ## Planning

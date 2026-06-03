@@ -38,6 +38,7 @@ export {
 } from './quality/index.js';
 export { MarkdownReportWriter, renderFinalReportMarkdown, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
 export { MockOpenCodeRunner, OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
+export { findLatestRunState, getNextActionForState, listRunIdsForTicket, loadRunStatus, readRunState, renderRunStatus } from './status/index.js';
 export {
   JsonRunStateStore,
   assertProductionPullRequestReady,
@@ -116,3 +117,4 @@ export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/in
 export type { MockOpenCodeRunnerOptions, OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';
 export type { BuildDevelopPullRequestBodyInput, BuildProductionPullRequestBodyInput } from './connectors/github/index.js';
 export type { CreateDeliveryRunStateRecordInput, RunStateStore } from './state/index.js';
+export type { RunStatusLookupOptions, RunStatusLookupResult } from './status/index.js';
