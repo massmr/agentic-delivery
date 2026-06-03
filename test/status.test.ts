@@ -6,6 +6,8 @@ import { test, type TestContext } from 'node:test';
 
 import {
   JsonRunStateStore,
+  assertStateResumable,
+  canResumeState,
   createCliProgram,
   createDeliveryRunStateRecord,
   deliveryRunStates,
@@ -178,6 +180,29 @@ test('getNextActionForState returns deterministic guidance for every lifecycle s
     assert.equal(typeof action, 'string');
     assert.notEqual(action.trim(), '');
   }
+});
+
+test('resume guard covers every lifecycle state and blocks terminal or human-gated states', () => {
+  const nonResumableStates = new Set<DeliveryRunState>(['FAILED', 'NEEDS_HUMAN', 'SKIPPED', 'PRODUCTION_PR_OPENED', 'DONE']);
+
+  for (const state of deliveryRunStates) {
+    const record = createState(state, 'run-1', '2026-06-03T10:00:00.000Z');
+
+    assert.equal(canResumeState(record), !nonResumableStates.has(state), `${state} resume policy`);
+
+    if (nonResumableStates.has(state)) {
+      assert.throws(() => assertStateResumable(record), new RegExp(`cannot resume automatically from ${state}`, 'u'));
+    } else {
+      assert.doesNotThrow(() => assertStateResumable(record));
+    }
+  }
+});
+
+test('resume guard gives explicit reasons for blocked automatic resume states', () => {
+  assert.throws(() => assertStateResumable(createState('FAILED', 'run-1', '2026-06-03T10:00:00.000Z')), /failure must be inspected/u);
+  assert.throws(() => assertStateResumable(createState('NEEDS_HUMAN', 'run-1', '2026-06-03T10:00:00.000Z')), /human input is required/u);
+  assert.throws(() => assertStateResumable(createState('SKIPPED', 'run-1', '2026-06-03T10:00:00.000Z')), /intentionally skipped/u);
+  assert.throws(() => assertStateResumable(createState('PRODUCTION_PR_OPENED', 'run-1', '2026-06-03T10:00:00.000Z')), /production approval is human-only/u);
 });
 
 test('agentic status prints latest run status and supports explicit run id', async (t) => {

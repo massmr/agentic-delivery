@@ -24,6 +24,7 @@ Status legend:
 - `[x]` Run status command
 - `[x]` Run listing and latest-run selection
 - `[x]` Deterministic next-action guidance
+- `[x]` Resume guard policy
 - `[x]` Markdown report writer
 
 ## Planning

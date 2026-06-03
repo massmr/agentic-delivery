@@ -109,3 +109,11 @@ Completed Milestone J status and resume foundation:
 - Added `agentic status <ticket-key> [--run-id <run-id>]` for local run inspection without provider credentials.
 - Added tests for state lookup, latest-run selection, missing run errors, summary rendering, next-action coverage, CLI help, and CLI status output.
 - Verified `pnpm typecheck` and `pnpm test` during implementation.
+
+Completed Milestone K resume guard:
+
+- Added `canResumeState(...)` and `assertStateResumable(...)` as side-effect-free policy helpers over persisted run state.
+- Covered every delivery lifecycle state in the resume policy.
+- Blocked automatic resume from `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE` with explicit error reasons.
+- Documented the resume policy in README and advanced next actions to Milestone L.
+- Added tests for every delivery run state and blocked-state error reasons.

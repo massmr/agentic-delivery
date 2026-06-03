@@ -87,6 +87,18 @@ export function getNextActionForState(state: DeliveryRunStateRecord): string {
   return nextActionByState[state.state];
 }
 
+export function canResumeState(state: DeliveryRunStateRecord): boolean {
+  return resumePolicyByState[state.state].resumable;
+}
+
+export function assertStateResumable(state: DeliveryRunStateRecord): void {
+  const policy = resumePolicyByState[state.state];
+
+  if (!policy.resumable) {
+    throw new Error(`Run ${state.ticket.key}/${state.runId} cannot resume automatically from ${state.state}: ${policy.reason}`);
+  }
+}
+
 export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly string[] = [state.runId]): string {
   const latestQuality = state.qualityReports[state.qualityReports.length - 1];
   const latestDeployment = state.stagingDeployments[state.stagingDeployments.length - 1];
@@ -202,4 +214,71 @@ const nextActionByState: Record<DeliveryRunState, string> = {
   NEEDS_HUMAN: 'Resolve the requested human action before continuing.',
   FAILED: 'Inspect the failure and decide whether to retry manually.',
   SKIPPED: 'No next action; run was skipped.'
+};
+
+const resumePolicyByState: Record<DeliveryRunState, { readonly resumable: boolean; readonly reason: string }> = {
+  DISCOVERED: {
+    resumable: true,
+    reason: 'Planning can start from the discovered ticket state.'
+  },
+  PLANNED: {
+    resumable: true,
+    reason: 'Branch creation can continue from the persisted plan.'
+  },
+  BRANCH_CREATED: {
+    resumable: true,
+    reason: 'Implementation can continue from the persisted branch reference.'
+  },
+  IMPLEMENTING: {
+    resumable: true,
+    reason: 'The implementation step can be retried from the persisted branch and prompt context.'
+  },
+  LOCAL_CHECKS_RUNNING: {
+    resumable: true,
+    reason: 'Local quality gates can be rerun from the persisted implementation result.'
+  },
+  LOCAL_CHECKS_PASSED: {
+    resumable: true,
+    reason: 'Develop PR handoff can continue after persisted local quality success.'
+  },
+  PUSHED: {
+    resumable: true,
+    reason: 'Develop PR creation can continue after persisted branch publication.'
+  },
+  PR_TO_DEVELOP_OPENED: {
+    resumable: true,
+    reason: 'Develop checks can be inspected from the persisted pull request.'
+  },
+  DEVELOP_CHECKS_PASSED: {
+    resumable: true,
+    reason: 'Staging verification can continue after persisted develop check success.'
+  },
+  STAGING_DEPLOYING: {
+    resumable: true,
+    reason: 'Staging deployment and smoke verification can be checked again.'
+  },
+  STAGING_VERIFIED: {
+    resumable: true,
+    reason: 'Production PR preparation can continue after persisted staging verification.'
+  },
+  PRODUCTION_PR_OPENED: {
+    resumable: false,
+    reason: 'production approval is human-only and must not resume automatically.'
+  },
+  DONE: {
+    resumable: false,
+    reason: 'the run is already complete.'
+  },
+  NEEDS_HUMAN: {
+    resumable: false,
+    reason: 'human input is required before any continuation.'
+  },
+  FAILED: {
+    resumable: false,
+    reason: 'the failure must be inspected before any manual retry.'
+  },
+  SKIPPED: {
+    resumable: false,
+    reason: 'the run was intentionally skipped.'
+  }
 };

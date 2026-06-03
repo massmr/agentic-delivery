@@ -38,7 +38,7 @@ export {
 } from './quality/index.js';
 export { MarkdownReportWriter, renderFinalReportMarkdown, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
 export { MockOpenCodeRunner, OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
-export { findLatestRunState, getNextActionForState, listRunIdsForTicket, loadRunStatus, readRunState, renderRunStatus } from './status/index.js';
+export { assertStateResumable, canResumeState, findLatestRunState, getNextActionForState, listRunIdsForTicket, loadRunStatus, readRunState, renderRunStatus } from './status/index.js';
 export {
   JsonRunStateStore,
   assertProductionPullRequestReady,
