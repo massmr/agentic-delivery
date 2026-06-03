@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Implement Milestone G: local git adapter and GitHub interface contract.
-2. Add deterministic branch-name and PR body tests using mock-only fixtures.
-3. Add mock GitHub PR handoff after the local git adapter contract is stable.
+1. Implement Milestone H: Railway verification interface.
+2. Add mock deployment status and staging report tests using mock-only fixtures.
+3. Add smoke URL verifier contract after the Railway connector shape is stable.
 
 ## OpenCode Prompt
 
@@ -16,4 +16,4 @@ Read AGENTS.md, then execute docs/prompts/opencode-next-step.md.
 
 ## After Milestone A
 
-Completed through Milestone F. Start Milestone G with local git and mock GitHub handoff interfaces while preserving local/mock-only behavior.
+Completed through Milestone G. Start Milestone H with Railway verification interfaces while preserving local/mock-only behavior.

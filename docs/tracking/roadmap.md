@@ -33,11 +33,11 @@ Status legend:
 
 ## Delivery
 
-- `[ ]` Git adapter
-- `[ ]` GitHub connector interface
-- `[ ]` Branch creation flow
-- `[ ]` PR body generator
-- `[ ]` Mock GitHub connector
+- `[x]` Git adapter
+- `[x]` GitHub connector interface
+- `[x]` Branch creation flow
+- `[x]` PR body generator
+- `[x]` Mock GitHub connector
 
 ## Development Runner
 

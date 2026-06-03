@@ -23,9 +23,9 @@ Jira backlog
 
 ## Current Phase
 
-This repository now includes the config, domain, state, report, mock planning, and local quality-gate foundation for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, and write resumable run state without provider credentials.
+This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, and local git/GitHub handoff foundations for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, and write resumable run state without provider credentials.
 
-The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls.
+The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and does not add a public run command yet.
 
 Start with:
 
@@ -114,6 +114,8 @@ runs/<ticket-key>/<run-id>/
     <gate>.stderr.log
   state.json
 ```
+
+Milestone G adds library interfaces for the future develop PR handoff path without adding a public CLI command. The exported helpers include deterministic `agent/<JIRA_KEY>-<short-slug>` branch naming, a local-only git adapter with an injectable argument-array command runner, a mock GitHub connector, a develop PR body builder, and state helpers for `BRANCH_CREATED`, `PUSHED`, and `PR_TO_DEVELOP_OPENED`.
 
 ## Operating Principles
 

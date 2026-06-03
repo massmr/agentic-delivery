@@ -2,6 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import type { DevRunResult } from '../domain/dev-runner.js';
+import type { PullRequestRef } from '../domain/pull-request.js';
+import type { BranchRef } from '../domain/run.js';
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
 
 export interface CreateDeliveryRunStateRecordInput {
@@ -59,6 +61,60 @@ export function recordDevRunResult(state: DeliveryRunStateRecord, result: DevRun
       occurredAt: updatedAt
     }
   };
+}
+
+export function recordBranchCreated(state: DeliveryRunStateRecord, branch: BranchRef, updatedAt: string): DeliveryRunStateRecord {
+  return transitionDeliveryRunState(
+    {
+      ...state,
+      branches: replaceBranch(state.branches, branch)
+    },
+    'BRANCH_CREATED',
+    updatedAt
+  );
+}
+
+export function recordBranchPushed(state: DeliveryRunStateRecord, branch: BranchRef, updatedAt: string): DeliveryRunStateRecord {
+  return transitionDeliveryRunState(
+    {
+      ...state,
+      branches: replaceBranch(state.branches, branch)
+    },
+    'PUSHED',
+    updatedAt
+  );
+}
+
+export function recordPullRequestOpened(state: DeliveryRunStateRecord, pullRequest: PullRequestRef, updatedAt: string): DeliveryRunStateRecord {
+  return transitionDeliveryRunState(
+    {
+      ...state,
+      pullRequests: replacePullRequest(state.pullRequests, pullRequest)
+    },
+    'PR_TO_DEVELOP_OPENED',
+    updatedAt
+  );
+}
+
+function replaceBranch(branches: readonly BranchRef[], branch: BranchRef): readonly BranchRef[] {
+  const remainingBranches = branches.filter(
+    (candidate) =>
+      candidate.repository.owner !== branch.repository.owner || candidate.repository.name !== branch.repository.name || candidate.name !== branch.name
+  );
+
+  return [...remainingBranches, branch];
+}
+
+function replacePullRequest(pullRequests: readonly PullRequestRef[], pullRequest: PullRequestRef): readonly PullRequestRef[] {
+  const remainingPullRequests = pullRequests.filter(
+    (candidate) =>
+      candidate.repositoryOwner !== pullRequest.repositoryOwner ||
+      candidate.repositoryName !== pullRequest.repositoryName ||
+      candidate.sourceBranch !== pullRequest.sourceBranch ||
+      candidate.targetBranch !== pullRequest.targetBranch
+  );
+
+  return [...remainingPullRequests, pullRequest];
 }
 
 function summarizeDevRunFailure(result: DevRunResult): string {

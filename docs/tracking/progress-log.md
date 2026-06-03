@@ -64,3 +64,12 @@ Completed Milestone F OpenCode runner contract:
 - Added OpenCode-compatible subprocess runner with prompt stdin, implementation log capture at `runs/<ticket-key>/<run-id>/implementation-log.md`, and retry attempt sections.
 - Added stateful implementation wrapper that writes `IMPLEMENTING`, runs the typed runner, appends dev run results, and persists failed outcomes.
 - Added harmless `process.execPath -e` mock-command tests for prompt rendering, runner success, runner failure, retry logging, and stateful failure persistence.
+
+Completed Milestone G git and GitHub interfaces:
+
+- Added deterministic working branch naming using `agent/<JIRA_KEY>-<short-slug>` with custom prefix support.
+- Added a local-only git adapter with an injectable argument-array command runner; it creates/checks out local branches and never fetches, pulls, or pushes remotes.
+- Added a future-shaped GitHub connector interface, deterministic mock GitHub connector, and develop PR body builder with Jira, run, branch, quality, risks, and local/mock-only details.
+- Added state helpers for branch creation, pushed branch state, and develop PR creation with idempotent replacement of matching branch and PR entries.
+- Added develop PR handoff flow that writes `BRANCH_CREATED`, then requires `LOCAL_CHECKS_PASSED` plus a latest passed required quality report before mock push and PR state writes.
+- Added tests for branch naming, mock GitHub behavior, PR body rendering, state helpers, local git command-runner behavior, a harmless temp git repository, handoff write sequencing, and failed-quality guarding.
