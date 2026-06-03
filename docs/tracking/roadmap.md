@@ -26,6 +26,8 @@ Status legend:
 - `[x]` Deterministic next-action guidance
 - `[x]` Resume guard policy
 - `[x]` Provider mode and adapter factory design
+- `[x]` MCP-first business port architecture
+- `[x]` MCP client foundation
 - `[x]` Markdown report writer
 
 ## Planning

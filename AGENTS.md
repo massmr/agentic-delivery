@@ -15,10 +15,11 @@ Before coding, read:
 3. `docs/specs/technical-architecture.md`
 4. `docs/plans/mvp-plan.md`
 5. `docs/plans/approved-backlog.md`
-6. `docs/specs/quality-gates.md`
-7. `docs/prompts/opencode-build-orchestrator.md`
-8. `docs/tracking/README.md`
-9. `docs/tracking/next-actions.md`
+6. `docs/specs/mcp-first-architecture.md`
+7. `docs/specs/quality-gates.md`
+8. `docs/prompts/opencode-build-orchestrator.md`
+9. `docs/tracking/README.md`
+10. `docs/tracking/next-actions.md`
 
 Then implement only the current approved milestone from `docs/tracking/next-actions.md` or `docs/plans/approved-backlog.md`.
 

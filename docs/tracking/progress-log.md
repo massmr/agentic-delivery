@@ -133,3 +133,17 @@ Completed Milestone M real provider adapter design:
 - Added explicit credential errors for real Jira, GitHub, and Railway factory paths before any live adapter can be constructed.
 - Kept real provider implementations out of scope and documented that Jira, GitHub, and Railway live adapters remain future milestones.
 - Added tests for real-mode parsing, mock-default factories, credential failures, and no-live-call factory behavior.
+
+Completed Milestone N MCP-first architecture realignment:
+
+- Added `docs/specs/mcp-first-architecture.md`.
+- Updated technical architecture to describe Agent Runtime, typed business ports, MCP layer, and native/subprocess/mock fallbacks.
+- Replaced the next approved Jira REST milestone with MCP-first architecture realignment, MCP client foundation, Jira MCP TicketPort, GitHub MCP CodeHostPort, and Railway MCP DeploymentPort.
+- Clarified that MCP is the preferred external SaaS control plane, while local git, filesystem, quality gates, state, reports, and production approval remain runtime-owned.
+
+Completed Milestone O MCP client foundation:
+
+- Added `src/mcp` shared infrastructure for MCP server config, `McpClient`, deterministic `MockMcpClient`, tool discovery, tool allowlist rules, tool call audit records, allowed tool-call execution, and timeout/auth/session error mapping.
+- Exported public MCP APIs through `src/mcp/index.ts` and `src/index.ts` so future TicketPort, CodeHostPort, and DeploymentPort MCP adapters can depend on typed interfaces instead of raw tool names in delivery logic.
+- Added mock-only tests for MCP config validation, discovery, missing-tool errors, allowlist enforcement, audit records, allowed tool calls, timeout/error mapping, failed-call audit capture, and no-live-call behavior.
+- Kept provider factories and live Jira/GitHub/Railway/Vercel/Bitbucket integrations untouched; Milestone O adds infrastructure only.

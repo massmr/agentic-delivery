@@ -10,17 +10,34 @@
 - Configuration: YAML.
 - Development runner: OpenCode.
 
+## Architecture Direction
+
+Agentic Delivery is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
+
+See [MCP-First Architecture](mcp-first-architecture.md).
+
+MCP is the preferred control plane for external SaaS providers such as Jira, GitHub, Railway, Vercel, and Bitbucket. The runtime still owns state, decisions, policy, retries, reports, and production approval gates.
+
 ## High-Level Components
 
 ```text
 CLI
-  -> Core Orchestrator
+  -> Agent Runtime
     -> State Machine
-    -> Jira Connector
-    -> Repo Resolver
-    -> GitHub Connector
-    -> Railway Connector
-    -> OpenCode Runner
+    -> Decision Policy
+    -> Operation Ledger
+    -> Business Ports
+      -> TicketPort
+      -> CodeHostPort
+      -> DeploymentPort
+      -> DevRunnerPort
+      -> WorkspacePort
+    -> MCP Layer
+      -> Server Registry
+      -> Tool Discovery
+      -> Tool Allowlist
+      -> Tool Schema Mapping
+    -> Native/Subprocess/Mock Adapters
     -> Quality Gate Runner
     -> Report Writer
 ```
@@ -36,6 +53,20 @@ src/
     orchestrator.ts
     state-machine.ts
     autonomy-policy.ts
+  agent/
+    runtime.ts
+    decision-policy.ts
+    operation-ledger.ts
+  ports/
+    ticket-port.ts
+    code-host-port.ts
+    deployment-port.ts
+    dev-runner-port.ts
+    workspace-port.ts
+  mcp/
+    server-registry.ts
+    client.ts
+    tool-mapper.ts
   connectors/
     jira/
     github/
@@ -56,9 +87,11 @@ See [workspace.example.yml](../../config/workspace.example.yml).
 
 Each target repository may also contain a local `.agent-quality.yml` file. If missing, the orchestrator falls back to a configured quality profile.
 
-## Connector Interfaces
+## Ports And Connector Interfaces
 
-### Jira Connector
+Core delivery logic must depend on typed ports, not raw MCP tool names. Connectors and MCP adapters implement these ports.
+
+### Ticket Port
 
 Responsibilities:
 
@@ -71,7 +104,7 @@ Responsibilities:
 Required methods:
 
 ```ts
-interface JiraConnector {
+interface TicketPort {
   listBacklog(): Promise<JiraTicket[]>;
   getTicket(key: string): Promise<JiraTicket>;
   comment(key: string, body: string): Promise<void>;
@@ -79,7 +112,7 @@ interface JiraConnector {
 }
 ```
 
-### GitHub Connector
+### Code Host Port
 
 Responsibilities:
 
@@ -92,7 +125,7 @@ Responsibilities:
 Required methods:
 
 ```ts
-interface GitHubConnector {
+interface CodeHostPort {
   createBranch(input: CreateBranchInput): Promise<BranchRef>;
   openPullRequest(input: PullRequestInput): Promise<PullRequestRef>;
   getChecks(input: ChecksInput): Promise<CheckRunSummary>;
@@ -100,7 +133,7 @@ interface GitHubConnector {
 }
 ```
 
-### Railway Connector
+### Deployment Port
 
 Responsibilities:
 
@@ -112,13 +145,13 @@ Responsibilities:
 Required methods:
 
 ```ts
-interface RailwayConnector {
+interface DeploymentPort {
   waitForDeployment(input: DeploymentInput): Promise<DeploymentResult>;
   getServiceUrl(input: ServiceUrlInput): Promise<string>;
 }
 ```
 
-### OpenCode Runner
+### Dev Runner Port
 
 Responsibilities:
 
@@ -135,6 +168,16 @@ interface DevRunner {
   run(input: DevRunInput): Promise<DevRunResult>;
 }
 ```
+
+## MCP Policy
+
+MCP tools are classified before use:
+
+- `read`: planning and verification actions.
+- `write`: actions allowed only through typed ports and state transitions.
+- `danger`: actions requiring human approval or explicit policy.
+
+Production merge is always `danger` and remains human-only.
 
 ## State Machine
 

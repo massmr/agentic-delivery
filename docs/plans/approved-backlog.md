@@ -91,34 +91,104 @@ Acceptance:
 - Real mode fails fast when required env vars are missing.
 - Tests assert no hidden live calls.
 
-### Milestone N: Real Jira Adapter
+### Milestone N: MCP-First Architecture Realignment
 
 Goal:
 
-Read Jira backlog and tickets through the Jira REST API.
+Reorient the post-Milestone M plan from provider-specific REST/native adapters toward an MCP-first agent runtime.
 
-Build only after Milestone M is approved and complete.
+Build:
 
-### Milestone O: Real GitHub Adapter
+- Document MCP-first as the external SaaS control plane.
+- Define typed business ports that hide raw MCP tools from core delivery logic.
+- Define MCP layer responsibilities: server registry, tool discovery, allowlist, schema mapping, auth/session handling, and audit logs.
+- Define safety classifications for MCP tools: `read`, `write`, `danger`.
+- Keep native/subprocess/mock connectors as fallback adapter types.
+
+Acceptance:
+
+- `docs/specs/mcp-first-architecture.md` exists.
+- `docs/specs/technical-architecture.md` references the MCP-first model.
+- Next approved milestones are MCP client foundation and MCP-backed provider ports, not Jira REST.
+
+### Milestone O: MCP Client Foundation
 
 Goal:
 
-Create branches and pull requests through GitHub APIs and local git handoff.
+Create shared MCP infrastructure without live provider calls in tests.
 
-Build only after Milestone M is approved and complete.
+Build:
 
-### Milestone P: Real Railway Adapter
+- MCP server config model.
+- MCP client interface.
+- Mock MCP client.
+- Tool discovery model.
+- Tool allowlist model.
+- Tool call audit model.
+- Timeout/error mapping.
+
+Acceptance:
+
+- Tests use mock MCP clients only.
+- No OAuth, network, or live MCP server calls happen in tests.
+- Business adapters can depend on an MCP client interface.
+
+### Milestone P: Jira MCP TicketPort
 
 Goal:
 
-Read Railway deployment state and service URLs for staging verification.
+Read Jira backlog and tickets through an MCP-backed TicketPort.
 
-Build only after Milestone M is approved and complete.
+Build:
 
-### Milestone Q: Worker Loop
+- `jira.mode = mcp` or role-based `providers.ticket.kind = mcp`.
+- Atlassian MCP server config example using `mcp-remote`.
+- MCP-backed Jira ticket adapter.
+- Tool mapping from Atlassian MCP search/fetch/comment capabilities into `TicketPort`.
+- Mock MCP tests for backlog, get ticket, comment, and missing tool errors.
+
+Acceptance:
+
+- No Jira REST adapter is implemented for this milestone.
+- No live Atlassian calls in tests.
+- Missing MCP tools fail with actionable errors.
+
+### Milestone Q: GitHub MCP CodeHostPort
+
+Goal:
+
+Create branches, inspect checks, comment, and open pull requests through an MCP-backed CodeHostPort where MCP provides enough capability.
+
+Build only after Milestone O is complete.
+
+Native GitHub fallback remains allowed for operations where MCP cannot provide required precision.
+
+### Milestone R: Railway MCP DeploymentPort
+
+Goal:
+
+Read Railway deployment state and service URLs through an MCP-backed DeploymentPort where MCP provides enough capability.
+
+Build only after Milestone O is complete.
+
+Native Railway fallback remains allowed for deployment polling if MCP capabilities are insufficient.
+
+### Milestone S: Native Fallback Contracts
+
+Goal:
+
+Define when native connectors are allowed or preferred over MCP.
+
+Examples:
+
+- Local git remains native/subprocess.
+- Filesystem and quality gates remain native/subprocess.
+- GitHub checks or Railway polling may use native APIs if MCP does not expose enough detail.
+
+### Milestone T: Agent Worker Loop
 
 Goal:
 
 Run the backlog processor continuously with queueing, concurrency limits, and escalation policy.
 
-Build only after real provider adapters are individually tested.
+Build only after MCP-backed provider ports and fallback contracts are individually tested.
