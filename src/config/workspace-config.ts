@@ -74,6 +74,7 @@ export interface WorkspaceRepositoryConfig {
   readonly productionBranch: string;
   readonly qualityProfile: string;
   readonly hints: readonly string[];
+  readonly stagingSmokeUrls: readonly string[];
 }
 
 type StringField = {
@@ -349,8 +350,14 @@ function parseRepositoryConfig(section: WorkspaceConfigInput, path: string, issu
     issues
   );
   const hints = readNonEmptyStringArray(section.hints, `${path}.hints`, 'Add at least one non-empty repository hint.', issues);
+  const stagingSmokeUrls = readStringArray(
+    section.staging_smoke_urls,
+    `${path}.staging_smoke_urls`,
+    'Set staging_smoke_urls to an array of smoke paths or URLs; use [] to skip smoke checks for this repository.',
+    issues
+  );
 
-  if (strings === undefined || hints === undefined) {
+  if (strings === undefined || hints === undefined || stagingSmokeUrls === undefined) {
     return undefined;
   }
 
@@ -361,7 +368,8 @@ function parseRepositoryConfig(section: WorkspaceConfigInput, path: string, issu
     defaultBranch: strings.defaultBranch,
     productionBranch: strings.productionBranch,
     qualityProfile: strings.qualityProfile,
-    hints
+    hints,
+    stagingSmokeUrls
   };
 }
 
@@ -426,6 +434,33 @@ function readNonEmptyStringArray(value: unknown, path: string, action: string, i
     issues.push({
       path,
       message: `${path} must be a non-empty array of strings.`,
+      action
+    });
+    return undefined;
+  }
+
+  const strings: string[] = [];
+
+  for (const [index, entry] of value.entries()) {
+    if (typeof entry !== 'string' || entry.trim().length === 0) {
+      issues.push({
+        path: `${path}[${index}]`,
+        message: `${path}[${index}] must be a non-empty string.`,
+        action
+      });
+    } else {
+      strings.push(entry);
+    }
+  }
+
+  return strings.length === value.length ? strings : undefined;
+}
+
+function readStringArray(value: unknown, path: string, action: string, issues: WorkspaceConfigIssue[]): readonly string[] | undefined {
+  if (!Array.isArray(value)) {
+    issues.push({
+      path,
+      message: `${path} must be an array of strings.`,
       action
     });
     return undefined;

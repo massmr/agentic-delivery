@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Implement Milestone H: Railway verification interface.
-2. Add mock deployment status and staging report tests using mock-only fixtures.
-3. Add smoke URL verifier contract after the Railway connector shape is stable.
+1. Start Milestone I: production PR gate interface and mock-only production PR preparation.
+2. Reuse the Milestone H `assertProductionPullRequestReady(...)` guard before any production PR preparation helper.
+3. Keep production merge human-only and do not add provider credentials or real GitHub/Railway calls.
 
 ## OpenCode Prompt
 
@@ -16,4 +16,4 @@ Read AGENTS.md, then execute docs/prompts/opencode-next-step.md.
 
 ## After Milestone A
 
-Completed through Milestone G. Start Milestone H with Railway verification interfaces while preserving local/mock-only behavior.
+Completed through Milestone H. Start Milestone I with production PR preparation interfaces while preserving local/mock-only behavior and human-only production merge approval.

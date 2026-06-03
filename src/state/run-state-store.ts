@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import type { DevRunResult } from '../domain/dev-runner.js';
+import type { DeploymentResult } from '../domain/deployment.js';
 import type { PullRequestRef } from '../domain/pull-request.js';
 import type { BranchRef } from '../domain/run.js';
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
@@ -96,6 +97,62 @@ export function recordPullRequestOpened(state: DeliveryRunStateRecord, pullReque
   );
 }
 
+export function recordStagingDeploying(state: DeliveryRunStateRecord, updatedAt: string): DeliveryRunStateRecord {
+  if (state.state !== 'DEVELOP_CHECKS_PASSED') {
+    throw new Error(`Staging verification requires DEVELOP_CHECKS_PASSED state; current state is ${state.state}.`);
+  }
+
+  return transitionDeliveryRunState(state, 'STAGING_DEPLOYING', updatedAt);
+}
+
+export function recordStagingVerified(
+  state: DeliveryRunStateRecord,
+  deployment: DeploymentResult,
+  updatedAt: string
+): DeliveryRunStateRecord {
+  return transitionDeliveryRunState(
+    {
+      ...state,
+      stagingDeployments: replaceDeployment(state.stagingDeployments, deployment)
+    },
+    'STAGING_VERIFIED',
+    updatedAt
+  );
+}
+
+export function recordStagingFailed(
+  state: DeliveryRunStateRecord,
+  deployment: DeploymentResult,
+  reason: string,
+  updatedAt: string
+): DeliveryRunStateRecord {
+  return {
+    ...transitionDeliveryRunState(
+      {
+        ...state,
+        stagingDeployments: replaceDeployment(state.stagingDeployments, deployment)
+      },
+      'FAILED',
+      updatedAt
+    ),
+    failure: {
+      state: 'STAGING_DEPLOYING',
+      reason,
+      occurredAt: updatedAt
+    }
+  };
+}
+
+export function canPrepareProductionPullRequest(state: DeliveryRunStateRecord): boolean {
+  return state.state === 'STAGING_VERIFIED';
+}
+
+export function assertProductionPullRequestReady(state: DeliveryRunStateRecord): void {
+  if (!canPrepareProductionPullRequest(state)) {
+    throw new Error(`Production pull request preparation requires STAGING_VERIFIED state; current state is ${state.state}.`);
+  }
+}
+
 function replaceBranch(branches: readonly BranchRef[], branch: BranchRef): readonly BranchRef[] {
   const remainingBranches = branches.filter(
     (candidate) =>
@@ -115,6 +172,17 @@ function replacePullRequest(pullRequests: readonly PullRequestRef[], pullRequest
   );
 
   return [...remainingPullRequests, pullRequest];
+}
+
+function replaceDeployment(deployments: readonly DeploymentResult[], deployment: DeploymentResult): readonly DeploymentResult[] {
+  const remainingDeployments = deployments.filter(
+    (candidate) =>
+      candidate.ref.projectId !== deployment.ref.projectId ||
+      candidate.ref.serviceId !== deployment.ref.serviceId ||
+      candidate.ref.deploymentId !== deployment.ref.deploymentId
+  );
+
+  return [...remainingDeployments, deployment];
 }
 
 function summarizeDevRunFailure(result: DevRunResult): string {

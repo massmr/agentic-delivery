@@ -1,7 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
+import type { DeploymentResult } from '../domain/deployment.js';
 import type { QualityGateResult, QualityReport } from '../domain/quality.js';
+import type { DeliveryRunFailure } from '../domain/run.js';
 import type { TicketPlan } from '../planning/repository-resolver.js';
 import { getRunDirectoryPath } from '../state/run-state-store.js';
 
@@ -23,6 +25,17 @@ export class MarkdownReportWriter {
     const relativePath = join(getRunDirectoryPath(ticketKey, runId), 'quality-report.md');
     const outputPath = join(this.rootPath, relativePath);
     const body = renderQualityReportMarkdown(ticketKey, runId, report);
+
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, body, 'utf8');
+
+    return relativePath;
+  }
+
+  async writeStaging(ticketKey: string, runId: string, deployment: DeploymentResult, failure?: DeliveryRunFailure): Promise<string> {
+    const relativePath = join(getRunDirectoryPath(ticketKey, runId), 'staging-report.md');
+    const outputPath = join(this.rootPath, relativePath);
+    const body = renderStagingReportMarkdown(ticketKey, runId, deployment, failure);
 
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, body, 'utf8');
@@ -94,6 +107,49 @@ export function renderQualityReportMarkdown(ticketKey: string, runId: string, re
     renderGateResults(report.optional),
     ''
   ].join('\n');
+}
+
+export function renderStagingReportMarkdown(ticketKey: string, runId: string, deployment: DeploymentResult, failure?: DeliveryRunFailure): string {
+  return [
+    `# Staging Report ${ticketKey}`,
+    '',
+    `Run: ${runId}`,
+    `Status: ${deployment.status.toUpperCase()}`,
+    `Provider: ${deployment.ref.provider}`,
+    `Environment: ${deployment.ref.environment}`,
+    `Deployment ID: ${deployment.ref.deploymentId}`,
+    `Branch: ${deployment.branch}`,
+    `Commit SHA: ${deployment.commitSha}`,
+    `Service URL: ${deployment.serviceUrl}`,
+    `Started At: ${deployment.startedAt}`,
+    `Finished At: ${deployment.finishedAt ?? 'n/a'}`,
+    '',
+    '## Deployment Summary',
+    '',
+    deployment.summary,
+    '',
+    '## Smoke Checks',
+    '',
+    renderSmokeChecks(deployment.smokeChecks),
+    '',
+    '## Failure Summary',
+    '',
+    failure === undefined ? '- None' : `- ${failure.state}: ${failure.reason}`,
+    ''
+  ].join('\n');
+}
+
+function renderSmokeChecks(results: DeploymentResult['smokeChecks']): string {
+  if (results.length === 0) {
+    return '- None configured; smoke checks skipped.';
+  }
+
+  return results
+    .map((result) => {
+      const statusCode = result.statusCode === undefined ? 'n/a' : String(result.statusCode);
+      return `- ${result.url}: ${result.status.toUpperCase()} (${statusCode}) - ${result.summary}`;
+    })
+    .join('\n');
 }
 
 function renderGateResults(results: readonly QualityGateResult[]): string {

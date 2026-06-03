@@ -73,3 +73,13 @@ Completed Milestone G git and GitHub interfaces:
 - Added state helpers for branch creation, pushed branch state, and develop PR creation with idempotent replacement of matching branch and PR entries.
 - Added develop PR handoff flow that writes `BRANCH_CREATED`, then requires `LOCAL_CHECKS_PASSED` plus a latest passed required quality report before mock push and PR state writes.
 - Added tests for branch naming, mock GitHub behavior, PR body rendering, state helpers, local git command-runner behavior, a harmless temp git repository, handoff write sequencing, and failed-quality guarding.
+
+Completed Milestone H Railway staging verification foundation:
+
+- Added a future-shaped Railway connector interface and deterministic `MockRailwayConnector` for local staging deployment status, service URL resolution, and failure simulation.
+- Added a `SmokeUrlVerifier` contract and deterministic `MockSmokeUrlVerifier` with passed, failed, and skipped outcomes without HTTP or network calls.
+- Added `runStagingVerification(...)` to require `DEVELOP_CHECKS_PASSED`, persist `STAGING_DEPLOYING`, verify mock deployment and smoke checks, then persist `STAGING_VERIFIED` or actionable `FAILED` state.
+- Added staging state helpers and a production PR readiness guard that rejects anything except `STAGING_VERIFIED`.
+- Added deterministic staging report rendering and `MarkdownReportWriter.writeStaging(...)` for `runs/<ticket-key>/<run-id>/staging-report.md`.
+- Added workspace config parsing for repository `staging_smoke_urls`, including explicit empty arrays for skipped smoke checks.
+- Added tests for mock Railway pass/fail behavior, smoke verifier pass/fail/skipped behavior, staging state write sequencing, failed deployment and smoke checks, production readiness guard, staging report output, and config parsing.

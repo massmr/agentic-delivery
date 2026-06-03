@@ -56,10 +56,10 @@ Status legend:
 
 ## Staging And Production
 
-- `[ ]` Railway connector interface
-- `[ ]` Staging deployment polling
-- `[ ]` Smoke checks
-- `[ ]` Production PR gate
+- `[x]` Railway connector interface
+- `[x]` Staging deployment polling
+- `[x]` Smoke checks
+- `[x]` Production PR gate
 
 ## Autonomous Worker
 

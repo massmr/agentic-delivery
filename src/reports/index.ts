@@ -1,1 +1,1 @@
-export { MarkdownReportWriter, renderQualityReportMarkdown, renderTicketPlanMarkdown } from './markdown-report-writer.js';
+export { MarkdownReportWriter, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './markdown-report-writer.js';

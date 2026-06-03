@@ -40,6 +40,9 @@ repos:
       - ui
       - web
       - next
+    staging_smoke_urls:
+      - /
+      - /health
 
   - name: api
     url: git@github.com:your-org/api.git
@@ -52,3 +55,5 @@ repos:
       - backend
       - server
       - database
+    staging_smoke_urls:
+      - /health

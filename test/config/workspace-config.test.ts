@@ -41,8 +41,50 @@ test('loads and validates config/workspace.example.yml', async () => {
     defaultBranch: 'develop',
     productionBranch: 'main',
     qualityProfile: 'node',
-    hints: ['frontend', 'ui', 'web', 'next']
+    hints: ['frontend', 'ui', 'web', 'next'],
+    stagingSmokeUrls: ['/', '/health']
   });
+});
+
+test('workspace repository config parses staging_smoke_urls and permits an empty array', () => {
+  const config = parseWorkspaceConfig(`
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+`);
+
+  assert.deepEqual(config.repos[0]?.stagingSmokeUrls, []);
 });
 
 test('invalid YAML reports a clear syntax issue', () => {
