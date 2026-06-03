@@ -1,0 +1,73 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+
+import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
+
+export interface CreateDeliveryRunStateRecordInput {
+  readonly runId: string;
+  readonly ticket: DeliveryRunStateRecord['ticket'];
+  readonly targetRepositories: DeliveryRunStateRecord['targetRepositories'];
+  readonly timestamps: DeliveryRunStateRecord['timestamps'];
+  readonly ticketAnalysis?: DeliveryRunStateRecord['ticketAnalysis'];
+}
+
+export interface RunStateStore {
+  read(ticketKey: string, runId: string): Promise<DeliveryRunStateRecord>;
+  write(state: DeliveryRunStateRecord): Promise<void>;
+}
+
+export function getRunDirectoryPath(ticketKey: string, runId: string): string {
+  return join('runs', ticketKey, runId);
+}
+
+export function getRunStateFilePath(ticketKey: string, runId: string): string {
+  return join(getRunDirectoryPath(ticketKey, runId), 'state.json');
+}
+
+export function createDeliveryRunStateRecord(input: CreateDeliveryRunStateRecordInput): DeliveryRunStateRecord {
+  return {
+    runId: input.runId,
+    ticket: input.ticket,
+    state: 'DISCOVERED',
+    targetRepositories: input.targetRepositories,
+    branches: [],
+    pullRequests: [],
+    stagingDeployments: [],
+    qualityReports: [],
+    timestamps: input.timestamps,
+    ...(input.ticketAnalysis === undefined ? {} : { ticketAnalysis: input.ticketAnalysis })
+  };
+}
+
+export function transitionDeliveryRunState(
+  state: DeliveryRunStateRecord,
+  nextState: DeliveryRunState,
+  updatedAt: string
+): DeliveryRunStateRecord {
+  return {
+    ...state,
+    state: nextState,
+    timestamps: {
+      ...state.timestamps,
+      updatedAt,
+      ...(nextState === 'DONE' || nextState === 'FAILED' || nextState === 'SKIPPED' ? { completedAt: updatedAt } : {})
+    }
+  };
+}
+
+export class JsonRunStateStore implements RunStateStore {
+  constructor(private readonly rootPath: string = process.cwd()) {}
+
+  async read(ticketKey: string, runId: string): Promise<DeliveryRunStateRecord> {
+    const statePath = join(this.rootPath, getRunStateFilePath(ticketKey, runId));
+    const source = await readFile(statePath, 'utf8');
+    return JSON.parse(source) as DeliveryRunStateRecord;
+  }
+
+  async write(state: DeliveryRunStateRecord): Promise<void> {
+    const statePath = join(this.rootPath, getRunStateFilePath(state.ticket.key, state.runId));
+
+    await mkdir(dirname(statePath), { recursive: true });
+    await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  }
+}
