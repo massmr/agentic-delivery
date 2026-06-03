@@ -30,6 +30,7 @@ test('loads and validates config/workspace.example.yml', async () => {
   assert.deepEqual(config.jira.projectKeys, ['LK']);
   assert.equal(config.github.mode, 'mock');
   assert.equal(config.railway.mode, 'mock');
+  assert.equal(config.devRunner.mode, 'mock');
   assert.equal(config.devRunner.provider, 'opencode');
   assert.equal(config.devRunner.maxAttempts, 2);
   assert.equal(config.quality.defaultProfile, 'node');
@@ -106,15 +107,30 @@ test('missing required field reports path and action', async () => {
   assert.match(error.message, /Set workspace\.max_concurrent_tickets to a whole number greater than 0/u);
 });
 
-test('real provider mode is rejected during Milestone B', async () => {
+test('workspace config accepts real provider modes without creating live adapters', async () => {
   const source = await readFile(exampleConfigPath, 'utf8');
-  const realProviderSource = source.replace('jira:\n  mode: mock', 'jira:\n  mode: real');
+  const realProviderSource = source
+    .replace('jira:\n  mode: mock', 'jira:\n  mode: real')
+    .replace('github:\n  mode: mock', 'github:\n  mode: real')
+    .replace('railway:\n  mode: mock', 'railway:\n  mode: real')
+    .replace('dev_runner:\n  provider: opencode', 'dev_runner:\n  mode: real\n  provider: opencode');
 
-  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(realProviderSource));
+  const config = parseWorkspaceConfig(realProviderSource);
+
+  assert.equal(config.jira.mode, 'real');
+  assert.equal(config.github.mode, 'real');
+  assert.equal(config.railway.mode, 'real');
+  assert.equal(config.devRunner.mode, 'real');
+});
+
+test('workspace config rejects unknown provider modes', async () => {
+  const source = await readFile(exampleConfigPath, 'utf8');
+  const invalidProviderSource = source.replace('jira:\n  mode: mock', 'jira:\n  mode: live');
+
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(invalidProviderSource));
 
   assert.ok(error.issues.some((issue) => issue.path === 'jira.mode'));
-  assert.match(error.message, /jira\.mode must be 'mock' for Milestone B/u);
-  assert.match(error.message, /real provider integrations are not enabled in Milestone B/u);
+  assert.match(error.message, /jira\.mode must be 'mock' or 'real'/u);
 });
 
 test('bad repository entry reports the exact repo field path', async () => {

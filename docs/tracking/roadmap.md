@@ -25,6 +25,7 @@ Status legend:
 - `[x]` Run listing and latest-run selection
 - `[x]` Deterministic next-action guidance
 - `[x]` Resume guard policy
+- `[x]` Provider mode and adapter factory design
 - `[x]` Markdown report writer
 
 ## Planning

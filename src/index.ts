@@ -10,7 +10,7 @@ export type {
   DevRunnerWorkspaceConfig,
   GitHubWorkspaceConfig,
   JiraWorkspaceConfig,
-  MockProviderMode,
+  ProviderMode,
   QualityWorkspaceConfig,
   RailwayWorkspaceConfig,
   WorkspaceConfig,
@@ -38,6 +38,15 @@ export {
 } from './quality/index.js';
 export { MarkdownReportWriter, renderFinalReportMarkdown, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
 export { MockOpenCodeRunner, OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
+export {
+  ProviderCredentialError,
+  RealProviderAdapterUnavailableError,
+  createDevRunner,
+  createGitHubConnector,
+  createJiraConnector,
+  createRailwayConnector,
+  createWorkspaceAdapters
+} from './providers/index.js';
 export { assertStateResumable, canResumeState, findLatestRunState, getNextActionForState, listRunIdsForTicket, loadRunStatus, readRunState, renderRunStatus } from './status/index.js';
 export {
   JsonRunStateStore,
@@ -114,6 +123,7 @@ export type { DevelopPullRequestHandoffInput, EndToEndMockDeliveryResult, RunEnd
 export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner } from './git/index.js';
 export type { TicketPlan } from './planning/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
+export type { ProviderFactoryEnvironment, ProviderFactoryOptions, WorkspaceAdapters } from './providers/index.js';
 export type { MockOpenCodeRunnerOptions, OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';
 export type { BuildDevelopPullRequestBodyInput, BuildProductionPullRequestBodyInput } from './connectors/github/index.js';
 export type { CreateDeliveryRunStateRecordInput, RunStateStore } from './state/index.js';

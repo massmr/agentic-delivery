@@ -10,7 +10,7 @@ export type {
   DevRunnerWorkspaceConfig,
   GitHubWorkspaceConfig,
   JiraWorkspaceConfig,
-  MockProviderMode,
+  ProviderMode,
   QualityWorkspaceConfig,
   RailwayWorkspaceConfig,
   WorkspaceConfig,

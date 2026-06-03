@@ -125,3 +125,11 @@ Completed Milestone L multi-repo safety guard:
 - Preserved the single-repo mock run path through `PRODUCTION_PR_OPENED`.
 - Documented the multi-repo guard in README and advanced next actions to Milestone M.
 - Added tests for single-repo completion and multi-repo safe stop behavior.
+
+Completed Milestone M real provider adapter design:
+
+- Expanded workspace provider mode types from mock-only to `mock | real` while keeping mock as the default behavior.
+- Added adapter factories for Jira, GitHub, Railway, and OpenCode runner boundaries.
+- Added explicit credential errors for real Jira, GitHub, and Railway factory paths before any live adapter can be constructed.
+- Kept real provider implementations out of scope and documented that Jira, GitHub, and Railway live adapters remain future milestones.
+- Added tests for real-mode parsing, mock-default factories, credential failures, and no-live-call factory behavior.

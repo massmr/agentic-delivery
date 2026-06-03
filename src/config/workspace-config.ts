@@ -2,7 +2,7 @@ import { readFile } from 'node:fs/promises';
 
 import { parseDocument } from 'yaml';
 
-export type MockProviderMode = 'mock';
+export type ProviderMode = 'mock' | 'real';
 export type DevRunnerProvider = 'opencode';
 
 export interface WorkspaceConfigIssue {
@@ -40,23 +40,24 @@ export interface WorkspaceSettings {
 }
 
 export interface JiraWorkspaceConfig {
-  readonly mode: MockProviderMode;
+  readonly mode: ProviderMode;
   readonly baseUrl: string;
   readonly projectKeys: readonly string[];
 }
 
 export interface GitHubWorkspaceConfig {
-  readonly mode: MockProviderMode;
+  readonly mode: ProviderMode;
   readonly organization: string;
 }
 
 export interface RailwayWorkspaceConfig {
-  readonly mode: MockProviderMode;
+  readonly mode: ProviderMode;
   readonly stagingBranch: string;
   readonly productionBranch: string;
 }
 
 export interface DevRunnerWorkspaceConfig {
+  readonly mode: ProviderMode;
   readonly provider: DevRunnerProvider;
   readonly command: string;
   readonly maxAttempts: number;
@@ -232,7 +233,7 @@ function parseWorkspaceSettings(section: WorkspaceConfigInput, issues: Workspace
 }
 
 function parseJiraConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): JiraWorkspaceConfig | undefined {
-  const mode = readMockMode(section, 'jira', issues);
+  const mode = readProviderMode(section, 'jira', issues);
   const baseUrl = readNonEmptyString(section, 'jira.base_url', 'Set jira.base_url to the Jira workspace URL.', issues);
   const projectKeys = readNonEmptyStringArray(section.project_keys, 'jira.project_keys', 'Add at least one Jira project key.', issues);
 
@@ -244,7 +245,7 @@ function parseJiraConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigI
 }
 
 function parseGitHubConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): GitHubWorkspaceConfig | undefined {
-  const mode = readMockMode(section, 'github', issues);
+  const mode = readProviderMode(section, 'github', issues);
   const organization = readNonEmptyString(section, 'github.organization', 'Set github.organization to the GitHub organization name.', issues);
 
   if (mode === undefined || organization === undefined) {
@@ -255,7 +256,7 @@ function parseGitHubConfig(section: WorkspaceConfigInput, issues: WorkspaceConfi
 }
 
 function parseRailwayConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): RailwayWorkspaceConfig | undefined {
-  const mode = readMockMode(section, 'railway', issues);
+  const mode = readProviderMode(section, 'railway', issues);
   const stagingBranch = readNonEmptyString(section, 'railway.staging_branch', 'Set railway.staging_branch to the staging branch name.', issues);
   const productionBranch = readNonEmptyString(section, 'railway.production_branch', 'Set railway.production_branch to the production branch name.', issues);
 
@@ -267,15 +268,16 @@ function parseRailwayConfig(section: WorkspaceConfigInput, issues: WorkspaceConf
 }
 
 function parseDevRunnerConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): DevRunnerWorkspaceConfig | undefined {
+  const mode = readOptionalProviderMode(section, 'dev_runner', issues);
   const provider = readDevRunnerProvider(section, issues);
   const command = readNonEmptyString(section, 'dev_runner.command', 'Set dev_runner.command to the local OpenCode command.', issues);
   const maxAttempts = readPositiveInteger(section, 'dev_runner', 'max_attempts', issues);
 
-  if (provider === undefined || command === undefined || maxAttempts === undefined) {
+  if (mode === undefined || provider === undefined || command === undefined || maxAttempts === undefined) {
     return undefined;
   }
 
-  return { provider, command, maxAttempts };
+  return { mode, provider, command, maxAttempts };
 }
 
 function parseQualityConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): QualityWorkspaceConfig | undefined {
@@ -499,19 +501,27 @@ function readPositiveInteger(section: WorkspaceConfigInput, sectionPath: string,
   return value;
 }
 
-function readMockMode(section: WorkspaceConfigInput, sectionPath: 'jira' | 'github' | 'railway', issues: WorkspaceConfigIssue[]): MockProviderMode | undefined {
+function readProviderMode(section: WorkspaceConfigInput, sectionPath: 'jira' | 'github' | 'railway' | 'dev_runner', issues: WorkspaceConfigIssue[]): ProviderMode | undefined {
   const value = section.mode;
 
-  if (value !== 'mock') {
+  if (value !== 'mock' && value !== 'real') {
     issues.push({
       path: `${sectionPath}.mode`,
-      message: `${sectionPath}.mode must be 'mock' for Milestone B.`,
-      action: `Set ${sectionPath}.mode to 'mock'; real provider integrations are not enabled in Milestone B.`
+      message: `${sectionPath}.mode must be 'mock' or 'real'.`,
+      action: `Set ${sectionPath}.mode to 'mock' for local runs or 'real' only when the matching adapter credentials are available.`
     });
     return undefined;
   }
 
   return value;
+}
+
+function readOptionalProviderMode(section: WorkspaceConfigInput, sectionPath: 'dev_runner', issues: WorkspaceConfigIssue[]): ProviderMode | undefined {
+  if (section.mode === undefined) {
+    return 'mock';
+  }
+
+  return readProviderMode(section, sectionPath, issues);
 }
 
 function readDevRunnerProvider(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): DevRunnerProvider | undefined {
