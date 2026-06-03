@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Start Milestone I: production PR gate interface and mock-only production PR preparation.
-2. Reuse the Milestone H `assertProductionPullRequestReady(...)` guard before any production PR preparation helper.
-3. Keep production merge human-only and do not add provider credentials or real GitHub/Railway calls.
+1. Start the next integration milestone by designing real provider adapter boundaries behind the existing mock Jira, GitHub, Railway, and OpenCode interfaces.
+2. Add resume/status behavior for existing `runs/<ticket-key>/<run-id>/state.json` records before introducing any real provider calls.
+3. Keep production merge human-only and keep credentials out of repository files and tests.
 
 ## OpenCode Prompt
 
@@ -14,6 +14,6 @@ Use:
 Read AGENTS.md, then execute docs/prompts/opencode-next-step.md.
 ```
 
-## After Milestone A
+## After Milestone I
 
-Completed through Milestone H. Start Milestone I with production PR preparation interfaces while preserving local/mock-only behavior and human-only production merge approval.
+Completed through Milestone I. The public `agentic run <ticket-key>` command is mock-only and reaches `PRODUCTION_PR_OPENED` with a complete local run folder. Next work should add resumability/status and real adapter planning without claiming live Jira/GitHub/Railway/OpenCode integrations.

@@ -21,11 +21,11 @@ export type {
 } from './config/index.js';
 export { createCliProgram } from './cli/program.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
-export { MockGitHubConnector, buildDevelopPullRequestBody } from './connectors/github/index.js';
+export { MockGitHubConnector, buildDevelopPullRequestBody, buildProductionPullRequestBody } from './connectors/github/index.js';
 export { MockJiraConnector } from './connectors/jira/index.js';
 export { MockRailwayConnector } from './connectors/railway/index.js';
 export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
-export { runDevelopPullRequestHandoff, runStagingVerification } from './delivery/index.js';
+export { runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
 export { LocalGitAdapter, buildWorkingBranchName, runGitCommand } from './git/index.js';
 export { analyzeTicket, createTicketPlan, resolveRepositoriesForTicket, toRepositoryRef } from './planning/index.js';
@@ -36,8 +36,8 @@ export {
   loadRepositoryQualityConfig,
   parseRepositoryQualityConfig
 } from './quality/index.js';
-export { MarkdownReportWriter, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
-export { OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
+export { MarkdownReportWriter, renderFinalReportMarkdown, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
+export { MockOpenCodeRunner, OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
 export {
   JsonRunStateStore,
   assertProductionPullRequestReady,
@@ -49,6 +49,7 @@ export {
   recordBranchPushed,
   recordDevRunResult,
   recordPullRequestOpened,
+  recordProductionPullRequestOpened,
   recordStagingDeploying,
   recordStagingFailed,
   recordStagingVerified,
@@ -108,10 +109,10 @@ export type {
 export type { JiraConnector } from './connectors/jira/index.js';
 export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
 export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
-export type { DevelopPullRequestHandoffInput, RunStagingVerificationInput } from './delivery/index.js';
+export type { DevelopPullRequestHandoffInput, EndToEndMockDeliveryResult, RunEndToEndMockDeliveryInput, RunProductionPullRequestPreparationInput, RunStagingVerificationInput } from './delivery/index.js';
 export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner } from './git/index.js';
 export type { TicketPlan } from './planning/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
-export type { OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';
-export type { BuildDevelopPullRequestBodyInput } from './connectors/github/index.js';
+export type { MockOpenCodeRunnerOptions, OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';
+export type { BuildDevelopPullRequestBodyInput, BuildProductionPullRequestBodyInput } from './connectors/github/index.js';
 export type { CreateDeliveryRunStateRecordInput, RunStateStore } from './state/index.js';

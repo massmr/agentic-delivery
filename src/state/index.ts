@@ -9,6 +9,7 @@ export {
   recordBranchPushed,
   recordDevRunResult,
   recordPullRequestOpened,
+  recordProductionPullRequestOpened,
   recordStagingDeploying,
   recordStagingFailed,
   recordStagingVerified,

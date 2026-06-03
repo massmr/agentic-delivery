@@ -2,10 +2,20 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import type { DeploymentResult } from '../domain/deployment.js';
+import type { DevRunResult } from '../domain/dev-runner.js';
+import type { PullRequestRef } from '../domain/pull-request.js';
 import type { QualityGateResult, QualityReport } from '../domain/quality.js';
-import type { DeliveryRunFailure } from '../domain/run.js';
+import type { BranchRef, DeliveryRunFailure, DeliveryRunStateRecord } from '../domain/run.js';
 import type { TicketPlan } from '../planning/repository-resolver.js';
 import { getRunDirectoryPath } from '../state/run-state-store.js';
+
+export interface FinalReportOptions {
+  readonly planReportPath?: string;
+  readonly implementationLogPath?: string;
+  readonly qualityReportPath?: string;
+  readonly stagingReportPath?: string;
+  readonly mockOnlyNote?: string;
+}
 
 export class MarkdownReportWriter {
   constructor(private readonly rootPath: string = process.cwd()) {}
@@ -36,6 +46,17 @@ export class MarkdownReportWriter {
     const relativePath = join(getRunDirectoryPath(ticketKey, runId), 'staging-report.md');
     const outputPath = join(this.rootPath, relativePath);
     const body = renderStagingReportMarkdown(ticketKey, runId, deployment, failure);
+
+    await mkdir(dirname(outputPath), { recursive: true });
+    await writeFile(outputPath, body, 'utf8');
+
+    return relativePath;
+  }
+
+  async writeFinal(ticketKey: string, runId: string, state: DeliveryRunStateRecord, options: FinalReportOptions = {}): Promise<string> {
+    const relativePath = join(getRunDirectoryPath(ticketKey, runId), 'final-report.md');
+    const outputPath = join(this.rootPath, relativePath);
+    const body = renderFinalReportMarkdown(ticketKey, runId, state, options);
 
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, body, 'utf8');
@@ -170,5 +191,140 @@ function renderGateResult(result: QualityGateResult): string {
     `  - Exit Code: ${result.exitCode === null ? 'n/a' : String(result.exitCode)}`,
     `  - Stdout Log: ${result.stdoutLogPath}`,
     `  - Stderr Log: ${result.stderrLogPath}`
+  ].join('\n');
+}
+
+export function renderFinalReportMarkdown(
+  ticketKey: string,
+  runId: string,
+  state: DeliveryRunStateRecord,
+  options: FinalReportOptions = {}
+): string {
+  const latestDevRun = state.devRuns[state.devRuns.length - 1];
+  const latestQualityReport = state.qualityReports[state.qualityReports.length - 1];
+  const developPullRequest = state.pullRequests.find((pullRequest) => pullRequest.targetBranch === 'develop');
+  const productionPullRequest = state.pullRequests.find((pullRequest) => pullRequest.targetBranch === 'main');
+  const latestDeployment = state.stagingDeployments[state.stagingDeployments.length - 1];
+
+  return [
+    `# Final Report ${ticketKey}`,
+    '',
+    `Run ID: ${runId}`,
+    `Final State: ${state.state}`,
+    `Ticket: [${state.ticket.key}](${state.ticket.url})`,
+    '',
+    '## Selected Repositories',
+    '',
+    renderRepositories(state),
+    '',
+    '## Branch References',
+    '',
+    renderBranches(state.branches),
+    '',
+    '## Plan',
+    '',
+    `- Plan Report: ${options.planReportPath ?? 'not recorded'}`,
+    `- Goal: ${state.ticketAnalysis?.goal ?? 'not recorded'}`,
+    '',
+    '## Development Run',
+    '',
+    renderDevRun(latestDevRun, options.implementationLogPath),
+    '',
+    '## Quality Summary',
+    '',
+    renderQualitySummary(latestQualityReport, options.qualityReportPath),
+    '',
+    '## Develop Pull Request',
+    '',
+    renderPullRequest(developPullRequest),
+    '',
+    '## Staging Verification',
+    '',
+    renderStagingSummary(latestDeployment, options.stagingReportPath),
+    '',
+    '## Production Pull Request',
+    '',
+    renderPullRequest(productionPullRequest),
+    '',
+    '## Final State',
+    '',
+    `- ${state.state}`,
+    '',
+    '## Mock-Only And Human Approval Note',
+    '',
+    options.mockOnlyNote ??
+      'This run used mock Jira, mock GitHub, mock Railway, and mock OpenCode/local-only interfaces. Production merge remains human-only; no production deployment or merge was performed.',
+    ''
+  ].join('\n');
+}
+
+function renderRepositories(state: DeliveryRunStateRecord): string {
+  if (state.targetRepositories.length === 0) {
+    return '- None selected.';
+  }
+
+  return state.targetRepositories.map((repository) => `- ${repository.owner}/${repository.name} (${repository.url})`).join('\n');
+}
+
+function renderBranches(branches: readonly BranchRef[]): string {
+  if (branches.length === 0) {
+    return '- None recorded.';
+  }
+
+  return branches.map((branch) => `- ${branch.repository.owner}/${branch.repository.name}: ${branch.name} from ${branch.baseBranch} at ${branch.headSha ?? 'unknown head'}`).join('\n');
+}
+
+function renderDevRun(devRun: DevRunResult | undefined, implementationLogPath: string | undefined): string {
+  if (devRun === undefined) {
+    return '- No development run recorded.';
+  }
+
+  return [
+    `- Status: ${devRun.status.toUpperCase()}`,
+    `- Summary: ${devRun.summary}`,
+    `- Implementation Log: ${implementationLogPath ?? devRun.implementationLogPath}`,
+    `- Attempts: ${devRun.attempts.length}`
+  ].join('\n');
+}
+
+function renderQualitySummary(report: QualityReport | undefined, reportPath: string | undefined): string {
+  if (report === undefined) {
+    return '- No quality report recorded.';
+  }
+
+  return [
+    `- Status: ${report.status.toUpperCase()}`,
+    `- Quality Report: ${reportPath ?? 'not recorded'}`,
+    `- Required Gates: ${report.required.map((result) => `${result.name} ${result.status.toUpperCase()}`).join(', ') || 'none'}`,
+    `- Optional Gates: ${report.optional.map((result) => `${result.name} ${result.status.toUpperCase()}`).join(', ') || 'none'}`
+  ].join('\n');
+}
+
+function renderPullRequest(pullRequest: PullRequestRef | undefined): string {
+  if (pullRequest === undefined) {
+    return '- No pull request recorded.';
+  }
+
+  return [
+    `- PR: [#${pullRequest.number}](${pullRequest.url})`,
+    `- Repository: ${pullRequest.repositoryOwner}/${pullRequest.repositoryName}`,
+    `- Source: ${pullRequest.sourceBranch}`,
+    `- Target: ${pullRequest.targetBranch}`,
+    `- Status: ${pullRequest.status}`
+  ].join('\n');
+}
+
+function renderStagingSummary(deployment: DeploymentResult | undefined, reportPath: string | undefined): string {
+  if (deployment === undefined) {
+    return '- No staging deployment recorded.';
+  }
+
+  return [
+    `- Status: ${deployment.status.toUpperCase()}`,
+    `- Staging Report: ${reportPath ?? 'not recorded'}`,
+    `- Deployment: ${deployment.ref.deploymentId}`,
+    `- Branch: ${deployment.branch}`,
+    `- Service URL: ${deployment.serviceUrl}`,
+    `- Smoke Checks: ${deployment.smokeChecks.length === 0 ? 'none configured' : deployment.smokeChecks.map((check) => `${check.url} ${check.status.toUpperCase()}`).join(', ')}`
   ].join('\n');
 }

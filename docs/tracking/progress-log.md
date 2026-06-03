@@ -83,3 +83,13 @@ Completed Milestone H Railway staging verification foundation:
 - Added deterministic staging report rendering and `MarkdownReportWriter.writeStaging(...)` for `runs/<ticket-key>/<run-id>/staging-report.md`.
 - Added workspace config parsing for repository `staging_smoke_urls`, including explicit empty arrays for skipped smoke checks.
 - Added tests for mock Railway pass/fail behavior, smoke verifier pass/fail/skipped behavior, staging state write sequencing, failed deployment and smoke checks, production readiness guard, staging report output, and config parsing.
+
+
+Completed Milestone I end-to-end mock run:
+
+- Added mock-only production PR preparation with `assertProductionPullRequestReady(...)`, production PR body rendering, and `PRODUCTION_PR_OPENED` state recording.
+- Added deterministic `MockOpenCodeRunner` that writes `implementation-log.md` without spawning OpenCode or making provider calls.
+- Added `runEndToEndMockDelivery(...)` and public `agentic run <ticket-key>` wiring for the mock lifecycle through `PRODUCTION_PR_OPENED`.
+- Added `final-report.md` rendering with ticket, run, repositories, branches, implementation, quality, develop PR, staging, production PR, final state, and human-only production approval note.
+- Added tests for production PR body/state/preparation, final report output, mock OpenCode runner, CLI help, and complete CLI run artifacts.
+- Verified `pnpm typecheck` and `pnpm test` during implementation.

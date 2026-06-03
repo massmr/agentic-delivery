@@ -19,7 +19,7 @@ Status legend:
 
 - `[x]` Config loader and validation
 - `[x]` Domain models
-- `[~]` State machine
+- `[x]` State machine
 - `[x]` Local state store
 - `[x]` Markdown report writer
 
@@ -60,6 +60,8 @@ Status legend:
 - `[x]` Staging deployment polling
 - `[x]` Smoke checks
 - `[x]` Production PR gate
+- `[x]` End-to-end mock run command
+- `[x]` Final report for completed mock runs
 
 ## Autonomous Worker
 

@@ -25,7 +25,7 @@ Jira backlog
 
 This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, and mock Railway staging verification foundations for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock GitHub develop PR handoffs, verify mock Railway staging deployments with deterministic smoke checks, write staging reports, and write resumable run state without provider credentials.
 
-The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and does not add a public run command yet.
+The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command now executes one deterministic mock ticket run through production PR preparation for human approval.
 
 Start with:
 
@@ -84,6 +84,12 @@ Plan one mock Jira ticket:
 node dist/src/cli/index.js plan LK-101
 ```
 
+Run one mock ticket end to end:
+
+```bash
+node dist/src/cli/index.js run LK-101
+```
+
 Run local quality gates for a repository:
 
 ```bash
@@ -102,6 +108,23 @@ runs/<ticket-key>/<run-id>/
   state.json
 ```
 
+`agentic run <ticket-key>` uses mock Jira, mock GitHub, mock Railway, a deterministic mock OpenCode runner, and local-only git command simulation. It writes a complete mock run folder and stops at `PRODUCTION_PR_OPENED` so production merge remains a human-only action:
+
+```text
+runs/<ticket-key>/<run-id>/
+  plan.md
+  implementation-log.md
+  quality-report.md
+  quality-logs/
+    test.stdout.log
+    test.stderr.log
+  staging-report.md
+  final-report.md
+  state.json
+```
+
+The final report summarizes the selected repositories, branch refs, implementation log path, quality outcome, develop PR, staging deployment and smoke checks, production PR, final state, and the mock-only/human approval note.
+
 `agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]` reads `.agent-quality.yml` from the target repository or falls back to detected Node package scripts. Required gates without commands fail configuration. Optional gates without commands are recorded as skipped warning results and do not fail the run.
 
 `agentic quality` writes:
@@ -118,6 +141,8 @@ runs/<ticket-key>/<run-id>/
 Milestone G adds library interfaces for the future develop PR handoff path without adding a public CLI command. The exported helpers include deterministic `agent/<JIRA_KEY>-<short-slug>` branch naming, a local-only git adapter with an injectable argument-array command runner, a mock GitHub connector, a develop PR body builder, and state helpers for `BRANCH_CREATED`, `PUSHED`, and `PR_TO_DEVELOP_OPENED`.
 
 Milestone H adds library interfaces for the future Railway staging verification path without adding a public CLI command. The exported helpers include a future-shaped Railway connector interface, deterministic `MockRailwayConnector`, `SmokeUrlVerifier` interface, deterministic `MockSmokeUrlVerifier`, `runStagingVerification(...)`, staging state helpers for `STAGING_DEPLOYING`, `STAGING_VERIFIED`, and failed staging outcomes, and a production pull request readiness guard that accepts only `STAGING_VERIFIED` runs. Staging verification writes `runs/<ticket-key>/<run-id>/staging-report.md` through `MarkdownReportWriter.writeStaging(...)`.
+
+Milestone I adds the public mock `agentic run <ticket-key>` path, deterministic `MockOpenCodeRunner`, production PR preparation helper, production PR body builder, `PRODUCTION_PR_OPENED` state recording, and final report writer. The command is still mock-only and prepares a production PR ref for human review without real provider calls, remote pushes, production merge, or production deployment.
 
 Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
 

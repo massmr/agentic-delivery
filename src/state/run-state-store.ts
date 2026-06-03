@@ -97,6 +97,21 @@ export function recordPullRequestOpened(state: DeliveryRunStateRecord, pullReque
   );
 }
 
+export function recordProductionPullRequestOpened(
+  state: DeliveryRunStateRecord,
+  pullRequest: PullRequestRef,
+  updatedAt: string
+): DeliveryRunStateRecord {
+  return transitionDeliveryRunState(
+    {
+      ...state,
+      pullRequests: replacePullRequest(state.pullRequests, pullRequest)
+    },
+    'PRODUCTION_PR_OPENED',
+    updatedAt
+  );
+}
+
 export function recordStagingDeploying(state: DeliveryRunStateRecord, updatedAt: string): DeliveryRunStateRecord {
   if (state.state !== 'DEVELOP_CHECKS_PASSED') {
     throw new Error(`Staging verification requires DEVELOP_CHECKS_PASSED state; current state is ${state.state}.`);

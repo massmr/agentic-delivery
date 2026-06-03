@@ -1,6 +1,7 @@
 import { runInitCommand } from './commands/init.js';
 import { runPlanCommand } from './commands/plan.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
+import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
 import { runScanCommand } from './commands/scan.js';
 
 const HELP_TEXT = [
@@ -11,18 +12,20 @@ const HELP_TEXT = [
   '  agentic init',
   '  agentic scan',
   '  agentic plan <ticket-key>',
+  '  agentic run <ticket-key> [--run-id <run-id>]',
   '  agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
   'Commands:',
   '  init        Copy config/workspace.example.yml to config/workspace.yml.',
   '  scan        List mock Jira backlog tickets.',
   '  plan        Create a local mock plan and run state for one ticket.',
+  '  run         Execute one ticket through the complete mock delivery lifecycle.',
   '  quality     Run local repository quality gates and write a quality report.',
   '',
   'Options:',
   '  -h, --help  Show this help message.',
   '',
-  'Mock planning only. No real provider integrations are wired yet.'
+  'Mock mode only. No real provider integrations, credentials, production merge, or production deployment are performed.'
 ].join('\n');
 
 export interface CliProgramIO {
@@ -90,6 +93,18 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runPlanCommand(ticketKey, { cwd: options.cwd, configPath: options.configPath, io });
+      }
+
+      if (args[0] === 'run') {
+        const parsed = parseRunCommandOptions(args.slice(1));
+
+        if (parsed.ticketKey === undefined || parsed.ticketKey.trim().length === 0) {
+          io.stderr('Missing ticket key for run command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runRunCommand(parsed.ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runId: parsed.runId });
       }
 
       if (args[0] === 'quality') {
