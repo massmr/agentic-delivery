@@ -260,7 +260,7 @@ function toOperationLookup(state: DeliveryRunStateRecord, provider: string, port
 
 function buildDevelopPullRequestComment(state: DeliveryRunStateRecord, qualityReport: QualityReport): string {
   return [
-    `Agentic Delivery run ${state.runId} prepared this develop pull request.`,
+    `Ewokbot run ${state.runId} prepared this develop pull request.`,
     `Quality status: ${qualityReport.status.toUpperCase()}.`,
     'Actual branch push used the local git/native fallback; GitHub actions use typed CodeHostPort operations.'
   ].join('\n');

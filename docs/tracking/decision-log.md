@@ -4,7 +4,7 @@
 
 Decision:
 
-Build Agentic Delivery as an independent software product rather than embedding agent logic inside business repositories.
+Build Ewokbot as an independent software product rather than embedding agent logic inside business repositories.
 
 Rationale:
 
@@ -28,7 +28,7 @@ Rationale:
 
 Decision:
 
-Agentic Delivery orchestrates work and delegates implementation to OpenCode.
+Ewokbot orchestrates work and delegates implementation to OpenCode.
 
 Rationale:
 

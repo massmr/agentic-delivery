@@ -2,7 +2,7 @@
 
 ## Position
 
-Agentic Delivery is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
+Ewokbot is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
 
 MCP is the default control plane for external SaaS tools. It is not the business architecture itself.
 

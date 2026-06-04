@@ -8,17 +8,19 @@ import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.j
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
 
 const HELP_TEXT = [
-  'Agentic Delivery',
+  'Ewokbot',
+  '',
+  'Autonomous software delivery runtime. The ewokbot and agentic binaries are aliases.',
   '',
   'Usage:',
-  '  agentic [--help]',
-  '  agentic init',
-  '  agentic scan',
-  '  agentic plan <ticket-key>',
-  '  agentic run <ticket-key> [--run-id <run-id>]',
-  '  agentic worker [--concurrency <n>] [--max-cycles <n>] [--max-attempts <n>] [--poll-interval-ms <ms>]',
-  '  agentic status <ticket-key> [--run-id <run-id>]',
-  '  agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
+  '  ewokbot [--help]',
+  '  ewokbot init',
+  '  ewokbot scan',
+  '  ewokbot plan <ticket-key>',
+  '  ewokbot run <ticket-key> [--run-id <run-id>]',
+  '  ewokbot worker [--concurrency <n>] [--max-cycles <n>] [--max-attempts <n>] [--poll-interval-ms <ms>]',
+  '  ewokbot status <ticket-key> [--run-id <run-id>]',
+  '  ewokbot quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
   'Commands:',
   '  init        Copy config/workspace.example.yml to config/workspace.yml.',
@@ -32,7 +34,7 @@ const HELP_TEXT = [
   'Options:',
   '  -h, --help  Show this help message.',
   '',
-  'Mock mode only. No real provider integrations, credentials, production merge, or production deployment are performed.'
+  'Mock mode remains the default. No credentials, production merge, or production deployment are performed by default.'
 ].join('\n');
 
 export interface CliProgramIO {

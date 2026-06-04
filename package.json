@@ -1,14 +1,18 @@
 {
-  "name": "agentic-delivery",
+  "name": "ewokbot",
   "version": "0.1.0",
-  "private": true,
+  "description": "MCP-first autonomous software delivery runtime with human-gated production approval.",
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "bin": {
+    "ewokbot": "./dist/src/cli/index.js",
     "agentic": "./dist/src/cli/index.js"
   },
   "files": [
     "dist",
-    "config"
+    "config",
+    "assets"
   ],
   "engines": {
     "node": ">=20"

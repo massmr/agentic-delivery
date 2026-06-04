@@ -1,48 +1,78 @@
-# Agentic Delivery
+<p align="center">
+  <img src="assets/ewokbot-logo.png" alt="Ewokbot logo" width="280" />
+</p>
 
-Agentic Delivery is an independent orchestration layer for autonomous software delivery.
+# Ewokbot
 
-The project goal is to connect Jira, GitHub, Railway, and a coding runner such as OpenCode so backlog items can move from analysis to implementation, staging verification, and production pull request creation.
+Ewokbot is an open-source agent runtime for autonomous software delivery.
 
-The planned system is designed for full autonomy until production. A human validates production pull requests before merge.
+It is designed to read work from Jira, inspect the relevant repositories, delegate implementation to a coding agent such as OpenCode, run quality gates, verify staging, and prepare production pull requests for human approval.
 
-## Architecture Direction
-
-Agentic Delivery is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
-
-MCP is the preferred control plane for external SaaS providers such as Jira, GitHub, Railway, Vercel, and Bitbucket. The runtime still owns state, decisions, policies, retries, reports, local quality gates, and production approval.
-
-See [MCP-First Architecture](docs/specs/mcp-first-architecture.md).
-
-## Core Goal
+The core idea is simple:
 
 ```text
-Jira backlog
-  -> ticket analysis
-  -> repo discovery
-  -> branch creation
-  -> OpenCode implementation
-  -> quality gates
-  -> PR to develop
-  -> Railway staging verification
-  -> PR to main
-  -> human production approval
+Jira ticket
+  -> repo analysis
+  -> implementation by coding runner
+  -> tests and quality gates
+  -> develop PR
+  -> staging verification
+  -> production PR
+  -> human approval
 ```
 
-## Current Phase
+Ewokbot is **MCP-first** for external SaaS providers and **human-gated** for production. It is not intended to silently merge production code.
 
-This repository now includes the config, domain, state, report, mock planning, local quality-gate, hardened OpenCode execution contract, local git/GitHub handoff, Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, provider adapter design boundaries, shared MCP client foundation, MCP-backed Jira TicketPort, GitHub CodeHostPort, Railway DeploymentPort, tested native fallback contracts, a mock-safe agent worker loop, and runtime MCP wiring for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, process queued mock backlog tickets with concurrency and retry limits, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, invoke OpenCode through a typed subprocess-first contract with cwd/env/timeout/cancellation guardrails, prepare idempotent mock or MCP-backed GitHub develop PR handoffs, verify mock or MCP-backed Railway deployment state and service URLs with precise staging failure evidence, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, discover and authorize mock MCP tools, audit MCP tool calls, map MCP timeout/auth/session errors, validate runtime MCP tool readiness before adapter use, distinguish mock and MCP worker modes, map Atlassian MCP Jira search/get/comment tools behind `TicketPort`, and write resumable run state without provider credentials. GitHub MCP currently covers branch creation, pull requests, checks, and comments through typed `CodeHostPort` operations; actual branch pushing remains on the local git/native or subprocess fallback path until a precise MCP push contract exists. GitHub delivery handoff records persistent operation-ledger entries under the run directory so reruns after a restart can avoid duplicate branches, pushes, pull requests, comments, and check reads. Railway MCP is read-oriented for deployment state and service URL lookups; native Railway fallback is allowed only when MCP lacks required polling, metadata, or service URL precision.
+## Project Status
 
-The current public CLI implementation is still local and mock-first. It makes no real Jira, GitHub, Railway, or OpenCode provider calls by default, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic scan` and `agentic worker` commands can use Jira MCP intake only when runtime code injects a configured `McpClient`; otherwise they use the deterministic mock Jira path. The public `agentic run <ticket-key>` command executes one deterministic mock ticket run through production PR preparation for human approval. Runtime MCP wiring does not start live MCP sessions, OAuth, or network clients by itself.
+Ewokbot is early, active, and intentionally conservative.
 
-Start with:
+Current capabilities:
 
-- [Product Spec](docs/specs/product-spec.md)
-- [Technical Architecture](docs/specs/technical-architecture.md)
-- [MVP Plan](docs/plans/mvp-plan.md)
-- [OpenCode Execution Prompt](docs/prompts/opencode-build-orchestrator.md)
+- CLI-first local runtime.
+- Deterministic mock end-to-end ticket runs.
+- Persistent run state and Markdown reports under `runs/`.
+- Jira ticket intake boundary with MCP-backed adapter support.
+- GitHub code-host boundary for branches, pull requests, comments, and checks.
+- Railway staging verification boundary for deployment state and service URLs.
+- OpenCode execution contract with subprocess guardrails.
+- Local quality-gate runner.
+- Worker loop with bounded concurrency, retry, and escalation policy.
+- Operation ledger for idempotent GitHub delivery handoffs.
+- MCP tool discovery, allowlist, audit records, and error mapping.
 
-## Usage
+Default behavior is safe:
+
+- No real Jira, GitHub, Railway, or OpenCode calls by default.
+- No remote git fetch, pull, or push by default.
+- No production merge.
+- No production deployment.
+- No credentials required for mock mode.
+
+The project is ready for local exploration and contribution, but not yet a turnkey autonomous production operator.
+
+## Why Ewokbot?
+
+Most coding agents are good at implementing a task once they are given a clean prompt and a checked-out repository. Real delivery work needs more around that:
+
+- picking the right ticket,
+- finding the right repository,
+- creating safe branches,
+- producing a focused implementation prompt,
+- running repeatable quality gates,
+- verifying staging,
+- preparing pull requests,
+- preserving state across failures,
+- keeping production approval human-only.
+
+Ewokbot is the orchestration layer around the coding agent.
+
+## Installation
+
+Requirements:
+
+- Node.js 20+
+- pnpm
 
 Install dependencies:
 
@@ -50,10 +80,10 @@ Install dependencies:
 pnpm install
 ```
 
-Typecheck:
+Build:
 
 ```bash
-pnpm typecheck
+pnpm build
 ```
 
 Run tests:
@@ -62,33 +92,33 @@ Run tests:
 pnpm test
 ```
 
-Build the CLI:
+Typecheck:
 
 ```bash
-pnpm build
+pnpm typecheck
 ```
 
-Show the built CLI help:
+## Quickstart
 
-```bash
-node dist/src/cli/index.js --help
-```
-
-Initialize a workspace config:
+Initialize a local workspace config:
 
 ```bash
 node dist/src/cli/index.js init
 ```
 
-Scan the Jira backlog:
+Inspect available commands:
+
+```bash
+node dist/src/cli/index.js --help
+```
+
+Scan the mock Jira backlog:
 
 ```bash
 node dist/src/cli/index.js scan
 ```
 
-By default this scans the deterministic mock Jira backlog. When `jira.mode: mcp` is explicitly configured and runtime code injects a Jira `McpClient`, `agentic scan` lists tickets through the typed `TicketPort` after MCP tool discovery and allowlist validation. The public CLI does not create live MCP sessions or Jira credentials by itself.
-
-Plan one mock Jira ticket:
+Plan a mock ticket:
 
 ```bash
 node dist/src/cli/index.js plan LK-101
@@ -100,19 +130,10 @@ Run one mock ticket end to end:
 node dist/src/cli/index.js run LK-101
 ```
 
-Process the mock backlog queue with the worker loop:
-
-```bash
-node dist/src/cli/index.js worker --concurrency 1 --max-cycles 1 --max-attempts 2
-```
-
-`agentic worker` reads backlog tickets through the typed ticket port, keeps mock providers as the default, de-duplicates tickets within the invocation, enforces bounded concurrency, and stops safely when the queue is idle unless additional cycles are requested. When Jira, GitHub, or Railway is explicitly configured with `mode: mcp` and runtime code injects matching `McpClient`s, worker startup validates all configured MCP provider tools and allowlists before the queue starts, then prints the worker, intake, and provider modes. `--concurrency` can only lower or match the workspace `max_concurrent_tickets` policy; it cannot raise that cap. Safe options are `--concurrency`, `--max-cycles`, `--max-attempts`, `--base-backoff-ms`, `--max-backoff-ms`, and `--poll-interval-ms`.
-
-Inspect an existing run state:
+Inspect persisted run state:
 
 ```bash
 node dist/src/cli/index.js status LK-101
-node dist/src/cli/index.js status LK-101 --run-id LK-101-20260603-100000000
 ```
 
 Run local quality gates for a repository:
@@ -121,11 +142,19 @@ Run local quality gates for a repository:
 node dist/src/cli/index.js quality ./path/to/repo --ticket-key LK-101 --run-id local-checks
 ```
 
-`agentic init` copies `config/workspace.example.yml` to `config/workspace.yml`. It creates the `config` directory when needed and refuses to overwrite an existing `config/workspace.yml`.
+Process the mock backlog through the worker:
 
-`config/workspace.yml` is the local workspace file. Provider sections support `mock` and `real` modes, and Jira, GitHub, and Railway also support `mcp` mode for runtime-wired MCP clients. Mock remains the default and the public commands still run without provider credentials. Real Jira, GitHub, and Railway modes currently fail fast in adapter factories when required environment variables are missing and otherwise report that live adapters are reserved for their later milestones. GitHub supports `mcp` mode for branch creation, pull requests, checks, and comments only; Railway supports `mcp` mode for deployment state and service URL lookups only.
+```bash
+node dist/src/cli/index.js worker --concurrency 1 --max-cycles 1 --max-attempts 2
+```
 
-An Atlassian MCP remote server can be declared without repository secrets like this:
+## Configuration
+
+`ewokbot init` copies `config/workspace.example.yml` to `config/workspace.yml`.
+
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode through runtime-injected MCP clients.
+
+Example Jira MCP configuration:
 
 ```yaml
 jira:
@@ -149,122 +178,119 @@ mcp_servers:
       - https://mcp.atlassian.com/v1/mcp/authv2
 ```
 
-The runtime factory path for `jira.mode: mcp`, `github.mode: mcp`, and `railway.mode: mcp` resolves configured `mcp_servers`, uses either injected `mcpClients[serverId]` or an injectable `createMcpClient(serverConfig)` factory, discovers required tools, validates them against typed port/action allowlists, and passes audit records through a shared MCP audit sink. Jira MCP tool names default to the Atlassian names above and can be overridden with `jira.mcp_tools`. In MCP mode, `jira.project_keys` are validated as uppercase Jira project keys before building JQL. `createRuntimeTicketPort(...)` provides the Jira-only intake seam used by scan code so Jira readiness can be checked without requiring GitHub or Railway MCP readiness. `agentic worker` uses full runtime workspace adapter readiness when any external provider is explicitly configured for MCP mode, while preserving the existing mock-safe processing path. Runtime MCP wiring does not add a live MCP process/session runner, OAuth flow, Jira REST adapter, or automatic public CLI MCP login.
+The public CLI does not start live MCP sessions, OAuth flows, or network clients by itself yet. MCP clients are wired through runtime factories and tests currently use mock clients.
 
-Railway follows the same runtime-wired client pattern. `railway.mode: mcp` requires a resolved `McpClient` keyed by `railway.mcp_server`. Railway MCP tool names default to the deployment-state and service URL names above and can be overridden with `railway.mcp_tools`. Railway MCP is read-oriented: it reads deployment state and service URLs, but any unsupported deployment action stays on the native/local fallback path.
+See:
 
-Railway staging verification uses the typed `DeploymentPort` for deployment polling, deployment reads, and service URL lookup. MCP results must match the requested branch, commit SHA, deployment reference, and staging environment before the workflow trusts them. Missing, invalid, or non-HTTP(S) service URLs fail staging before smoke checks run. Failed deployment polling, missing service URL, failed deployment status, or failed smoke checks persist `FAILED` state and write `staging-report.md`; production PR preparation remains blocked unless staging reaches `STAGING_VERIFIED`.
+- [MCP-first architecture](docs/specs/mcp-first-architecture.md)
+- [Technical architecture](docs/specs/technical-architecture.md)
+- [Product spec](docs/specs/product-spec.md)
+- [Quality gates](docs/specs/quality-gates.md)
 
-## Native Fallback Contracts
+## Architecture
 
-The exported `nativeFallbackContracts` policy defines which adapter kinds are allowed for each typed port action. External SaaS providers stay MCP-first by default:
+Ewokbot separates business intent from provider-specific tools through typed ports:
 
-- Jira ticket list/get/comment actions use MCP or mock only.
-- GitHub branch creation, pull requests, checks, and PR comments are MCP-first; native GitHub fallback is allowed only when MCP lacks the precision needed for PR fields, check status/conclusion detail, or exact comment targeting.
-- GitHub `pushBranch` is not an MCP action. Actual branch pushes require local git/native or subprocess behavior until a precise MCP push contract exists.
-- Railway deployment polling, deployment reads, and service URL lookup are MCP-first; native Railway fallback is allowed only when MCP lacks required polling state, metadata, timeout, or URL precision.
-- Local workspace git operations, filesystem run state/report writes, quality gates, and OpenCode execution use native or subprocess adapters rather than MCP.
-- Production merge and production deployment mutation remain human-only and have no autonomous adapter fallback.
+- `TicketPort` for Jira-like backlog systems.
+- `CodeHostPort` for GitHub-like code hosts.
+- `DeploymentPort` for Railway-like deployment providers.
+- `DevRunnerPort` for coding agents such as OpenCode.
+- Local git, filesystem state, reports, and quality gates through native or subprocess adapters.
 
-Mock adapters remain allowed for deterministic local runs and tests. The fallback contracts do not add live API calls, credentials, remote git pushes, production merges, or production deployments.
-
-`agentic plan` writes:
-
-```text
-runs/<ticket-key>/<run-id>/
-  plan.md
-  state.json
-```
-
-`agentic run <ticket-key>` uses mock Jira, mock GitHub, mock Railway, a deterministic mock OpenCode runner, and local-only git command simulation. The real OpenCode runner contract is subprocess-first: it constructs executable-plus-args commands without a shell, validates the working directory against the workspace root, passes only allowlisted environment variables, enforces timeouts and cancellation, retries normal non-zero failures, stops safely after timeout or cancellation, and redacts secret-like output before writing implementation logs. Tests use fake subprocess executors only and never execute OpenCode. The mock run command writes a complete mock run folder and stops at `PRODUCTION_PR_OPENED` so production merge remains a human-only action:
-
-After required local quality gates pass, develop handoff uses `CodeHostPort` for GitHub branch metadata, pull request opening, PR comments, and check reads. Actual branch push uses `LocalGitAdapter.pushBranch(...)` through the native/subprocess fallback contract; `CodeHostPort.pushBranch` is not used by the delivery workflow. The operation ledger records branch creation, local push, PR creation, comment, and check operations so reruns with existing ledger state do not duplicate provider side effects.
+External SaaS providers are MCP-first:
 
 ```text
-runs/<ticket-key>/<run-id>/
-  plan.md
-  implementation-log.md
-  quality-report.md
-  quality-logs/
-    test.stdout.log
-    test.stderr.log
-  staging-report.md
-  final-report.md
-  state.json
+Ewokbot runtime
+  -> typed business port
+  -> MCP adapter
+  -> provider MCP tool
 ```
 
-The final report summarizes the selected repositories, branch refs, implementation log path, quality outcome, develop PR, staging deployment and smoke checks, production PR, final state, and the mock-only/human approval note.
+Fallbacks are explicit and policy-bound:
 
-If mock planning selects more than one repository, `agentic run <ticket-key>` stops before branch creation or implementation, persists `NEEDS_HUMAN`, writes the plan report, and exits non-zero with a reason. Multi-repo sub-runs are not implemented yet; split the Jira ticket or choose one repository before continuing.
+- MCP for external SaaS tools when possible.
+- Native APIs only for documented precision gaps.
+- Subprocesses for local git, quality commands, and OpenCode.
+- Mocks for deterministic tests and local demos.
+- Human-only for production merge and production deployment.
 
-`agentic worker` uses the same mock-safe delivery path for each queued ticket. Intake reads backlog and fetches ticket details through the typed `TicketPort`; explicit MCP worker mode validates configured Jira, GitHub, and Railway MCP tools before the queue starts and reports the selected worker/intake/provider modes to the operator. The worker persists attempt state before processing, writes returned ticket run state, retries failed tickets with deterministic backoff, escalates exhausted or human-gated tickets to `NEEDS_HUMAN`, and returns a non-zero exit code when any ticket escalates. It does not transition real Jira tickets, make live provider calls by default, request credentials, push remote branches, merge production pull requests, or deploy production.
+## Safety Model
 
-`agentic status <ticket-key> [--run-id <run-id>]` reads existing local `runs/<ticket-key>/<run-id>/state.json` files without provider credentials. When `--run-id` is omitted, it lists known runs for the ticket and selects the latest run by persisted `updatedAt` timestamp. The status output summarizes state, next action, repositories, branches, PRs, quality, staging, failures, and required human action.
+Ewokbot is built around a strict production boundary.
 
-Resume policy is currently exposed as library helpers only: `canResumeState(state)` and `assertStateResumable(state)`. Automatic resume is allowed for active lifecycle states from `DISCOVERED` through `STAGING_VERIFIED`. It is blocked for terminal or human-gated states: `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE`. The guard has no side effects and does not call providers, rerun commands, merge production, or trigger a resume command.
+Allowed autonomously:
 
-`agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]` reads `.agent-quality.yml` from the target repository or falls back to detected Node package scripts. Required gates without commands fail configuration. Optional gates without commands are recorded as skipped warning results and do not fail the run.
+- read backlog tickets,
+- analyze repositories,
+- create working branches,
+- run a coding runner,
+- run local quality gates,
+- prepare develop pull requests,
+- verify staging,
+- prepare production pull requests.
 
-`agentic quality` writes:
+Requires a human:
 
-```text
-runs/<ticket-key>/<run-id>/
-  quality-report.md
-  quality-logs/
-    <gate>.stdout.log
-    <gate>.stderr.log
-  state.json
+- merging to production,
+- deploying production,
+- changing production deployment configuration,
+- exposing or rotating secrets,
+- destructive data operations.
+
+Never commit `.env` files or provider credentials. Use `.env.example` and local environment variables for private configuration.
+
+## Development
+
+Common commands:
+
+```bash
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
-Milestone G adds library interfaces for the future develop PR handoff path without adding a public CLI command. The exported helpers include deterministic `agent/<JIRA_KEY>-<short-slug>` branch naming, a local-only git adapter with an injectable argument-array command runner, a mock GitHub connector, a develop PR body builder, and state helpers for `BRANCH_CREATED`, `PUSHED`, and `PR_TO_DEVELOP_OPENED`.
+Run formatting checks for whitespace-sensitive diffs:
 
-Milestone H adds library interfaces for the future Railway staging verification path without adding a public CLI command. The exported helpers include a future-shaped Railway connector interface, deterministic `MockRailwayConnector`, `SmokeUrlVerifier` interface, deterministic `MockSmokeUrlVerifier`, `runStagingVerification(...)`, staging state helpers for `STAGING_DEPLOYING`, `STAGING_VERIFIED`, and failed staging outcomes, and a production pull request readiness guard that accepts only `STAGING_VERIFIED` runs. Staging verification writes `runs/<ticket-key>/<run-id>/staging-report.md` through `MarkdownReportWriter.writeStaging(...)`.
-
-Milestone I adds the public mock `agentic run <ticket-key>` path, deterministic `MockOpenCodeRunner`, production PR preparation helper, production PR body builder, `PRODUCTION_PR_OPENED` state recording, and final report writer. The command is still mock-only and prepares a production PR ref for human review without real provider calls, remote pushes, production merge, or production deployment.
-
-Milestone J adds the public local `agentic status <ticket-key> [--run-id <run-id>]` path, run-state lookup/listing/latest-selection helpers, concise Markdown status rendering, and deterministic `getNextActionForState(...)` guidance for every delivery lifecycle state. It does not resume or trigger side effects; resumability policy is reserved for Milestone K.
-
-Milestone K adds the resume guard policy with `canResumeState(...)` and `assertStateResumable(...)`. The policy covers every delivery lifecycle state and prevents automatic continuation from `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE`. No resume command or live provider action is added in this milestone.
-
-Milestone L adds the multi-repo safety guard for `agentic run <ticket-key>`. Single-repo mock runs still complete to `PRODUCTION_PR_OPENED`; tickets that resolve to multiple repositories persist `NEEDS_HUMAN` with a clear reason and do not proceed to implementation, quality, staging, or production PR preparation.
-
-Milestone M adds real provider adapter design boundaries without live calls. Workspace config now accepts `mock` or `real` provider modes, adapter factories keep mock connectors as the default, and real Jira/GitHub/Railway factories fail fast with explicit credential errors before any future live adapter can be constructed. Real Jira, GitHub, and Railway implementations remain future milestones.
-
-Milestone O adds the shared MCP client foundation without live provider calls. The exported `src/mcp` APIs include MCP server config helpers, `McpClient`, deterministic `MockMcpClient`, tool discovery, tool allowlist enforcement for typed port/action pairs, audit record creation, allowed tool-call execution with audit records, and timeout/auth/session error mapping. Tests use only mock MCP clients and do not start OAuth, network, or live MCP server sessions.
-
-Milestone P adds a typed `TicketPort` boundary and a Jira MCP adapter for Atlassian MCP search, issue fetch, and comment capabilities. Raw MCP tool names stay inside the Jira adapter/config layer, can be overridden per workspace, and missing tools raise actionable `McpToolNotFoundError`s. The adapter preserves MCP audit records through an optional typed audit sink, and MCP-mode project keys are validated before JQL construction. Tests use only `MockMcpClient` with no live Jira, OAuth, or MCP server calls. `JiraConnector` remains compatible with `TicketPort` for existing planning and run code.
-
-Milestone S adds tested Native Fallback Contracts under `src/policy`. The policy defines when MCP, native, subprocess, mock, and human-only surfaces are allowed for Jira, GitHub, Railway, local workspace git, filesystem writes, quality gates, OpenCode execution, and production controls. It preserves MCP-first external SaaS behavior while making local/subprocess fallback boundaries explicit.
-
-Milestone T adds the mock-safe `agentic worker` backlog processor. The worker queues mock backlog tickets, honors concurrency and max-cycle stop limits, supports deterministic retry/backoff and escalation, persists attempt and returned run states, and exposes a safe CLI command without live provider calls, credentials, remote pushes, production merge, or production deployment.
-
-Milestone U adds runtime MCP wiring for typed Jira, GitHub, and Railway adapters. `createRuntimeWorkspaceAdapters(...)` resolves configured MCP servers, constructs or injects clients, validates tool discovery and typed allowlists before adapter use, exposes provider MCP requirement metadata, and shares MCP audit capture across providers. Tests use only `MockMcpClient`; no live MCP sessions, OAuth, provider network calls, production merge, or production deployment are added.
-
-Milestone V adds real Jira intake through the typed `TicketPort`. `agentic scan` and worker intake can use Jira MCP mode when a runtime caller injects a configured `McpClient`; mock Jira remains the default. The worker fetches ticket details through `TicketPort.getTicket` before handing them to the existing mock-safe delivery path. Missing Jira MCP clients or tools fail during readiness checks before side effects, Jira MCP intake records audit entries, no Jira REST adapter is introduced, and tests use only `MockMcpClient`.
-
-Milestone W adds explicit Worker MCP Mode. `agentic worker` still defaults to mock mode, but when Jira, GitHub, or Railway is configured with `mode: mcp`, startup uses `createRuntimeWorkspaceAdapters(...)` with injected runtime MCP clients to validate required tools and Native Fallback Contract boundaries before queue processing begins. Worker output now shows worker mode, intake mode, and provider modes. Retry, escalation, safe-stop, abort, durable-state, and workspace concurrency behavior remain unchanged. Tests use only `MockMcpClient`, and the milestone does not add OpenCode hardening, GitHub delivery workflow, Railway staging verification, remote pushes, production merges, or production deployments.
-
-Milestone X hardens the OpenCode Execution Contract. `OpenCodeSubprocessRunner` now uses an injectable subprocess executor, command arguments instead of shell strings, workspace-root cwd validation, environment allowlists, timeout and abort handling, sanitized implementation logs, and explicit `passed`, `failed`, `timed_out`, and `cancelled` run statuses. Normal non-zero exits can retry; timeout and cancellation stop further attempts safely. Run state and reports persist actionable summaries without storing environment values or secret-like output. Tests use fake executors only and do not run real OpenCode, GitHub delivery, Railway staging verification, remote pushes, production merges, or production deployments.
-
-Milestone Y adds the GitHub Delivery Workflow. Develop handoff now requires passed local quality gates before remote handoff, uses typed `CodeHostPort` operations for GitHub branch metadata, pull requests, PR comments, and check reads, and uses local git/native fallback for the actual branch push. A persistent operation ledger at `runs/<ticket-key>/<run-id>/operation-ledger.json` records branch, push, PR, comment, and check operations for idempotent reruns across local restarts. Tests use only mock `CodeHostPort` and fake local git command runners; no live GitHub, MCP, credentials, real remote push, production merge, or production deployment behavior is added.
-
-Milestone Z hardens Railway Staging Verification. Staging now persists actionable `FAILED` state and `staging-report.md` evidence when Railway polling, service URL lookup, deployment status, or smoke checks fail. Railway MCP deployment results are validated for requested branch, commit SHA, deployment reference, staging environment, and HTTP(S) service URL precision before use. Tests use mock Railway connectors, mock MCP clients, and mock smoke verifiers only; no live Railway, live MCP, deployed-service HTTP checks, credentials, production deployment mutation, or production merge behavior is added.
-
-Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
-
-```yaml
-repos:
-  - name: api
-    staging_smoke_urls:
-      - /health
+```bash
+git diff --check
 ```
 
-## Operating Principles
+The test suite is intentionally mock-heavy. New provider work should add contract tests around typed ports before adding live network behavior.
 
-- Jira is the source of truth for work.
-- GitHub is the source of truth for code review and checks.
-- Railway deploys staging from `develop` and production from `main`.
-- OpenCode is the primary development runner.
-- Quality gates are required before pushing work.
-- Production merges require human approval.
-- Every ticket run must be resumable, auditable, and reportable.
+## Roadmap
+
+Near-term direction:
+
+- real MCP session runner for local CLI usage,
+- real Jira intake smoke test,
+- control-plane command layer for Telegram, WhatsApp, CLI, and future mobile interfaces,
+- first real end-to-end ticket run with explicit operator approval,
+- durable worker and resume flow,
+- richer GitHub and Railway MCP integrations.
+
+Track detailed planning in:
+
+- [Roadmap](docs/tracking/roadmap.md)
+- [Next actions](docs/tracking/next-actions.md)
+- [Progress log](docs/tracking/progress-log.md)
+- [Risks and blockers](docs/tracking/risks-and-blockers.md)
+
+## Contributing
+
+Contributions are welcome. Please keep changes aligned with the safety model:
+
+- mock mode must remain the default,
+- production merge must remain human-only,
+- provider adapters must stay behind typed ports,
+- MCP tool names must not leak into delivery logic,
+- tests should not require live credentials or network access.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Security
+
+If you find a security issue, please do not open a public issue with exploit details. See [SECURITY.md](SECURITY.md).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

@@ -13,7 +13,7 @@
 
 ## Architecture Direction
 
-Agentic Delivery is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
+Ewokbot is an agent runtime with typed business ports backed first by MCP tools, with native, subprocess, and mock adapters as fallbacks.
 
 See [MCP-First Architecture](mcp-first-architecture.md).
 

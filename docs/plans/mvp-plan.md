@@ -2,7 +2,7 @@
 
 ## Objective
 
-Build the first CLI version of Agentic Delivery. It should be capable of taking a Jira ticket key, creating a durable run, planning the work, invoking OpenCode, running quality gates, and preparing GitHub/Railway handoffs through production-shaped interfaces.
+Build the first CLI version of Ewokbot. It should be capable of taking a Jira ticket key, creating a durable run, planning the work, invoking OpenCode, running quality gates, and preparing GitHub/Railway handoffs through production-shaped interfaces.
 
 ## Milestone 1: Project Foundation
 
@@ -18,7 +18,7 @@ Deliverables:
 Acceptance criteria:
 
 - `agentic --help` works.
-- `agentic init` creates example config.
+- `ewokbot init` creates example config.
 - Config validation returns useful errors.
 - State can be created, updated, and read.
 
@@ -133,7 +133,7 @@ Acceptance criteria:
 ## Initial Command Set
 
 ```bash
-agentic init
+ewokbot init
 agentic scan
 agentic plan JIRA-123
 agentic run JIRA-123

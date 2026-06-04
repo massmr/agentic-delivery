@@ -61,7 +61,7 @@ export function buildProductionPullRequestBody(input: BuildProductionPullRequest
     '',
     '## Human-Only Production Merge',
     '',
-    'This production pull request is prepared for human review only. Agentic Delivery must not merge it, deploy production, push production branches, or bypass approval.',
+    'This production pull request is prepared for human review only. Ewokbot must not merge it, deploy production, push production branches, or bypass approval.',
     ''
   ].join('\n');
 }

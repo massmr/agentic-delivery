@@ -1,6 +1,6 @@
 # OpenCode Prompt: Next Autonomous Step
 
-You are working in the Agentic Delivery repository.
+You are working in the Ewokbot repository.
 
 ## Task
 

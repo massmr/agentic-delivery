@@ -1,6 +1,6 @@
-# OpenCode Prompt: Build Agentic Delivery Orchestrator
+# OpenCode Prompt: Build Ewokbot Orchestrator
 
-You are implementing Agentic Delivery, a TypeScript/Node.js CLI orchestrator for autonomous software delivery.
+You are implementing Ewokbot, a TypeScript/Node.js CLI orchestrator for autonomous software delivery.
 
 ## Mission
 
@@ -45,7 +45,7 @@ Required outcomes:
 - State store.
 - Markdown report writer.
 - Mock Jira connector.
-- `agentic init`.
+- `ewokbot init`.
 - `agentic scan`.
 - `agentic plan <ticket>`.
 - Unit tests for config/state/planning basics.

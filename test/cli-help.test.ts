@@ -29,21 +29,22 @@ function createCapturedIO() {
   };
 }
 
-test('agentic --help prints the mock planning help output', async () => {
+test('ewokbot --help prints the mock planning help output', async () => {
   const captured = createCapturedIO();
-  const exitCode = await createCliProgram({ io: captured.io }).run(['node', 'agentic', '--help']);
+  const exitCode = await createCliProgram({ io: captured.io }).run(['node', 'ewokbot', '--help']);
 
   assert.equal(exitCode, 0);
-  assert.match(captured.stdout, /Usage:\n  agentic \[--help\]/u);
-  assert.match(captured.stdout, /agentic init/u);
-  assert.match(captured.stdout, /agentic scan/u);
-  assert.match(captured.stdout, /agentic plan <ticket-key>/u);
-  assert.match(captured.stdout, /agentic run <ticket-key>/u);
-  assert.match(captured.stdout, /agentic worker \[--concurrency <n>\]/u);
-  assert.match(captured.stdout, /agentic status <ticket-key>/u);
-  assert.match(captured.stdout, /agentic quality <repo-path> --ticket-key <ticket-key>/u);
+  assert.match(captured.stdout, /Ewokbot/u);
+  assert.match(captured.stdout, /Usage:\n  ewokbot \[--help\]/u);
+  assert.match(captured.stdout, /ewokbot init/u);
+  assert.match(captured.stdout, /ewokbot scan/u);
+  assert.match(captured.stdout, /ewokbot plan <ticket-key>/u);
+  assert.match(captured.stdout, /ewokbot run <ticket-key>/u);
+  assert.match(captured.stdout, /ewokbot worker \[--concurrency <n>\]/u);
+  assert.match(captured.stdout, /ewokbot status <ticket-key>/u);
+  assert.match(captured.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
   assert.match(captured.stdout, /Copy config\/workspace\.example\.yml to config\/workspace\.yml/u);
-  assert.match(captured.stdout, /Mock mode only/u);
+  assert.match(captured.stdout, /Mock mode remains the default/u);
   assert.equal(captured.stderr, '');
 });
 
@@ -52,18 +53,18 @@ test('help output does not require credentials or provider configuration', async
   const exitCode = await createCliProgram({ io: captured.io }).run(['node', 'agentic']);
 
   assert.equal(exitCode, 0);
-  assert.match(captured.stdout, /agentic \[--help\]/u);
-  assert.match(captured.stdout, /agentic init/u);
-  assert.match(captured.stdout, /agentic worker/u);
+  assert.match(captured.stdout, /ewokbot \[--help\]/u);
+  assert.match(captured.stdout, /ewokbot init/u);
+  assert.match(captured.stdout, /ewokbot worker/u);
   assert.equal(captured.stderr, '');
 });
 
-test('built agentic bin prints help when invoked through a package-manager symlink', () => {
+test('built ewokbot bin prints help when invoked through a package-manager symlink', () => {
   const binDir = mkdtempSync(join(tmpdir(), 'agentic-bin-test-'));
-  const agenticBin = join(binDir, 'agentic');
-  symlinkSync(resolve('dist/src/cli/index.js'), agenticBin);
+  const ewokbotBin = join(binDir, 'ewokbot');
+  symlinkSync(resolve('dist/src/cli/index.js'), ewokbotBin);
 
-  const result = spawnSync('agentic', ['--help'], {
+  const result = spawnSync('ewokbot', ['--help'], {
     encoding: 'utf8',
     env: {
       PATH: `${binDir}:${process.env.PATH ?? ''}`
@@ -72,13 +73,13 @@ test('built agentic bin prints help when invoked through a package-manager symli
 
   assert.equal(result.status, 0);
   assert.equal(result.stderr, '');
-  assert.match(result.stdout, /Usage:\n  agentic \[--help\]/u);
-  assert.match(result.stdout, /agentic init/u);
-  assert.match(result.stdout, /agentic run <ticket-key>/u);
-  assert.match(result.stdout, /agentic worker/u);
-  assert.match(result.stdout, /agentic status <ticket-key>/u);
-  assert.match(result.stdout, /agentic quality <repo-path> --ticket-key <ticket-key>/u);
-  assert.match(result.stdout, /Mock mode only/u);
+  assert.match(result.stdout, /Usage:\n  ewokbot \[--help\]/u);
+  assert.match(result.stdout, /ewokbot init/u);
+  assert.match(result.stdout, /ewokbot run <ticket-key>/u);
+  assert.match(result.stdout, /ewokbot worker/u);
+  assert.match(result.stdout, /ewokbot status <ticket-key>/u);
+  assert.match(result.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
+  assert.match(result.stdout, /Mock mode remains the default/u);
 });
 
 test('agentic worker processes the mock backlog without credentials', async () => {
