@@ -7,11 +7,13 @@
   "type": "module",
   "bin": {
     "ewokbot": "./dist/src/cli/index.js",
+    "ewok": "./dist/src/cli/index.js",
     "agentic": "./dist/src/cli/index.js"
   },
   "files": [
     "dist",
     "config",
+    ".env.example",
     "assets"
   ],
   "engines": {

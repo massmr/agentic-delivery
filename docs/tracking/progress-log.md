@@ -2,6 +2,31 @@
 
 ## 2026-06-04
 
+Fixed Milestone AA review findings:
+
+- Replaced shared setup capability stubs with provider-specific local detection and generated-config validation for OpenCode, optional oh-my-openagent, GitHub, Jira, Railway, Vercel, and CLI control.
+- Hardened `ewokbot init --deployment-monitor` parsing so invalid or missing values fail before writing setup files.
+- Updated generated onboarding config to use `dev_runner.env_var_names`, matching the workspace config parser.
+- Made the no-command CLI hint state-aware: fresh workspaces point to `ewokbot init`, while configured workspaces point to `ewokbot doctor`, `ewokbot worker`, and `ewokbot status`.
+- Preserved Milestone AA scope only, with no live provider calls, package installs, daemonization, hosted workers, or production automation.
+
+Completed Milestone AA Interactive CLI Onboarding For VPS Setup:
+
+- Added the `ewok` package binary while retaining `ewokbot` and `agentic`, and updated no-command/help output to point new users to `ewokbot init`.
+- Added typed setup provider capability contracts for OpenCode, optional oh-my-openagent, GitHub, Jira, Railway, Vercel, and CLI-only control, with deterministic onboarding order and secret-env metadata.
+- Reworked `ewokbot init` to create mock-safe `config/workspace.yml` and `.env.example` files for Railway-only, Vercel-only, or both deployment monitor choices, while preserving a non-interactive automation path.
+- Added a local-only `ewokbot doctor` skeleton that validates local config shape and required `.env.example` placeholders without provider, MCP, installer, OpenCode, or network calls.
+- Added tests for aliases/help, setup hints, generated configs, placeholder safety, existing config detection, provider ordering, and doctor missing/generated config behavior.
+- Preserved mock mode as the default and avoided Telegram, WhatsApp, dashboards, daemonization, systemd, pm2, Docker, hosted workers, live provider calls, global installs, production merge, and production deployment automation.
+
+Aligned post-Z product direction:
+
+- Defined Ewokbot's next product phase as an npm-installable CLI designed to run continuously on a VPS.
+- Made CLI control the current control plane and moved Telegram, WhatsApp, and dashboards to future interfaces.
+- Added Railway and Vercel as first-class deployment/CI monitoring choices for onboarding and future smoke runs.
+- Added approved post-Z milestones AA-AE covering interactive onboarding, doctor checks, long-running worker runtime, CLI control commands, and the first real-provider smoke run.
+- Updated README, product spec, roadmap, next actions, approved backlog, and decision log to prevent unapproved task invention.
+
 Completed Milestone Z Railway Staging Verification:
 
 - Hardened staging verification so Railway polling errors, missing or invalid service URLs, failed deployment statuses, and failed smoke checks persist actionable `FAILED` state and write `staging-report.md` evidence.

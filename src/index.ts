@@ -38,6 +38,29 @@ export type {
 export { createCliProgram } from './cli/program.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
 export {
+  createOnboardingFiles,
+  defaultSetupSelections,
+  getDeploymentMonitors,
+  getRequiredEnvPlaceholders,
+  getSetupCapabilities,
+  getSetupCapabilitiesForSelections,
+  renderEnvExample,
+  renderOnboardingWorkspaceConfig,
+  runLocalDoctor
+} from './setup/index.js';
+export type {
+  DeploymentMonitorSelection,
+  DoctorIssue,
+  DoctorReport,
+  OnboardingFiles,
+  SetupDetectionInput,
+  SetupDetectionResult,
+  SetupGeneratedConfigMetadata,
+  SetupProviderCapability,
+  SetupSelections,
+  SetupValidationResult
+} from './setup/index.js';
+export {
   GitHubMcpCodeHostPort,
   MockGitHubConnector,
   buildDevelopPullRequestBody,

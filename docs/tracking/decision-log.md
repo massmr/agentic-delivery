@@ -55,3 +55,17 @@ Rationale:
 
 - Reliability comes from state, retries, and quality gates.
 - A dashboard is useful later but should not be the first dependency.
+
+## 2026-06-04: Productize Around CLI And VPS Runtime
+
+Decision:
+
+Make Ewokbot an npm-installable CLI product that can be configured and left running on a VPS. Keep the terminal as the first control plane.
+
+Rationale:
+
+- The operator should not depend on a personal laptop for autonomous delivery.
+- CLI control fits the expected user experience for tools like Claude Code and OpenCode.
+- A VPS worker needs onboarding, readiness checks, locks, logs, and crash-safe state before chat controls.
+- Telegram, WhatsApp, and dashboards should become later interfaces over the same command model, not the first product surface.
+- Railway and Vercel both need first-class setup paths for public users and the founder's own deployment stack.

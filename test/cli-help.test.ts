@@ -35,27 +35,51 @@ test('ewokbot --help prints the mock planning help output', async () => {
 
   assert.equal(exitCode, 0);
   assert.match(captured.stdout, /Ewokbot/u);
+  assert.match(captured.stdout, /ewokbot, ewok, and agentic binaries are aliases/u);
   assert.match(captured.stdout, /Usage:\n  ewokbot \[--help\]/u);
   assert.match(captured.stdout, /ewokbot init/u);
+  assert.match(captured.stdout, /ewokbot doctor/u);
   assert.match(captured.stdout, /ewokbot scan/u);
   assert.match(captured.stdout, /ewokbot plan <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot run <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot worker \[--concurrency <n>\]/u);
   assert.match(captured.stdout, /ewokbot status <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
-  assert.match(captured.stdout, /Copy config\/workspace\.example\.yml to config\/workspace\.yml/u);
+  assert.match(captured.stdout, /Create config\/workspace\.yml and \.env\.example/u);
   assert.match(captured.stdout, /Mock mode remains the default/u);
   assert.equal(captured.stderr, '');
 });
 
-test('help output does not require credentials or provider configuration', async () => {
+test('no-command output does not require credentials and points to setup', async () => {
+  const rootPath = mkdtempSync(join(tmpdir(), 'agentic-no-command-missing-'));
   const captured = createCapturedIO();
-  const exitCode = await createCliProgram({ io: captured.io }).run(['node', 'agentic']);
+  const exitCode = await createCliProgram({ cwd: rootPath, io: captured.io }).run(['node', 'agentic']);
 
   assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /No command provided/u);
+  assert.match(captured.stdout, /Run ewokbot init/u);
   assert.match(captured.stdout, /ewokbot \[--help\]/u);
   assert.match(captured.stdout, /ewokbot init/u);
   assert.match(captured.stdout, /ewokbot worker/u);
+  assert.equal(captured.stderr, '');
+});
+
+test('no-command output points configured workspaces to operational commands', async () => {
+  const rootPath = mkdtempSync(join(tmpdir(), 'agentic-no-command-ready-'));
+  const captured = createCapturedIO();
+
+  mkdirSync(join(rootPath, 'config'));
+  writeFileSync(join(rootPath, 'config', 'workspace.yml'), workerConfigYaml, 'utf8');
+
+  const exitCode = await createCliProgram({ cwd: rootPath, io: captured.io }).run(['node', 'ewokbot']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /No command provided/u);
+  assert.match(captured.stdout, /Run ewokbot doctor/u);
+  assert.match(captured.stdout, /ewokbot worker/u);
+  assert.match(captured.stdout, /ewokbot status/u);
+  assert.doesNotMatch(captured.stdout, /Run ewokbot init to create/u);
+  assert.match(captured.stdout, /ewokbot \[--help\]/u);
   assert.equal(captured.stderr, '');
 });
 
@@ -79,6 +103,25 @@ test('built ewokbot bin prints help when invoked through a package-manager symli
   assert.match(result.stdout, /ewokbot worker/u);
   assert.match(result.stdout, /ewokbot status <ticket-key>/u);
   assert.match(result.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
+  assert.match(result.stdout, /Mock mode remains the default/u);
+});
+
+test('built ewok alias prints help when invoked through a package-manager symlink', () => {
+  const binDir = mkdtempSync(join(tmpdir(), 'ewok-bin-test-'));
+  const ewokBin = join(binDir, 'ewok');
+  symlinkSync(resolve('dist/src/cli/index.js'), ewokBin);
+
+  const result = spawnSync('ewok', ['--help'], {
+    encoding: 'utf8',
+    env: {
+      PATH: `${binDir}:${process.env.PATH ?? ''}`
+    }
+  });
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stderr, '');
+  assert.match(result.stdout, /ewokbot, ewok, and agentic binaries are aliases/u);
+  assert.match(result.stdout, /ewokbot doctor/u);
   assert.match(result.stdout, /Mock mode remains the default/u);
 });
 

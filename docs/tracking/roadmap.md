@@ -92,6 +92,29 @@ Status legend:
 - `[x]` Retry and escalation policy
 - `[x]` Worker MCP mode
 
+## Productized CLI And VPS Runtime
+
+- `[x]` npm-installable CLI experience with `ewokbot` and `ewok` binaries
+- `[x]` Interactive first-run onboarding
+- `[x]` Provider capability setup model
+- `[~]` OpenCode setup detection
+- `[~]` oh-my-openagent optional setup detection
+- `[~]` GitHub setup prompts
+- `[~]` Jira setup prompts
+- `[x]` Railway setup prompts
+- `[x]` Vercel setup prompts
+- `[x]` Secret placeholder and redaction policy for onboarding
+- `[~]` `ewokbot doctor` readiness command
+- `[ ]` VPS-oriented worker start command
+- `[ ]` Worker lock and graceful shutdown
+- `[ ]` CLI run inspection and approval commands
+
+## Future Control Surfaces
+
+- `[ ]` Telegram control plane
+- `[ ]` WhatsApp control plane
+- `[ ]` Web or mobile dashboard
+
 ## Optional Dashboard
 
 - `[ ]` Run list

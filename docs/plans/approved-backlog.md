@@ -372,3 +372,127 @@ Explicit safety constraints:
 - Do not deploy to production or mutate production environments.
 - Do not bypass failed or missing staging verification.
 - Production merge and production deploy remain human-only.
+
+### Milestone AA: Interactive CLI Onboarding For VPS Setup
+
+Goal:
+
+Make Ewokbot feel like a product that can be installed from npm, configured from the terminal, and prepared to run continuously on a VPS.
+
+Product direction:
+
+- CLI is the first control plane.
+- Telegram, WhatsApp, and dashboard controls are explicitly future work.
+- Railway and Vercel are both first-class deployment/CI monitoring choices.
+- OpenCode is the only supported development runner for now.
+- oh-my-openagent is optional setup assistance for OpenCode users.
+
+Build:
+
+- Primary CLI entrypoints for `ewokbot` and `ewok`, while keeping `agentic` as a backward-compatible alias.
+- A friendly no-command entrypoint that points new users toward setup.
+- Interactive `ewokbot init` onboarding backed by typed setup/provider capability modules.
+- Non-interactive init behavior retained for tests and automation.
+- Provider capability contracts for detecting existing setup, describing install steps, collecting non-secret config, declaring required secret env vars, validating generated config, and producing a setup summary.
+- First setup choices:
+  - Dev runner: OpenCode only.
+  - Optional OpenCode preset/tooling: oh-my-openagent yes/no.
+  - Code host: GitHub only.
+  - Ticket provider: Jira only.
+  - Deployment/CI monitor: Railway, Vercel, or both.
+  - Control plane: CLI only.
+- Non-secret workspace config generation in `config/workspace.yml`.
+- Secret placeholder generation in `.env.example`, without storing real secrets in tracked files.
+- A first `ewokbot doctor` command skeleton that validates local config shape and reports missing setup pieces without live provider calls.
+
+Acceptance:
+
+- Mock mode remains available and safe by default.
+- Tests cover CLI aliases/help, no-command setup hint, generated config for Railway only, Vercel only, and both, secret placeholder/redaction behavior, existing config detection, provider capability ordering, and doctor behavior for missing and generated config.
+- The onboarding flow does not perform live provider calls.
+- The onboarding flow does not install global packages automatically.
+- Real secret values are never printed or written to tracked files.
+- Telegram, WhatsApp, daemonization, systemd, pm2, Docker, hosted workers, and production automation are not implemented in this milestone.
+
+### Milestone AB: Doctor And Local Readiness Checks
+
+Goal:
+
+Make `ewokbot doctor` the operator's first readiness tool before running a long-lived worker.
+
+Build:
+
+- Local checks for Node, pnpm, OpenCode, optional oh-my-openagent config, workspace config, `.env`, GitHub, Jira, Railway, Vercel, repository paths, staging/production branch settings, and quality gate presence.
+- Redacted output for all secret-related diagnostics.
+- Clear pass/warn/fail categories.
+- No live provider calls unless an explicit future flag is approved.
+
+Acceptance:
+
+- Doctor is safe on a fresh clone and on a partially configured VPS.
+- Missing secrets or tools produce actionable next steps.
+- No secrets are printed.
+
+### Milestone AC: Long-Running Worker Runtime
+
+Goal:
+
+Turn the existing worker loop into a VPS-suitable runtime process.
+
+Build:
+
+- `ewokbot worker start`.
+- `--once` and `--dry-run` modes.
+- Worker lock to prevent concurrent workers in the same workspace.
+- Graceful shutdown.
+- Crash-safe state reuse.
+- Operator-readable logs.
+
+Acceptance:
+
+- The worker can run continuously without relying on a developer laptop.
+- Restarting after interruption preserves state and avoids duplicate side effects.
+- Production merge and production deployment remain human-only.
+
+### Milestone AD: CLI Control Plane
+
+Goal:
+
+Provide day-to-day terminal control over runs without needing Telegram or a dashboard.
+
+Build:
+
+- `ewokbot runs`.
+- `ewokbot inspect <run-id>`.
+- `ewokbot run <ticket-key>`.
+- `ewokbot pause`.
+- `ewokbot resume <run-id>`.
+- `ewokbot approve <run-id>`.
+- `ewokbot reject <run-id>`.
+- `ewokbot logs <run-id>`.
+
+Acceptance:
+
+- Commands operate on persisted state.
+- Approval commands do not merge or deploy production directly.
+- Output remains readable over SSH on a VPS.
+
+### Milestone AE: First Real Provider Smoke Run
+
+Goal:
+
+Validate a narrowly scoped real-provider path after onboarding, doctor, and worker controls exist.
+
+Build:
+
+- A single-ticket smoke run with explicit operator confirmation.
+- Jira intake through MCP.
+- GitHub PR preparation through the typed code host port.
+- Railway and/or Vercel staging observation through typed deployment/CI ports.
+- No production merge.
+
+Acceptance:
+
+- The run can be tested with one real ticket and one configured repository.
+- Every provider write is auditable and idempotency-protected.
+- Production remains human-approved.

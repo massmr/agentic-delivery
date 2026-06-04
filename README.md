@@ -6,7 +6,7 @@
 
 Ewokbot is an open-source agent runtime for autonomous software delivery.
 
-It is designed to read work from Jira, inspect the relevant repositories, delegate implementation to a coding agent such as OpenCode, run quality gates, verify staging, and prepare production pull requests for human approval.
+It is designed to read work from Jira, inspect the relevant repositories, delegate implementation to a coding agent such as OpenCode, run quality gates, verify staging through Railway and/or Vercel, and prepare production pull requests for human approval.
 
 The core idea is simple:
 
@@ -30,6 +30,9 @@ Ewokbot is early, active, and intentionally conservative.
 Current capabilities:
 
 - CLI-first local runtime.
+- Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
+- Interactive and non-interactive local onboarding that writes `config/workspace.yml` and `.env.example` placeholders.
+- Local-only `ewokbot doctor` setup validation.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `runs/`.
 - Jira ticket intake boundary with MCP-backed adapter support.
@@ -50,6 +53,24 @@ Default behavior is safe:
 - No credentials required for mock mode.
 
 The project is ready for local exploration and contribution, but not yet a turnkey autonomous production operator.
+
+## Product Direction
+
+Ewokbot is moving toward an npm-installable CLI that can be configured on a VPS and left running continuously.
+
+Target shape:
+
+```bash
+npm install -g ewokbot
+ewokbot init
+ewokbot doctor
+ewokbot worker start
+ewokbot status
+```
+
+The first control surface is the terminal. It should feel familiar to users of Claude Code or OpenCode: explicit commands, readable state, local logs, and human approval gates. Telegram, WhatsApp, and other remote controls are future interfaces, not the current product surface.
+
+The first supported setup path should cover OpenCode, optional oh-my-openagent configuration, GitHub, Jira, Railway, and Vercel. Railway and Vercel are both first-class deployment/CI monitoring targets.
 
 ## Why Ewokbot?
 
@@ -100,10 +121,24 @@ pnpm typecheck
 
 ## Quickstart
 
-Initialize a local workspace config:
+After building locally, use the built CLI entrypoint directly. In an installed package, the same commands are available as `ewokbot`, `ewok`, or the retained `agentic` alias.
+
+Initialize local setup files:
 
 ```bash
 node dist/src/cli/index.js init
+```
+
+For automation or CI, use the non-interactive path:
+
+```bash
+node dist/src/cli/index.js init --non-interactive --deployment-monitor railway
+```
+
+Validate local setup files without provider, MCP, installer, or network calls:
+
+```bash
+node dist/src/cli/index.js doctor
 ```
 
 Inspect available commands:
@@ -150,7 +185,17 @@ node dist/src/cli/index.js worker --concurrency 1 --max-cycles 1 --max-attempts 
 
 ## Configuration
 
-`ewokbot init` copies `config/workspace.example.yml` to `config/workspace.yml`.
+`ewokbot init` creates a mock-safe `config/workspace.yml` and a root `.env.example` with empty secret placeholders. It supports Railway-only, Vercel-only, or both deployment/CI monitor choices while keeping runtime provider modes on `mock` by default.
+
+Examples:
+
+```bash
+ewokbot init --non-interactive --deployment-monitor railway
+ewokbot init --non-interactive --deployment-monitor vercel
+ewokbot init --non-interactive --deployment-monitor both
+```
+
+`ewokbot doctor` validates local file presence, workspace config shape, and required `.env.example` placeholders. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, or network APIs.
 
 Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode through runtime-injected MCP clients.
 
@@ -261,12 +306,10 @@ The test suite is intentionally mock-heavy. New provider work should add contrac
 
 Near-term direction:
 
-- real MCP session runner for local CLI usage,
-- real Jira intake smoke test,
-- control-plane command layer for Telegram, WhatsApp, CLI, and future mobile interfaces,
-- first real end-to-end ticket run with explicit operator approval,
-- durable worker and resume flow,
-- richer GitHub and Railway MCP integrations.
+- long-running VPS worker runtime,
+- CLI control commands for status, runs, pause/resume, and approval,
+- real provider smoke runs with explicit operator approval,
+- richer GitHub, Jira, Railway, and Vercel integrations.
 
 Track detailed planning in:
 

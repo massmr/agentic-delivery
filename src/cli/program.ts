@@ -1,4 +1,8 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { runInitCommand } from './commands/init.js';
+import { runDoctorCommand } from './commands/doctor.js';
 import { runPlanCommand } from './commands/plan.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
 import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
@@ -6,15 +10,17 @@ import { runScanCommand } from './commands/scan.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
+import type { InitPrompter } from './commands/init.js';
 
 const HELP_TEXT = [
   'Ewokbot',
   '',
-  'Autonomous software delivery runtime. The ewokbot and agentic binaries are aliases.',
+  'Autonomous software delivery runtime. The ewokbot, ewok, and agentic binaries are aliases.',
   '',
   'Usage:',
   '  ewokbot [--help]',
   '  ewokbot init',
+  '  ewokbot doctor',
   '  ewokbot scan',
   '  ewokbot plan <ticket-key>',
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
@@ -23,7 +29,8 @@ const HELP_TEXT = [
   '  ewokbot quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
   'Commands:',
-  '  init        Copy config/workspace.example.yml to config/workspace.yml.',
+  '  init        Create config/workspace.yml and .env.example for local onboarding.',
+  '  doctor      Validate local setup files without live provider calls.',
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local mock plan and run state for one ticket.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
@@ -49,6 +56,7 @@ export interface CliProgramOptions {
   readonly configPath?: string;
   readonly io?: CliProgramIO;
   readonly initTemplatePath?: string;
+  readonly initPrompter?: InitPrompter;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
 }
 
@@ -82,13 +90,29 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
     async run(argv: readonly string[]): Promise<number> {
       const args = argv.slice(2);
 
-      if (args.length === 0 || args.some(isHelpFlag)) {
+      if (args.length === 0) {
+        const cwd = options.cwd ?? process.cwd();
+        const configExists = existsSync(join(cwd, 'config', 'workspace.yml'));
+        const hint = configExists
+          ? 'No command provided. Run ewokbot doctor to validate setup, ewokbot worker to process work, or ewokbot status to inspect a run.'
+          : 'No command provided. Run ewokbot init to create config/workspace.yml and .env.example.';
+
+        io.stdout(`${hint}\n\n`);
+        printHelp();
+        return 0;
+      }
+
+      if (args.some(isHelpFlag)) {
         printHelp();
         return 0;
       }
 
       if (args[0] === 'init') {
-        return runInitCommand({ cwd: options.cwd, io, templatePath: options.initTemplatePath });
+        return runInitCommand({ cwd: options.cwd, io, args: args.slice(1), prompter: options.initPrompter });
+      }
+
+      if (args[0] === 'doctor') {
+        return runDoctorCommand({ cwd: options.cwd, io });
       }
 
       if (args[0] === 'scan') {
