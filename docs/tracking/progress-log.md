@@ -2,6 +2,14 @@
 
 ## 2026-06-04
 
+Completed Milestone Y GitHub Delivery Workflow:
+
+- Added a deterministic operation ledger with stable input hashing, completed-operation lookup, and a local JSON-backed implementation stored under each run directory for restart-safe delivery handoff idempotency.
+- Added `LocalGitAdapter.pushBranch(...)` as the local git/native fallback for actual branch pushes, with fake command-runner tests and no real remote push tests.
+- Reworked develop PR handoff to require passed quality gates before push or PR handoff, use `CodeHostPort` for GitHub branch metadata, PR creation, PR comments, and check reads, and use local git for actual branch push.
+- Added ledger-backed idempotency coverage for branch creation, local push, pull request creation, PR comments, and check reads so reruns do not duplicate side effects when ledger state exists, including after recreating a persistent ledger instance.
+- Integrated the mock end-to-end run with the new workflow while preserving mock-only providers, human-only production controls, and no live GitHub/MCP/remote git calls.
+
 Completed Milestone X OpenCode Execution Contract:
 
 - Hardened `OpenCodeSubprocessRunner` with an injectable subprocess executor, executable-plus-args command construction, workspace-root cwd validation, environment allowlists, timeout handling, cancellation handling, and secret-like output redaction.

@@ -31,6 +31,7 @@ Status legend:
 - `[x]` Runtime MCP wiring
 - `[x]` Jira MCP TicketPort
 - `[x]` Native fallback contracts
+- `[x]` Operation ledger
 - `[x]` Markdown report writer
 
 ## Planning
@@ -53,6 +54,8 @@ Status legend:
 - `[x]` PR body generator
 - `[x]` Mock GitHub connector
 - `[x]` GitHub MCP CodeHostPort
+- `[x]` Local git push fallback
+- `[x]` GitHub delivery workflow
 
 ## Development Runner
 

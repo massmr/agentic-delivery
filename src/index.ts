@@ -25,6 +25,16 @@ export type {
   WorkspaceRepositoryConfig,
   WorkspaceSettings
 } from './config/index.js';
+export { InMemoryOperationLedger, JsonOperationLedger, buildOperationId, getOperationLedgerFilePath, hashOperationInput } from './agent/index.js';
+export type {
+  OperationLedger,
+  OperationLedgerFailureInput,
+  OperationLedgerLookupInput,
+  OperationLedgerRecord,
+  OperationLedgerStartInput,
+  OperationLedgerStatus,
+  OperationLedgerSuccessInput
+} from './agent/index.js';
 export { createCliProgram } from './cli/program.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
 export {
@@ -210,7 +220,7 @@ export type {
   RunProductionPullRequestPreparationInput,
   RunStagingVerificationInput
 } from './delivery/index.js';
-export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner } from './git/index.js';
+export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, PushLocalBranchInput } from './git/index.js';
 export type {
   CreateMcpToolCallAuditRecordInput,
   DiscoveredMcpTool,

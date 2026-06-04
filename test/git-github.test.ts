@@ -10,6 +10,9 @@ import {
   buildDevelopPullRequestBody,
   buildWorkingBranchName,
   createDeliveryRunStateRecord,
+  InMemoryOperationLedger,
+  JsonOperationLedger,
+  getOperationLedgerFilePath,
   recordBranchCreated,
   recordBranchPushed,
   recordPullRequestOpened,
@@ -21,6 +24,8 @@ import {
   type DeliveryTicket,
   type GitCommandInput,
   type GitCommandResult,
+  type PullRequestCheckSummary,
+  type PullRequestCommentInput,
   type PullRequestRef,
   type QualityReport,
   type RepositoryConfig,
@@ -134,6 +139,31 @@ test('LocalGitAdapter uses argument-array git commands and injected command runn
   assert.equal(branch.headSha, 'abc123');
 });
 
+test('LocalGitAdapter pushes branches through local git fallback without real remote access', async () => {
+  const commands: GitCommandInput[] = [];
+  const adapter = new LocalGitAdapter(async (input) => {
+    commands.push(input);
+
+    if (input.args[0] === 'rev-parse') {
+      return { stdout: 'pushed123\n', stderr: '', exitCode: 0 };
+    }
+
+    return { stdout: '', stderr: '', exitCode: 0 };
+  });
+  const branch = await adapter.pushBranch({
+    repository: repositoryRef,
+    localPath: '/repo',
+    branch: createBranchRef('agent/AD-123-github-pr-handoff')
+  });
+
+  assert.deepEqual(commands.map((command) => command.args), [
+    ['push', 'origin', 'agent/AD-123-github-pr-handoff'],
+    ['rev-parse', 'HEAD']
+  ]);
+  assert.equal(commands.every((command) => command.command === 'git'), true);
+  assert.equal(branch.headSha, 'pushed123');
+});
+
 test('LocalGitAdapter creates a harmless local branch in a temporary git repository', async (t) => {
   const rootPath = await createTempRoot(t, 'agentic-git-');
 
@@ -223,9 +253,11 @@ test('state helpers idempotently replace matching branch and PR entries while tr
   assert.equal(replacedPrState.pullRequests[0]?.number, 13);
 });
 
-test('runDevelopPullRequestHandoff writes branch, pushed, and PR states in order after passed local quality', async () => {
+test('runDevelopPullRequestHandoff uses CodeHostPort actions and local push after passed local quality', async () => {
   const store = new MemoryRunStateStore();
-  const commandRunner = createSuccessfulGitCommandRunner();
+  const commands: GitCommandInput[] = [];
+  const commandRunner = createSuccessfulGitCommandRunner(commands);
+  const connector = new CountingGitHubConnector();
   const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
   const result = await runDevelopPullRequestHandoff({
     state,
@@ -233,14 +265,131 @@ test('runDevelopPullRequestHandoff writes branch, pushed, and PR states in order
     repository,
     branchName: 'agent/AD-123-github-pr-handoff',
     git: new LocalGitAdapter(commandRunner),
-    github: new MockGitHubConnector(),
+    github: connector,
     stateStore: store,
     now: fixedClock()
   });
 
-  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED', 'PUSHED', 'PR_TO_DEVELOP_OPENED']);
+  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED', 'PUSHED', 'PR_TO_DEVELOP_OPENED', 'DEVELOP_CHECKS_PASSED']);
+  assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'push'), [
+    ['push', 'origin', 'agent/AD-123-github-pr-handoff']
+  ]);
+  assert.equal(connector.createBranchCount, 1);
+  assert.equal(connector.pushCount, 0);
+  assert.equal(connector.pullRequestCount, 1);
+  assert.equal(connector.commentCount, 1);
+  assert.equal(connector.checkCount, 1);
   assert.equal(result.pullRequests.length, 1);
   assert.equal(result.pullRequests[0]?.targetBranch, 'develop');
+  assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+});
+
+test('runDevelopPullRequestHandoff without a ledger root ignores stale cwd ledger state', async (t) => {
+  const rootPath = await createTempRoot(t, 'agentic-stale-ledger-');
+  const staleLedger = new JsonOperationLedger(ticket.ref.key, 'run-1', rootPath);
+  const staleStarted = await staleLedger.startOperation({
+    runId: 'run-1',
+    provider: 'git',
+    port: 'LocalGitAdapter',
+    action: 'pushBranch',
+    input: { repository: repository.ref, branch: createBranchRef('agent/AD-123-github-pr-handoff') },
+    startedAt: '2026-06-03T10:00:00.000Z'
+  });
+  await staleLedger.succeedOperation({
+    operationId: staleStarted.operationId,
+    finishedAt: '2026-06-03T10:00:01.000Z',
+    externalId: 'agent/AD-123-github-pr-handoff',
+    result: createBranchRef('agent/AD-123-github-pr-handoff')
+  });
+
+  const store = new MemoryRunStateStore();
+  const commands: GitCommandInput[] = [];
+  const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
+  await runDevelopPullRequestHandoff({
+    state,
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-github-pr-handoff',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+    github: new CountingGitHubConnector(),
+    stateStore: store,
+    now: fixedClock()
+  });
+
+  assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'push'), [
+    ['push', 'origin', 'agent/AD-123-github-pr-handoff']
+  ]);
+  assert.equal(getOperationLedgerFilePath(ticket.ref.key, 'run-1'), 'runs/AD-123/run-1/operation-ledger.json');
+});
+
+test('runDevelopPullRequestHandoff ledger prevents duplicate GitHub handoff side effects on rerun', async () => {
+  const store = new MemoryRunStateStore();
+  const commands: GitCommandInput[] = [];
+  const connector = new CountingGitHubConnector();
+  const ledger = new InMemoryOperationLedger();
+  const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
+  const input = {
+    state,
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-github-pr-handoff',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+    github: connector,
+    operationLedger: ledger,
+    stateStore: store,
+    now: fixedClock()
+  };
+
+  await runDevelopPullRequestHandoff(input);
+  await runDevelopPullRequestHandoff(input);
+
+  assert.equal(connector.createBranchCount, 1);
+  assert.equal(connector.pushCount, 0);
+  assert.equal(connector.pullRequestCount, 1);
+  assert.equal(connector.commentCount, 1);
+  assert.equal(connector.checkCount, 1);
+  assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
+  assert.deepEqual((await ledger.listOperations()).filter((record) => record.status === 'succeeded').map((record) => `${record.provider}:${record.port}.${record.action}`).sort(), [
+    'git:LocalGitAdapter.pushBranch',
+    'github:CodeHostPort.commentOnPullRequest',
+    'github:CodeHostPort.createBranch',
+    'github:CodeHostPort.getChecks',
+    'github:CodeHostPort.openPullRequest'
+  ]);
+});
+
+test('runDevelopPullRequestHandoff uses persisted ledger state on rerun with a new ledger instance', async (t) => {
+  const rootPath = await createTempRoot(t, 'agentic-json-ledger-');
+  const store = new MemoryRunStateStore();
+  const commands: GitCommandInput[] = [];
+  const connector = new CountingGitHubConnector();
+  const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
+  const input = {
+    state,
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-github-pr-handoff',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+    github: connector,
+    stateStore: store,
+    now: fixedClock()
+  };
+
+  await runDevelopPullRequestHandoff({
+    ...input,
+    operationLedger: new JsonOperationLedger(ticket.ref.key, state.runId, rootPath)
+  });
+  await runDevelopPullRequestHandoff({
+    ...input,
+    operationLedger: new JsonOperationLedger(ticket.ref.key, state.runId, rootPath)
+  });
+
+  assert.equal(connector.createBranchCount, 1);
+  assert.equal(connector.pushCount, 0);
+  assert.equal(connector.pullRequestCount, 1);
+  assert.equal(connector.commentCount, 1);
+  assert.equal(connector.checkCount, 1);
+  assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
 });
 
 test('runDevelopPullRequestHandoff persists BRANCH_CREATED but blocks push and PR when quality failed', async () => {
@@ -268,8 +417,11 @@ test('runDevelopPullRequestHandoff persists BRANCH_CREATED but blocks push and P
   );
 
   assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED']);
+  assert.equal(connector.createBranchCount, 0);
   assert.equal(connector.pushCount, 0);
   assert.equal(connector.pullRequestCount, 0);
+  assert.equal(connector.commentCount, 0);
+  assert.equal(connector.checkCount, 0);
 });
 
 async function createTempRoot(t: TestContext, prefix: string): Promise<string> {
@@ -339,8 +491,10 @@ function createState(state: DeliveryRunStateRecord['state'], qualityReports: rea
   };
 }
 
-function createSuccessfulGitCommandRunner(): (input: GitCommandInput) => Promise<GitCommandResult> {
+function createSuccessfulGitCommandRunner(commands: GitCommandInput[] = []): (input: GitCommandInput) => Promise<GitCommandResult> {
   return async (input) => {
+    commands.push(input);
+
     if (input.args[0] === 'show-ref') {
       return { stdout: '', stderr: '', exitCode: 1 };
     }
@@ -383,8 +537,16 @@ class MemoryRunStateStore implements RunStateStore {
 }
 
 class CountingGitHubConnector extends MockGitHubConnector {
+  createBranchCount = 0;
   pushCount = 0;
   pullRequestCount = 0;
+  commentCount = 0;
+  checkCount = 0;
+
+  override async createBranch(input: Parameters<MockGitHubConnector['createBranch']>[0]): Promise<BranchRef> {
+    this.createBranchCount += 1;
+    return super.createBranch(input);
+  }
 
   override async pushBranch(input: Parameters<MockGitHubConnector['pushBranch']>[0]): Promise<BranchRef> {
     this.pushCount += 1;
@@ -394,5 +556,21 @@ class CountingGitHubConnector extends MockGitHubConnector {
   override async openPullRequest(input: Parameters<MockGitHubConnector['openPullRequest']>[0]): Promise<PullRequestRef> {
     this.pullRequestCount += 1;
     return super.openPullRequest(input);
+  }
+
+  override async getChecks(): Promise<PullRequestCheckSummary> {
+    this.checkCount += 1;
+    return {
+      status: 'passed',
+      totalCount: 1,
+      passedCount: 1,
+      failedCount: 0,
+      pendingCount: 0
+    };
+  }
+
+  override async commentOnPullRequest(input: PullRequestCommentInput): Promise<void> {
+    this.commentCount += 1;
+    return super.commentOnPullRequest(input);
   }
 }

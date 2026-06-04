@@ -17,10 +17,9 @@ import {
   createDeliveryRunStateRecord,
   getRunDirectoryPath,
   recordBranchCreated,
-  recordBranchPushed,
-  recordPullRequestOpened,
   transitionDeliveryRunState
 } from '../state/index.js';
+import { runDevelopPullRequestHandoff } from './develop-pr-handoff.js';
 import { runProductionPullRequestPreparation } from './production-pr-preparation.js';
 import { runStagingVerification } from './staging-verification.js';
 
@@ -156,30 +155,18 @@ export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInpu
   await stateStore.write(localChecksPassedState);
 
   const github = new MockGitHubConnector();
-  await github.createBranch({ repository: repository.ref, branch });
-  const pushedBranch = await github.pushBranch({ repository: repository.ref, branch });
-  const pushedState = recordBranchPushed(localChecksPassedState, pushedBranch, now().toISOString());
-  await stateStore.write(pushedState);
-
-  const developPullRequest = await github.openPullRequest({
-    repository: repository.ref,
-    title: `${ticket.ref.key} ${ticket.summary}`,
-    body: buildDevelopPullRequestBody({
-      ticket,
-      analysis: pushedState.ticketAnalysis,
-      runId,
-      repository: repository.ref,
-      branch: pushedBranch,
-      qualityReport
-    }),
-    sourceBranch: pushedBranch.name,
-    targetBranch: repository.branchPolicy.stagingTarget
+  const checksPassedState = await runDevelopPullRequestHandoff({
+    state: localChecksPassedState,
+    ticket,
+    repository,
+    branchName,
+    git: new LocalGitAdapter(createMockGitCommandRunner(repository.ref, branchName)),
+    github,
+    operationLedgerRootPath: rootPath,
+    stateStore,
+    now
   });
-  const developPullRequestState = recordPullRequestOpened(pushedState, developPullRequest, now().toISOString());
-  await stateStore.write(developPullRequestState);
-
-  const checksPassedState = transitionDeliveryRunState(developPullRequestState, 'DEVELOP_CHECKS_PASSED', now().toISOString());
-  await stateStore.write(checksPassedState);
+  const pushedBranch = checksPassedState.branches.find((candidate) => candidate.name === branchName) ?? branch;
 
   const stagingState = await runStagingVerification({
     state: checksPassedState,

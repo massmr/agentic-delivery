@@ -23,6 +23,12 @@ export interface CreateLocalBranchInput {
   readonly baseBranch: string;
 }
 
+export interface PushLocalBranchInput {
+  readonly repository: RepositoryRef;
+  readonly localPath: string;
+  readonly branch: BranchRef;
+}
+
 export class LocalGitAdapter {
   constructor(private readonly commandRunner: GitCommandRunner = runGitCommand) {}
 
@@ -44,6 +50,19 @@ export class LocalGitAdapter {
       repository: input.repository,
       name: input.branchName,
       baseBranch: input.baseBranch,
+      ...(headSha.length === 0 ? {} : { headSha })
+    };
+  }
+
+  async pushBranch(input: PushLocalBranchInput): Promise<BranchRef> {
+    assertSafeBranchName(input.branch.name);
+
+    await this.runOrThrow(['push', 'origin', input.branch.name], input.localPath);
+    const headSha = (await this.runOrThrow(['rev-parse', 'HEAD'], input.localPath)).stdout.trim();
+
+    return {
+      ...input.branch,
+      repository: input.repository,
       ...(headSha.length === 0 ? {} : { headSha })
     };
   }

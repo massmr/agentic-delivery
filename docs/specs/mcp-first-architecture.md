@@ -170,6 +170,8 @@ Examples:
 
 External MCP calls can timeout after succeeding. To avoid duplicated comments, branches, PRs, or transitions, mutating operations must be recorded in an operation ledger before and after execution.
 
+The GitHub develop handoff persists this ledger under the run directory as `operation-ledger.json` and uses it for branch metadata creation, local branch push handoff, pull request creation, PR comments, and check reads. GitHub branch metadata, PR, comment, and check operations stay behind `CodeHostPort`; the actual branch push remains local git/native or subprocess fallback only.
+
 Minimum operation ledger fields:
 
 - operation id

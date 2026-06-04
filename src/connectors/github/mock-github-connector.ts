@@ -62,9 +62,9 @@ export class MockGitHubConnector implements GitHubConnector {
 
   async getChecks(_input: ChecksInput): Promise<PullRequestCheckSummary> {
     return {
-      status: 'pending',
-      totalCount: 0,
-      passedCount: 0,
+      status: 'passed',
+      totalCount: 1,
+      passedCount: 1,
       failedCount: 0,
       pendingCount: 0
     };

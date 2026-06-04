@@ -127,6 +127,8 @@ Responsibilities:
 - Read checks.
 - Comment on PRs.
 
+Develop handoff uses this port for GitHub branch metadata, pull request creation, PR comments, and check reads. Actual branch push is intentionally outside the GitHub MCP surface and uses the local git/native subprocess fallback through `LocalGitAdapter.pushBranch(...)`. Required local quality gates must pass before the workflow attempts local push, PR handoff, comments, or check reads. Mutating handoff actions are recorded in the operation ledger before and after execution so reruns can avoid duplicate branches, pushes, PRs, comments, and check polling side effects.
+
 Required methods:
 
 ```ts
@@ -256,6 +258,8 @@ Target branches:
 The orchestrator must not push or open a staging PR unless required local quality gates pass.
 
 OpenCode runner success does not bypass quality gates. Failed, timed-out, or cancelled runner attempts persist actionable run state and reports before stopping or escalating; later GitHub and staging steps remain blocked until required quality gates pass.
+
+GitHub develop handoff also remains blocked until the latest required quality report has passed. The workflow may prepare local branch state, but it must not push the branch, create/open the develop pull request, comment on the pull request, or read checks until quality has passed.
 
 Default required gates:
 
