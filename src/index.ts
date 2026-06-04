@@ -27,9 +27,21 @@ export type {
 } from './config/index.js';
 export { createCliProgram } from './cli/program.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
-export { GitHubMcpCodeHostPort, MockGitHubConnector, buildDevelopPullRequestBody, buildProductionPullRequestBody, defaultGitHubMcpToolNames } from './connectors/github/index.js';
-export { JiraMcpTicketPort, MockJiraConnector, defaultJiraMcpToolNames } from './connectors/jira/index.js';
-export { MockRailwayConnector, RailwayMcpDeploymentPort, defaultRailwayMcpToolNames } from './connectors/railway/index.js';
+export {
+  GitHubMcpCodeHostPort,
+  MockGitHubConnector,
+  buildDevelopPullRequestBody,
+  buildProductionPullRequestBody,
+  createGitHubMcpToolRequirements,
+  defaultGitHubMcpToolNames
+} from './connectors/github/index.js';
+export { JiraMcpTicketPort, MockJiraConnector, createJiraMcpToolRequirements, defaultJiraMcpToolNames } from './connectors/jira/index.js';
+export {
+  MockRailwayConnector,
+  RailwayMcpDeploymentPort,
+  createRailwayMcpToolRequirements,
+  defaultRailwayMcpToolNames
+} from './connectors/railway/index.js';
 export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
 export { runAgentWorkerLoop, runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
@@ -78,10 +90,14 @@ export {
   ProviderCredentialError,
   ProviderMcpClientError,
   RealProviderAdapterUnavailableError,
+  RuntimeMcpClientResolutionError,
+  RuntimeMcpServerConfigError,
+  collectRuntimeMcpRequirements,
   createDevRunner,
   createGitHubConnector,
   createJiraConnector,
   createRailwayConnector,
+  createRuntimeWorkspaceAdapters,
   createWorkspaceAdapters
 } from './providers/index.js';
 export { assertStateResumable, canResumeState, findLatestRunState, getNextActionForState, listRunIdsForTicket, loadRunStatus, readRunState, renderRunStatus } from './status/index.js';
@@ -207,7 +223,14 @@ export type {
 export type { TicketPlan } from './planning/index.js';
 export type { AdapterKind, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
-export type { ProviderFactoryEnvironment, ProviderFactoryOptions, WorkspaceAdapters } from './providers/index.js';
+export type {
+  ProviderFactoryEnvironment,
+  ProviderFactoryOptions,
+  RuntimeMcpAuditSink,
+  RuntimeMcpClientFactory,
+  RuntimeProviderFactoryOptions,
+  WorkspaceAdapters
+} from './providers/index.js';
 export type { MockOpenCodeRunnerOptions, OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';
 export type { BuildDevelopPullRequestBodyInput, BuildProductionPullRequestBodyInput } from './connectors/github/index.js';
 export type { CreateDeliveryRunStateRecordInput, RunStateStore } from './state/index.js';

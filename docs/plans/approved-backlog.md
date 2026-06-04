@@ -192,3 +192,183 @@ Goal:
 Run the backlog processor continuously with queueing, concurrency limits, and escalation policy.
 
 Build only after MCP-backed provider ports and fallback contracts are individually tested.
+
+### Milestone U: Runtime MCP Wiring
+
+Goal:
+
+Wire configured MCP clients into the runtime provider factory so MCP-backed typed ports can be selected by workspace configuration without leaking raw MCP tools into delivery logic.
+
+Build:
+
+- Runtime MCP server resolution from workspace configuration.
+- MCP client construction and injection path for Jira, GitHub, and Railway MCP adapters.
+- Tool discovery and allowlist validation before adapter use.
+- Tool call audit capture for MCP-backed port operations.
+- Clear startup errors for missing server config, missing tools, or disallowed tools.
+
+Acceptance:
+
+- Mock mode remains the default and works without MCP servers or credentials.
+- Tests use mock MCP clients only and do not start live MCP servers.
+- Runtime configuration can select MCP-backed Jira, GitHub, or Railway ports through typed adapters.
+- Missing or disallowed MCP tools fail before delivery side effects occur.
+- Raw MCP tool names remain inside MCP adapter/config layers and do not leak into core delivery logic.
+
+Explicit safety constraints:
+
+- Keep MCP-first architecture for external SaaS providers.
+- Do not store credentials, OAuth tokens, or private server config in the repository.
+- Do not add live provider calls, live MCP server calls, or network calls in tests.
+- Do not implement production merge or production deployment automation.
+- Production merge and production deploy remain human-only.
+
+### Milestone V: Real Jira Intake
+
+Goal:
+
+Enable real backlog intake through the Jira MCP TicketPort while preserving deterministic mock intake as the default local and test path.
+
+Build:
+
+- Workspace configuration for selecting Jira MCP intake at runtime.
+- Backlog listing and ticket fetching through the typed `TicketPort` using the MCP adapter.
+- Jira comment/report handoff through typed port methods where configured and allowed.
+- Intake error mapping for missing credentials, inaccessible projects, empty backlog, and missing MCP tools.
+- Tests covering intake behavior with mock MCP clients and mock Jira connectors.
+
+Acceptance:
+
+- `agentic scan` and worker intake can use Jira MCP mode when explicitly configured.
+- Mock Jira remains the default and all tests pass without credentials.
+- Jira MCP intake records audit entries for external tool calls.
+- Missing credentials or missing MCP tools produce actionable errors and no hidden fallback to live REST APIs.
+- No Jira REST adapter is introduced for this milestone.
+
+Explicit safety constraints:
+
+- Keep Jira MCP-first for external Jira access.
+- Do not commit Jira domains, emails, tokens, OAuth material, or private project credentials.
+- Do not make live Jira or Atlassian MCP calls in tests.
+- Do not transition real Jira tickets unless the typed policy explicitly allows it in a later approved milestone.
+- Production merge and production deploy remain human-only.
+
+### Milestone W: Worker MCP Mode
+
+Goal:
+
+Allow the agent worker loop to process backlog tickets using explicitly configured MCP-backed provider ports while retaining mock-safe defaults and worker stop guarantees.
+
+Build:
+
+- Worker configuration path that selects MCP-backed ticket, code host, and deployment ports through the runtime provider factory.
+- Worker startup checks for MCP readiness, allowlisted tools, and native fallback contracts.
+- Queue processing that preserves concurrency caps, retries, escalation, abort handling, and durable state writes in MCP mode.
+- Clear operator output distinguishing mock mode from explicitly configured MCP mode.
+- Tests using mock MCP clients to prove the worker does not require live services.
+
+Acceptance:
+
+- `agentic worker` remains mock by default.
+- Explicit MCP mode can be constructed with injected/mock MCP clients in tests.
+- Worker MCP mode refuses to start when required MCP configuration or tools are missing.
+- Retry, escalation, safe stop, and concurrency behavior remains unchanged from mock mode.
+- Native/subprocess fallbacks are used only where Milestone S contracts allow them.
+
+Explicit safety constraints:
+
+- Do not make live MCP, Jira, GitHub, or Railway calls in tests.
+- Do not allow CLI flags to bypass workspace concurrency or production gates.
+- Do not perform remote pushes, production merges, or production deployments as part of worker MCP mode.
+- Do not store credentials or OAuth state in repository files.
+- Production merge and production deploy remain human-only.
+
+### Milestone X: OpenCode Execution Contract
+
+Goal:
+
+Define and enforce the contract for invoking OpenCode as the development runner so implementation attempts are bounded, observable, retryable, and safe for local execution.
+
+Build:
+
+- Typed OpenCode execution input/output contract for prompts, workspace paths, timeout, logs, exit status, and produced summary.
+- Subprocess runner guardrails for command construction, working directory, environment allowlist, timeout, and cancellation.
+- Run-state and report updates for OpenCode attempt start, completion, failure, retry, and escalation.
+- Tests using fake subprocess execution only.
+- Documentation for local runner requirements and failure handling.
+
+Acceptance:
+
+- OpenCode execution remains subprocess-first unless a stable OpenCode MCP server is explicitly contracted later.
+- Tests do not execute real OpenCode or require OpenCode credentials.
+- Runner failures map to retry/escalation policy without skipping quality gates.
+- Logs and summaries are persisted without storing secrets.
+- Cancellation or timeout stops further attempts safely.
+
+Explicit safety constraints:
+
+- Do not run untrusted shell commands outside the configured workspace.
+- Do not add live OpenCode execution to tests.
+- Do not expose secrets through prompts, logs, reports, or persisted state.
+- Do not bypass required quality gates after runner success or failure.
+- Production merge and production deploy remain human-only.
+
+### Milestone Y: GitHub Delivery Workflow
+
+Goal:
+
+Implement the GitHub delivery handoff through typed CodeHostPort operations, using MCP where precise enough and local/native fallback only where explicitly contracted.
+
+Build:
+
+- Branch creation, pull request opening, check reading, and PR commenting through the configured CodeHostPort.
+- Local git/subprocess push handoff for actual branch push according to Native Fallback Contracts.
+- Operation ledger entries for mutating GitHub actions.
+- Idempotency checks for existing branches, existing PRs, duplicate comments, and repeated check reads.
+- Tests using mock CodeHostPort and mock subprocess/local git behavior only.
+
+Acceptance:
+
+- GitHub MCP remains first choice for precise typed operations.
+- Actual branch push does not use MCP until a precise MCP push contract exists.
+- Quality gates must pass before any push or PR handoff is attempted.
+- Re-running the same delivery does not duplicate branches, PRs, or comments when ledger state exists.
+- Tests do not call live GitHub APIs, live MCP servers, or real remote git endpoints.
+
+Explicit safety constraints:
+
+- Do not store GitHub tokens, SSH keys, or remote credentials in the repository.
+- Do not perform real remote pushes in tests.
+- Do not merge production pull requests automatically.
+- Do not treat GitHub check mocks as proof of real provider integration.
+- Production merge and production deploy remain human-only.
+
+### Milestone Z: Railway Staging Verification
+
+Goal:
+
+Verify staging deployments through the typed DeploymentPort using Railway MCP where precise enough and native fallback only for documented polling or service URL precision gaps.
+
+Build:
+
+- Staging deployment lookup and polling through `DeploymentPort.waitForDeployment` and deployment reads.
+- Service URL resolution through `DeploymentPort.getServiceUrl`.
+- Staging verification report persisted into the run directory and status summary.
+- Timeout, failed deployment, missing service URL, and imprecise MCP result handling.
+- Tests using mock Railway MCP/native deployment ports only.
+
+Acceptance:
+
+- Railway MCP remains first choice for deployment state and service URL reads.
+- Native Railway fallback is allowed only when MCP lacks required polling, metadata, timeout, or URL precision.
+- Staging verification failures block production PR handoff and escalate with actionable state.
+- Tests do not call live Railway APIs, live MCP servers, or deployed services.
+- Production deployment mutation is not implemented.
+
+Explicit safety constraints:
+
+- Do not store Railway tokens, project IDs, service IDs, or environment credentials in the repository.
+- Do not make live Railway calls in tests.
+- Do not deploy to production or mutate production environments.
+- Do not bypass failed or missing staging verification.
+- Production merge and production deploy remain human-only.

@@ -1,4 +1,4 @@
-export { GitHubMcpCodeHostPort, defaultGitHubMcpToolNames } from './github-mcp-code-host-port.js';
+export { GitHubMcpCodeHostPort, createGitHubMcpToolRequirements, defaultGitHubMcpToolNames } from './github-mcp-code-host-port.js';
 export { MockGitHubConnector } from './mock-github-connector.js';
 export { buildDevelopPullRequestBody, buildProductionPullRequestBody } from './pr-body-builder.js';
 export type {

@@ -2,6 +2,15 @@
 
 ## 2026-06-04
 
+Completed Milestone U Runtime MCP Wiring:
+
+- Added runtime MCP provider construction through `createRuntimeWorkspaceAdapters(...)`, resolving configured MCP servers to injected clients or an injectable `createMcpClient(serverConfig)` factory.
+- Exposed Jira, GitHub, and Railway MCP tool requirement metadata from adapter layers while keeping raw MCP tool names out of core delivery logic.
+- Added startup readiness validation for discovered tools and typed port/action allowlists before MCP-backed adapter use.
+- Wired a shared MCP audit sink through runtime-created Jira, GitHub, and Railway adapters.
+- Added mock-only runtime MCP wiring tests for mock defaults, client construction, readiness failures, disallowed tools, audit capture, and GitHub `pushBranch` exclusion.
+- Preserved mock mode as the default and avoided live MCP sessions, provider network calls, credentials, production merge, or production deployment automation.
+
 Completed Milestone T Agent Worker Loop:
 
 - Added a mock-safe `runAgentWorkerLoop(...)` delivery coordinator that queues backlog tickets, de-duplicates tickets within an invocation, respects concurrency limits, and stops on idle, max cycles, explicit stop callbacks, or abort signals.

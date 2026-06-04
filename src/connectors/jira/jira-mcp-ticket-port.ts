@@ -59,7 +59,7 @@ export class JiraMcpTicketPort implements JiraConnector {
     this.timeoutMs = options.timeoutMs;
     this.toolNames = { ...defaultJiraMcpToolNames, ...options.toolNames };
     this.auditSink = options.auditSink;
-    this.allowlist = createJiraMcpAllowlist(options.serverId, this.toolNames);
+    this.allowlist = createJiraMcpToolRequirements(options.serverId, this.toolNames);
   }
 
   async listBacklog(): Promise<readonly DeliveryTicket[]> {
@@ -139,11 +139,13 @@ export class JiraMcpTicketPort implements JiraConnector {
   }
 }
 
-function createJiraMcpAllowlist(serverId: string, toolNames: JiraMcpToolNames): readonly McpToolAllowlistRule[] {
+export function createJiraMcpToolRequirements(serverId: string, toolNames: Partial<JiraMcpToolNames> = {}): readonly McpToolAllowlistRule[] {
+  const resolvedToolNames: JiraMcpToolNames = { ...defaultJiraMcpToolNames, ...toolNames };
+
   return [
-    { serverId, toolName: toolNames.listBacklog, port: portName, action: 'listBacklog', safety: 'read' },
-    { serverId, toolName: toolNames.getTicket, port: portName, action: 'getTicket', safety: 'read' },
-    { serverId, toolName: toolNames.comment, port: portName, action: 'comment', safety: 'write' }
+    { serverId, toolName: resolvedToolNames.listBacklog, port: portName, action: 'listBacklog', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.getTicket, port: portName, action: 'getTicket', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.comment, port: portName, action: 'comment', safety: 'write' }
   ];
 }
 

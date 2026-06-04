@@ -42,7 +42,7 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
     this.timeoutMs = options.timeoutMs;
     this.toolNames = { ...defaultRailwayMcpToolNames, ...options.toolNames };
     this.auditSink = options.auditSink;
-    this.allowlist = createRailwayMcpAllowlist(options.serverId, this.toolNames);
+    this.allowlist = createRailwayMcpToolRequirements(options.serverId, this.toolNames);
   }
 
   async waitForDeployment(input: WaitForDeploymentInput): Promise<DeploymentResult> {
@@ -108,11 +108,13 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
   }
 }
 
-function createRailwayMcpAllowlist(serverId: string, toolNames: RailwayMcpToolNames): readonly McpToolAllowlistRule[] {
+export function createRailwayMcpToolRequirements(serverId: string, toolNames: Partial<RailwayMcpToolNames> = {}): readonly McpToolAllowlistRule[] {
+  const resolvedToolNames: RailwayMcpToolNames = { ...defaultRailwayMcpToolNames, ...toolNames };
+
   return [
-    { serverId, toolName: toolNames.waitForDeployment, port: portName, action: 'waitForDeployment', safety: 'read' },
-    { serverId, toolName: toolNames.readDeployment, port: portName, action: 'readDeployment', safety: 'read' },
-    { serverId, toolName: toolNames.getServiceUrl, port: portName, action: 'getServiceUrl', safety: 'read' }
+    { serverId, toolName: resolvedToolNames.waitForDeployment, port: portName, action: 'waitForDeployment', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.readDeployment, port: portName, action: 'readDeployment', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.getServiceUrl, port: portName, action: 'getServiceUrl', safety: 'read' }
   ];
 }
 

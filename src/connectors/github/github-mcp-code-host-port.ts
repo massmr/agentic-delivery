@@ -51,7 +51,7 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
     this.timeoutMs = options.timeoutMs;
     this.toolNames = { ...defaultGitHubMcpToolNames, ...options.toolNames };
     this.auditSink = options.auditSink;
-    this.allowlist = createGitHubMcpAllowlist(options.serverId, this.toolNames);
+    this.allowlist = createGitHubMcpToolRequirements(options.serverId, this.toolNames);
   }
 
   async createBranch(input: CreateCodeHostBranchInput): Promise<BranchRef> {
@@ -131,12 +131,14 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
   }
 }
 
-function createGitHubMcpAllowlist(serverId: string, toolNames: GitHubMcpToolNames): readonly McpToolAllowlistRule[] {
+export function createGitHubMcpToolRequirements(serverId: string, toolNames: Partial<GitHubMcpToolNames> = {}): readonly McpToolAllowlistRule[] {
+  const resolvedToolNames: GitHubMcpToolNames = { ...defaultGitHubMcpToolNames, ...toolNames };
+
   return [
-    { serverId, toolName: toolNames.createBranch, port: portName, action: 'createBranch', safety: 'write' },
-    { serverId, toolName: toolNames.openPullRequest, port: portName, action: 'openPullRequest', safety: 'write' },
-    { serverId, toolName: toolNames.getChecks, port: portName, action: 'getChecks', safety: 'read' },
-    { serverId, toolName: toolNames.commentOnPullRequest, port: portName, action: 'commentOnPullRequest', safety: 'write' }
+    { serverId, toolName: resolvedToolNames.createBranch, port: portName, action: 'createBranch', safety: 'write' },
+    { serverId, toolName: resolvedToolNames.openPullRequest, port: portName, action: 'openPullRequest', safety: 'write' },
+    { serverId, toolName: resolvedToolNames.getChecks, port: portName, action: 'getChecks', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.commentOnPullRequest, port: portName, action: 'commentOnPullRequest', safety: 'write' }
   ];
 }
 

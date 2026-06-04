@@ -28,6 +28,7 @@ Status legend:
 - `[x]` Provider mode and adapter factory design
 - `[x]` MCP-first business port architecture
 - `[x]` MCP client foundation
+- `[x]` Runtime MCP wiring
 - `[x]` Jira MCP TicketPort
 - `[x]` Native fallback contracts
 - `[x]` Markdown report writer

@@ -1,4 +1,4 @@
-export { RailwayMcpDeploymentPort, defaultRailwayMcpToolNames } from './railway-mcp-deployment-port.js';
+export { RailwayMcpDeploymentPort, createRailwayMcpToolRequirements, defaultRailwayMcpToolNames } from './railway-mcp-deployment-port.js';
 export { MockRailwayConnector } from './mock-railway-connector.js';
 export type { MockRailwayConnectorOptions } from './mock-railway-connector.js';
 export type { RailwayConnector } from './railway-connector.js';
