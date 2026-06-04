@@ -35,6 +35,7 @@ Current capabilities:
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `runs/`.
+- Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
 - Railway staging verification boundary for deployment state and service URLs.
@@ -65,6 +66,7 @@ npm install -g ewokbot
 ewokbot init
 ewokbot doctor
 ewokbot worker start
+ewokbot runs
 ewokbot status
 ```
 
@@ -171,6 +173,30 @@ Inspect persisted run state:
 node dist/src/cli/index.js status LK-101
 ```
 
+List all persisted runs and inspect one by run id:
+
+```bash
+node dist/src/cli/index.js runs
+node dist/src/cli/index.js inspect <run-id>
+```
+
+Pause worker processing, record a resume intent for a resumable run, and read local run reports/logs:
+
+```bash
+node dist/src/cli/index.js pause
+node dist/src/cli/index.js resume <run-id>
+node dist/src/cli/index.js logs <run-id>
+```
+
+Record the human production decision for a run that has opened a production PR:
+
+```bash
+node dist/src/cli/index.js approve <run-id>
+node dist/src/cli/index.js reject <run-id>
+```
+
+These control commands read and write only local files under `runs/`. `pause` writes `runs/control.json`; `resume`, `approve`, and `reject` write `runs/<ticket-key>/<run-id>/control.json`. Approval and rejection are local operator records only: they do not merge pull requests, deploy production, call providers, run OpenCode, or push git changes.
+
 Run local quality gates for a repository:
 
 ```bash
@@ -197,7 +223,7 @@ node dist/src/cli/index.js worker start
 
 `worker start` acquires a workspace lock at `runs/worker.lock` before it opens provider adapters, so two workers cannot process the same workspace concurrently. It logs startup mode, provider modes, lock lifecycle, cycle summaries, restart-safety decisions, and the human-only production boundary in operator-readable text.
 
-Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects.
+Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects. If `runs/control.json` marks the workspace paused, the worker exits before opening ticket providers or starting delivery work.
 
 The legacy `worker` command remains available for compatibility with existing local and test workflows.
 

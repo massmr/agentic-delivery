@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import type { WorkspaceConfig } from '../config/index.js';
+import { JsonRunControlStore } from '../control/index.js';
 import type { AgentWorkerLoopSummary, AgentWorkerRetryPolicy, AgentWorkerRuntimeInfo } from '../delivery/index.js';
 import { runAgentWorkerLoop } from '../delivery/index.js';
 import type { TicketPort } from '../ports/index.js';
@@ -37,6 +41,7 @@ const defaultContinuousPollIntervalMs = 60000;
 
 export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<WorkerRuntimeResult> {
   const logger = createWorkerLogger({ io: options.io, now: options.now });
+  const controlStore = new JsonRunControlStore(options.rootPath);
   let staleRecovered = false;
 
   logger.log('info', 'worker_starting', {
@@ -72,6 +77,12 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<W
   logger.log('info', 'worker_lock_acquired', { lockPath: lease.lockPath, pid: lease.metadata.pid, staleRecovered });
 
   try {
+    if (await controlStore.isWorkspacePaused()) {
+      logger.log('warn', 'worker_paused', { controlPath: 'runs/control.json' });
+      options.io.stdout('Worker paused by runs/control.json. No backlog tickets, provider adapters, OpenCode runs, git operations, pull requests, or deployments were started. Use ewokbot resume <run-id> to clear the workspace pause after choosing a resumable run.\n');
+      return { exitCode: 0 };
+    }
+
     const ticketPort = await options.createTicketPort();
 
     if (options.dryRun === true) {
@@ -97,6 +108,13 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<W
       pollIntervalMs,
       stopWhenIdle,
       retryPolicy: options.retryPolicy,
+      shouldStop: () => {
+        if (options.abortSignal?.aborted === true) {
+          return false;
+        }
+
+        return readWorkspacePauseSynchronously(options.rootPath);
+      },
       abortSignal: options.abortSignal,
       sleep: options.sleep
     });
@@ -124,6 +142,20 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<W
   } finally {
     await lease.release();
     logger.log('info', 'worker_lock_released', { lockPath: lease.lockPath });
+  }
+}
+
+function readWorkspacePauseSynchronously(rootPath: string): boolean {
+  try {
+    const source = readFileSync(join(rootPath, 'runs', 'control.json'), 'utf8');
+    const parsed = JSON.parse(source) as { readonly paused?: boolean };
+    return parsed.paused === true;
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return false;
+    }
+
+    throw error;
   }
 }
 

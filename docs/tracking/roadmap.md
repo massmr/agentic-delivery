@@ -107,7 +107,7 @@ Status legend:
 - `[x]` `ewokbot doctor` readiness command
 - `[x]` VPS-oriented worker start command
 - `[x]` Worker lock and graceful shutdown
-- `[ ]` CLI run inspection and approval commands
+- `[x]` CLI run inspection and approval commands
 
 ## Future Control Surfaces
 

@@ -25,6 +25,26 @@ export type {
   WorkspaceRepositoryConfig,
   WorkspaceSettings
 } from './config/index.js';
+export {
+  JsonRunControlStore,
+  getRunControlFilePath,
+  getWorkspaceControlFilePath,
+  renderRunInspection,
+  renderRunLogs,
+  renderRunsList
+} from './control/index.js';
+export type {
+  ListedRun,
+  RunControlDecision,
+  RunControlRecord,
+  RunControlStore,
+  RunDecisionIntent,
+  RunLogFile,
+  RunLogsResult,
+  RunLookupResult,
+  RunResumeIntent,
+  WorkspaceControlRecord
+} from './control/index.js';
 export { InMemoryOperationLedger, JsonOperationLedger, buildOperationId, getOperationLedgerFilePath, hashOperationInput } from './agent/index.js';
 export type {
   OperationLedger,

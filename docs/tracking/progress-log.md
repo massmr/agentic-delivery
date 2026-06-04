@@ -2,6 +2,15 @@
 
 ## 2026-06-04
 
+Completed Milestone AD CLI Control Plane:
+
+- Added `ewokbot runs`, `ewokbot inspect <run-id>`, `ewokbot pause`, `ewokbot resume <run-id>`, `ewokbot approve <run-id>`, `ewokbot reject <run-id>`, and `ewokbot logs <run-id>` as SSH-readable local control commands over persisted run state.
+- Added durable sidecar control records under `runs/control.json` and `runs/<ticket-key>/<run-id>/control.json` for workspace pause state, resume intent, and local production approval/rejection decisions.
+- Preserved the human-only production boundary: approval and rejection commands record local decisions only and do not merge pull requests, deploy production, call providers, run OpenCode, or push git changes.
+- Added worker pause enforcement so `ewokbot worker start` exits before provider/ticket processing when the workspace is paused and re-checks pause state between continuous cycles through the existing stop hook.
+- Added local-only tests for run-id resolution, run listing, inspection, pause/resume, approval/rejection, logs, CLI help, and worker pause behavior.
+- Preserved mock-safe defaults and avoided Telegram/WhatsApp/dashboard scope, daemonization, live provider calls in tests, autonomous production merge, and autonomous production deployment.
+
 Completed Milestone AC Long-Running Worker Runtime:
 
 - Added the operator-facing `ewokbot worker start` command while preserving the legacy `ewokbot worker` path for compatibility.

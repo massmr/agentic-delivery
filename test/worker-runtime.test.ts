@@ -9,6 +9,7 @@ import {
   createAgentWorkerRuntimeInfo,
   createCliProgram,
   createDeliveryRunStateRecord,
+  JsonRunControlStore,
   getRunStateFilePath,
   getWorkerLockPath,
   parseWorkspaceConfig,
@@ -127,6 +128,62 @@ test('worker runtime runs bounded continuous cycles with injectable sleep', asyn
   assert.equal(result.summary?.queued, 0);
   assert.deepEqual(sleeps, [5]);
   assert.match(captured.stdout, /worker_completed stoppedReason=max-cycles cycles=2/u);
+  assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
+});
+
+test('worker runtime exits paused workspace before opening ticket providers', async () => {
+  const rootPath = createWorkspaceRoot(workerConfigYaml);
+  const config = parseWorkspaceConfig(workerConfigYaml);
+  const captured = createCapturedIO();
+  let createTicketPortCalls = 0;
+
+  await new JsonRunControlStore(rootPath).pauseWorkspace('Pause before providers.', new Date('2026-06-04T12:00:00.000Z'));
+
+  const result = await runWorkerRuntime({
+    config,
+    rootPath,
+    io: captured.io,
+    runtimeInfo: createAgentWorkerRuntimeInfo(config),
+    mode: 'start',
+    createTicketPort: async () => {
+      createTicketPortCalls += 1;
+      return createMemoryTicketPort([createTicket('AD-901', 'Should not be listed')]);
+    }
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.summary, undefined);
+  assert.equal(createTicketPortCalls, 0);
+  assert.match(captured.stdout, /worker_paused controlPath=runs\/control.json/u);
+  assert.match(captured.stdout, /No backlog tickets, provider adapters, OpenCode runs, git operations, pull requests, or deployments were started/u);
+  assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
+});
+
+test('worker runtime shouldStop hook observes workspace pause between continuous cycles', async () => {
+  const rootPath = createWorkspaceRoot(workerConfigYaml);
+  const config = parseWorkspaceConfig(workerConfigYaml);
+  const captured = createCapturedIO();
+  const controlStore = new JsonRunControlStore(rootPath);
+  const emptyTicketPort = createMemoryTicketPort([]);
+
+  const result = await runWorkerRuntime({
+    config,
+    rootPath,
+    io: captured.io,
+    runtimeInfo: createAgentWorkerRuntimeInfo(config),
+    mode: 'start',
+    maxCycles: 3,
+    pollIntervalMs: 5,
+    sleep: async () => {
+      await controlStore.pauseWorkspace('Pause after first cycle.', new Date('2026-06-04T12:01:00.000Z'));
+    },
+    createTicketPort: async () => emptyTicketPort
+  });
+
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.summary?.cycles, 1);
+  assert.equal(result.summary?.stoppedReason, 'stop-condition');
+  assert.match(captured.stdout, /worker_completed stoppedReason=stop-condition cycles=1/u);
   assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
 });
 

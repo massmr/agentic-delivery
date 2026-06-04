@@ -1,6 +1,15 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
+import {
+  runApproveCommand,
+  runInspectCommand,
+  runLogsCommand,
+  runPauseCommand,
+  runRejectCommand,
+  runResumeCommand,
+  runRunsCommand
+} from './commands/control.js';
 import { runInitCommand } from './commands/init.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runPlanCommand } from './commands/plan.js';
@@ -25,6 +34,13 @@ const HELP_TEXT = [
   '  ewokbot scan',
   '  ewokbot plan <ticket-key>',
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
+  '  ewokbot runs',
+  '  ewokbot inspect <run-id>',
+  '  ewokbot pause',
+  '  ewokbot resume <run-id>',
+  '  ewokbot approve <run-id>',
+  '  ewokbot reject <run-id>',
+  '  ewokbot logs <run-id>',
   '  ewokbot worker start [--once] [--dry-run] [--concurrency <n>] [--max-cycles <n>] [--poll-interval-ms <ms>]',
   '  ewokbot worker [--concurrency <n>] [--max-cycles <n>] [--max-attempts <n>] [--poll-interval-ms <ms>] (legacy)',
   '  ewokbot status <ticket-key> [--run-id <run-id>]',
@@ -36,6 +52,13 @@ const HELP_TEXT = [
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local mock plan and run state for one ticket.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
+  '  runs        List persisted local runs without contacting providers.',
+  '  inspect     Show detailed local run state, reports, control intent, and next action.',
+  '  pause       Pause workspace worker processing using runs/control.json.',
+  '  resume      Record a local resume intent for a resumable run and clear workspace pause.',
+  '  approve     Record local human approval for a production PR; does not merge or deploy.',
+  '  reject      Record local human rejection for a production PR; does not merge or deploy.',
+  '  logs        Print known local report and quality log files for a run.',
   '  worker      Run the foreground worker runtime; start mode adds locking, dry-run, and graceful shutdown.',
   '  status      Inspect existing local run state and next action.',
   '  quality     Run local repository quality gates and write a quality report.',
@@ -144,6 +167,74 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runRunCommand(parsed.ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runId: parsed.runId });
+      }
+
+      if (args[0] === 'runs') {
+        return runRunsCommand({ cwd: options.cwd, io });
+      }
+
+      if (args[0] === 'inspect') {
+        const runId = args[1];
+
+        if (runId === undefined || runId.trim().length === 0) {
+          io.stderr('Missing run id for inspect command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runInspectCommand(runId, { cwd: options.cwd, io });
+      }
+
+      if (args[0] === 'pause') {
+        return runPauseCommand({ cwd: options.cwd, io });
+      }
+
+      if (args[0] === 'resume') {
+        const runId = args[1];
+
+        if (runId === undefined || runId.trim().length === 0) {
+          io.stderr('Missing run id for resume command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runResumeCommand(runId, { cwd: options.cwd, io });
+      }
+
+      if (args[0] === 'approve') {
+        const runId = args[1];
+
+        if (runId === undefined || runId.trim().length === 0) {
+          io.stderr('Missing run id for approve command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runApproveCommand(runId, { cwd: options.cwd, io });
+      }
+
+      if (args[0] === 'reject') {
+        const runId = args[1];
+
+        if (runId === undefined || runId.trim().length === 0) {
+          io.stderr('Missing run id for reject command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runRejectCommand(runId, { cwd: options.cwd, io });
+      }
+
+      if (args[0] === 'logs') {
+        const runId = args[1];
+
+        if (runId === undefined || runId.trim().length === 0) {
+          io.stderr('Missing run id for logs command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runLogsCommand(runId, { cwd: options.cwd, io });
       }
 
       if (args[0] === 'worker') {
