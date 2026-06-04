@@ -10,6 +10,7 @@ import { runScanCommand } from './commands/scan.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
+import type { DoctorProbeOptions } from '../setup/index.js';
 import type { InitPrompter } from './commands/init.js';
 
 const HELP_TEXT = [
@@ -57,6 +58,7 @@ export interface CliProgramOptions {
   readonly io?: CliProgramIO;
   readonly initTemplatePath?: string;
   readonly initPrompter?: InitPrompter;
+  readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
 }
 
@@ -112,7 +114,7 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
       }
 
       if (args[0] === 'doctor') {
-        return runDoctorCommand({ cwd: options.cwd, io });
+        return runDoctorCommand({ cwd: options.cwd, io, doctorOptions: options.doctorOptions });
       }
 
       if (args[0] === 'scan') {

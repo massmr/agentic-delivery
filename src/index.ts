@@ -50,7 +50,10 @@ export {
 } from './setup/index.js';
 export type {
   DeploymentMonitorSelection,
+  DoctorCheck,
+  DoctorCheckStatus,
   DoctorIssue,
+  DoctorProbeOptions,
   DoctorReport,
   OnboardingFiles,
   SetupDetectionInput,

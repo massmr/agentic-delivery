@@ -2,6 +2,14 @@
 
 ## 2026-06-04
 
+Completed Milestone AB Doctor And Local Readiness Checks:
+
+- Expanded `ewokbot doctor` from setup-file validation into a local readiness report with PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent, workspace config, `.env.example`, `.env`, GitHub, Jira, Railway, Vercel, repository paths, branch settings, and quality gate presence.
+- Added injectable doctor probes for environment, command availability, file reads, and file/directory existence so tests stay deterministic and do not call providers, MCP servers, package managers, git, scripts, installers, or networks.
+- Added redacted secret diagnostics: doctor reports missing key names and `[redacted]` readiness, but never prints token, email, organization, URL, or secret values.
+- Added static repository readiness checks for missing paths, non-directory paths, staging/production branch separation, `.agent-quality.yml` validity, and package quality scripts without executing quality commands.
+- Preserved Milestone AB scope only, with no long-running worker runtime, daemonization, control approval commands, live provider calls, hosted workers, or production automation.
+
 Fixed Milestone AA review findings:
 
 - Replaced shared setup capability stubs with provider-specific local detection and generated-config validation for OpenCode, optional oh-my-openagent, GitHub, Jira, Railway, Vercel, and CLI control.

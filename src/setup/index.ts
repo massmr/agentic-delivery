@@ -17,4 +17,4 @@ export type {
 export { createOnboardingFiles, renderEnvExample, renderOnboardingWorkspaceConfig } from './onboarding-config.js';
 export type { OnboardingFiles } from './onboarding-config.js';
 export { runLocalDoctor } from './doctor.js';
-export type { DoctorIssue, DoctorReport } from './doctor.js';
+export type { DoctorCheck, DoctorCheckStatus, DoctorIssue, DoctorProbeOptions, DoctorReport } from './doctor.js';

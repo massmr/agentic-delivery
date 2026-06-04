@@ -32,7 +32,7 @@ Current capabilities:
 - CLI-first local runtime.
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
 - Interactive and non-interactive local onboarding that writes `config/workspace.yml` and `.env.example` placeholders.
-- Local-only `ewokbot doctor` setup validation.
+- Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `runs/`.
 - Jira ticket intake boundary with MCP-backed adapter support.
@@ -195,7 +195,9 @@ ewokbot init --non-interactive --deployment-monitor vercel
 ewokbot init --non-interactive --deployment-monitor both
 ```
 
-`ewokbot doctor` validates local file presence, workspace config shape, and required `.env.example` placeholders. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, or network APIs.
+`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.env.example`, `.env`, GitHub, Jira, Railway, Vercel, repository paths, staging/production branch settings, and static quality gate presence.
+
+Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
 Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode through runtime-injected MCP clients.
 
