@@ -29,6 +29,7 @@ Status legend:
 - `[x]` MCP-first business port architecture
 - `[x]` MCP client foundation
 - `[x]` Jira MCP TicketPort
+- `[x]` Native fallback contracts
 - `[x]` Markdown report writer
 
 ## Planning

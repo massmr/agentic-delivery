@@ -57,6 +57,15 @@ export {
 } from './mcp/index.js';
 export { analyzeTicket, createTicketPlan, resolveRepositoriesForTicket, toRepositoryRef } from './planning/index.js';
 export {
+  NativeFallbackContractNotFoundError,
+  NativeFallbackContractViolationError,
+  assertAdapterAllowedForAction,
+  getNativeFallbackContract,
+  isAdapterAllowed,
+  isAdapterAllowedForAction,
+  nativeFallbackContracts
+} from './policy/index.js';
+export {
   QualityRunner,
   buildQualityGateDefinitions,
   detectNodeQualityConfig,
@@ -182,6 +191,7 @@ export type {
   MockMcpToolRegistration
 } from './mcp/index.js';
 export type { TicketPlan } from './planning/index.js';
+export type { AdapterKind, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
 export type { ProviderFactoryEnvironment, ProviderFactoryOptions, WorkspaceAdapters } from './providers/index.js';
 export type { MockOpenCodeRunnerOptions, OpenCodePromptBranchInput, OpenCodePromptInput, OpenCodeSubprocessRunnerOptions, RunOpenCodeImplementationInput } from './runners/index.js';

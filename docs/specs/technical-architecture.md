@@ -37,6 +37,7 @@ CLI
       -> Tool Discovery
       -> Tool Allowlist
       -> Tool Schema Mapping
+    -> Native Fallback Contracts
     -> Native/Subprocess/Mock Adapters
     -> Quality Gate Runner
     -> Report Writer
@@ -178,6 +179,21 @@ MCP tools are classified before use:
 - `danger`: actions requiring human approval or explicit policy.
 
 Production merge is always `danger` and remains human-only.
+
+## Native Fallback Policy
+
+Native, subprocess, and mock adapters are allowed only through explicit contracts, not by ad hoc provider selection. The shared policy module is `src/policy/native-fallback-contracts.ts`.
+
+Rules:
+
+- MCP is the default for external SaaS actions on Jira, GitHub, and Railway when the MCP tool maps cleanly into a typed port.
+- Native provider APIs are allowed for GitHub checks/PR details and Railway deployment polling/service URL lookup only when MCP lacks required precision.
+- Local git branch pushing and workspace operations use native or subprocess behavior because they depend on local repository state and credentials.
+- Filesystem state/report writes, quality gates, and OpenCode execution are runtime-owned native/subprocess surfaces, not MCP provider calls.
+- Mock adapters remain valid for local deterministic runs and tests without credentials or network.
+- Production pull request merge and production deployment mutation remain human-only and have no autonomous fallback adapter.
+
+Any new port action must add a contract and tests before an adapter can call it.
 
 ## State Machine
 

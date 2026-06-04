@@ -2,6 +2,15 @@
 
 ## 2026-06-04
 
+Completed Milestone S Native Fallback Contracts:
+
+- Added a typed `nativeFallbackContracts` policy surface under `src/policy` with explicit MCP, native, subprocess, mock, and human-only adapter rules.
+- Covered Jira MCP-first ticket actions, GitHub MCP-first PR/check/comment actions, GitHub local git push fallback, Railway MCP-first deployment reads with narrow native precision fallback, local workspace/filesystem/quality/OpenCode subprocess boundaries, and human-only production merge/deployment controls.
+- Added tests for the contract matrix, disallowed adapters, undeclared operations, and Milestone S required policy surfaces without live API calls or credentials.
+- Documented the fallback rules in README, MCP-first architecture, technical architecture, and quality gate specs.
+
+## 2026-06-04 Earlier
+
 Completed Milestone R Railway MCP DeploymentPort:
 
 - Added a typed `DeploymentPort` boundary under `src/ports` and kept `RailwayConnector` compatible with that surface.

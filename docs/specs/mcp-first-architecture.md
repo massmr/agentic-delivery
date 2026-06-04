@@ -105,6 +105,50 @@ Filesystem -> native, not MCP
 Quality    -> native/subprocess, not MCP
 ```
 
+## Native Fallback Contracts
+
+Every typed port action must declare which adapter kinds are allowed before implementation code can use it. The Milestone S contract surface lives in `src/policy/native-fallback-contracts.ts` and is exported as `nativeFallbackContracts`.
+
+Adapter kinds:
+
+- `mcp`: preferred for external SaaS providers when a typed MCP tool contract is precise enough.
+- `native`: allowed for provider APIs only when MCP cannot express required precision, and required for local filesystem-owned operations.
+- `subprocess`: required for local git, quality commands, and OpenCode execution where the repository or runner is the source of truth.
+- `mock`: allowed for deterministic tests and local mock runs without credentials.
+
+Current contract matrix:
+
+```text
+TicketPort listBacklog/getTicket/comment
+  -> MCP first, mock fallback only
+
+CodeHostPort createBranch/openPullRequest/getChecks/commentOnPullRequest
+  -> MCP first; native fallback only for documented precision gaps
+
+CodeHostPort pushBranch
+  -> native/subprocess/mock only; MCP disallowed until a precise push contract exists
+
+DeploymentPort waitForDeployment/readDeployment/getServiceUrl
+  -> MCP first; native fallback only for polling, metadata, timeout, or service URL precision gaps
+
+WorkspacePort checkout/diff/commit
+  -> native/subprocess/mock only; MCP disallowed
+
+FilesystemPort run state and report writes
+  -> native/mock only; MCP disallowed
+
+QualityGateRunner runRequiredGates
+  -> subprocess/mock only; MCP disallowed
+
+DevRunnerPort runOpenCode
+  -> subprocess/mock only unless a future stable OpenCode MCP server is explicitly contracted
+
+ProductionControl mergeProductionPullRequest/deployProduction
+  -> human-only; no autonomous adapter allowed
+```
+
+Native fallback must not become a general bypass around MCP. It is a narrow contract for local runtime responsibilities and provider precision gaps that MCP cannot yet model.
+
 ## Safety Policy
 
 Every MCP tool is classified before use:
