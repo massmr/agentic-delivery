@@ -2,6 +2,14 @@
 
 ## 2026-06-04
 
+Completed Milestone V Real Jira Intake:
+
+- Added a Jira-only runtime `TicketPort` factory with `createRuntimeTicketPort(...)`, preserving mock defaults while validating Jira MCP clients, discovered tools, and typed allowlists before intake use.
+- Routed `agentic scan` through the runtime `TicketPort` so explicit Jira MCP configuration can list backlog tickets with injected `MockMcpClient` tests and MCP audit capture.
+- Routed worker intake through a typed `TicketPort`, fetching ticket details with `getTicket` before handing tickets to the existing mock-safe delivery path.
+- Added mock-only tests for Jira MCP scan intake, empty backlog handling, missing client/tool readiness failures, typed comment audit capture, and worker list/get intake behavior.
+- Preserved the no-Jira-REST boundary, mock local default, no live provider/MCP calls in tests, and human-only production merge/deployment controls.
+
 Completed Milestone U Runtime MCP Wiring:
 
 - Added runtime MCP provider construction through `createRuntimeWorkspaceAdapters(...)`, resolving configured MCP servers to injected clients or an injectable `createMcpClient(serverConfig)` factory.

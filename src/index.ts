@@ -97,6 +97,7 @@ export {
   createGitHubConnector,
   createJiraConnector,
   createRailwayConnector,
+  createRuntimeTicketPort,
   createRuntimeWorkspaceAdapters,
   createWorkspaceAdapters
 } from './providers/index.js';

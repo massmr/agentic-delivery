@@ -13,6 +13,7 @@ export {
   RuntimeMcpClientResolutionError,
   RuntimeMcpServerConfigError,
   collectRuntimeMcpRequirements,
+  createRuntimeTicketPort,
   createRuntimeWorkspaceAdapters
 } from './runtime-mcp-factory.js';
 export type { RuntimeMcpAuditSink, RuntimeMcpClientFactory, RuntimeProviderFactoryOptions } from './runtime-mcp-factory.js';

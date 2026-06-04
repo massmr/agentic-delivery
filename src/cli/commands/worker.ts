@@ -2,7 +2,8 @@ import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/index.js';
 import { runAgentWorkerLoop, type AgentWorkerLoopSummary, type AgentWorkerRetryPolicy } from '../../delivery/index.js';
-import type { CliProgramIO } from '../program.js';
+import { createRuntimeTicketPort } from '../../providers/index.js';
+import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface WorkerCommandOptions {
   readonly configPath?: string;
@@ -14,6 +15,7 @@ export interface WorkerCommandOptions {
   readonly maxCycles?: number | undefined;
   readonly baseBackoffMs?: number | undefined;
   readonly pollIntervalMs?: number | undefined;
+  readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
 }
 
 export interface ParsedWorkerCommandOptions {
@@ -29,9 +31,11 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
   const cwd = options.cwd ?? process.cwd();
   const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.example.yml'));
   const retryPolicy = buildRetryPolicy(options);
+  const ticketPort = await createRuntimeTicketPort({ config, ...options.runtimeMcp });
   const summary = await runAgentWorkerLoop({
     config,
     rootPath: cwd,
+    ticketPort,
     concurrencyLimit: options.concurrencyLimit,
     maxCycles: options.maxCycles,
     pollIntervalMs: options.pollIntervalMs,

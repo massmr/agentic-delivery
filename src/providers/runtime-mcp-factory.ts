@@ -5,7 +5,8 @@ import { createRailwayMcpToolRequirements } from '../connectors/railway/index.js
 import type { DeliveryTicket } from '../domain/index.js';
 import type { McpClient, McpServerConfig, McpToolAllowlistRule, McpToolCallAuditRecord } from '../mcp/index.js';
 import { assertMcpToolAllowed, discoverMcpTools, requireDiscoveredMcpTool } from '../mcp/index.js';
-import { createWorkspaceAdapters } from './adapter-factory.js';
+import type { TicketPort } from '../ports/index.js';
+import { createJiraConnector, createWorkspaceAdapters } from './adapter-factory.js';
 import type { ProviderFactoryEnvironment, WorkspaceAdapters } from './adapter-factory.js';
 
 export type RuntimeMcpClientFactory = (server: McpServerConfig) => McpClient | Promise<McpClient>;
@@ -71,6 +72,31 @@ export async function createRuntimeWorkspaceAdapters(options: RuntimeProviderFac
   });
 }
 
+export async function createRuntimeTicketPort(options: RuntimeProviderFactoryOptions): Promise<TicketPort> {
+  const binding = collectRuntimeJiraMcpBinding(options.config);
+
+  if (binding === undefined) {
+    return createJiraConnector({
+      config: options.config,
+      environment: options.environment,
+      mockTickets: options.mockTickets,
+      mcpClients: options.mcpClients,
+      jiraMcpAuditSink: options.mcpAuditSink
+    });
+  }
+
+  const mcpClients = await resolveRuntimeMcpClients(options, [binding]);
+  await validateRuntimeMcpReadiness(mcpClients, [binding], options.mcpAllowlist ?? binding.requirements);
+
+  return createJiraConnector({
+    config: options.config,
+    environment: options.environment,
+    mockTickets: options.mockTickets,
+    mcpClients,
+    jiraMcpAuditSink: options.mcpAuditSink
+  });
+}
+
 export function collectRuntimeMcpRequirements(config: WorkspaceConfig): readonly McpToolAllowlistRule[] {
   return collectRuntimeMcpBindings(config).flatMap((binding) => [...binding.requirements]);
 }
@@ -79,11 +105,10 @@ function collectRuntimeMcpBindings(config: WorkspaceConfig): readonly RuntimeMcp
   const bindings: RuntimeMcpBinding[] = [];
 
   if (config.jira.mode === 'mcp') {
-    bindings.push({
-      provider: 'Jira',
-      serverId: requireRuntimeServerId('Jira', config.jira.mcpServerId),
-      requirements: createJiraMcpToolRequirements(requireRuntimeServerId('Jira', config.jira.mcpServerId), config.jira.mcpToolNames)
-    });
+    const jiraBinding = collectRuntimeJiraMcpBinding(config);
+    if (jiraBinding !== undefined) {
+      bindings.push(jiraBinding);
+    }
   }
 
   if (config.github.mode === 'mcp') {
@@ -103,6 +128,20 @@ function collectRuntimeMcpBindings(config: WorkspaceConfig): readonly RuntimeMcp
   }
 
   return bindings;
+}
+
+function collectRuntimeJiraMcpBinding(config: WorkspaceConfig): RuntimeMcpBinding | undefined {
+  if (config.jira.mode !== 'mcp') {
+    return undefined;
+  }
+
+  const serverId = requireRuntimeServerId('Jira', config.jira.mcpServerId);
+
+  return {
+    provider: 'Jira',
+    serverId,
+    requirements: createJiraMcpToolRequirements(serverId, config.jira.mcpToolNames)
+  };
 }
 
 async function resolveRuntimeMcpClients(

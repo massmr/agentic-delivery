@@ -37,6 +37,7 @@ export interface EndToEndMockDeliveryResult {
 
 export interface RunEndToEndMockDeliveryInput {
   readonly ticketKey: string;
+  readonly ticket?: DeliveryTicket | undefined;
   readonly config: WorkspaceConfig;
   readonly rootPath?: string;
   readonly runId?: string;
@@ -46,7 +47,7 @@ export interface RunEndToEndMockDeliveryInput {
 export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInput): Promise<EndToEndMockDeliveryResult> {
   const rootPath = input.rootPath ?? process.cwd();
   const now = input.now ?? (() => new Date());
-  const ticket = await new MockJiraConnector(input.config).getTicket(input.ticketKey);
+  const ticket = input.ticket ?? await new MockJiraConnector(input.config).getTicket(input.ticketKey);
   const plan = createTicketPlan(ticket, input.config);
 
   if (plan.needsHuman) {

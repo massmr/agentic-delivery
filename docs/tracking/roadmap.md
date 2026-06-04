@@ -40,6 +40,7 @@ Status legend:
 - `[x]` Mock Jira connector
 - `[x]` MCP Jira ticket adapter
 - `[x]` Backlog scan command
+- `[x]` Real Jira MCP intake
 - `[x]` Ticket planning command
 - `[x]` Repository resolver
 - `[x]` Multi-repo safety guard

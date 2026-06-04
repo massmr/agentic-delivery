@@ -14,6 +14,7 @@ import {
   RuntimeMcpClientResolutionError,
   collectRuntimeMcpRequirements,
   createMockMcpTool,
+  createRuntimeTicketPort,
   createRuntimeWorkspaceAdapters,
   defaultGitHubMcpToolNames,
   defaultJiraMcpToolNames,
@@ -84,6 +85,32 @@ test('runtime MCP wiring constructs configured server clients, validates tools, 
   assert.deepEqual(auditRecords.map((record) => `${record.port}.${record.action}`), [
     'CodeHostPort.createBranch',
     'CodeHostPort.createBranch'
+  ]);
+});
+
+test('runtime TicketPort wiring validates only Jira intake and captures typed comment audits', async () => {
+  const config = parseWorkspaceConfig(workspaceWithAllMcpProviders());
+  const clients = createRuntimeMcpClients();
+  const createdServers: string[] = [];
+  const auditRecords: McpToolCallAuditRecord[] = [];
+
+  const ticketPort = await createRuntimeTicketPort({
+    config,
+    createMcpClient: (server: McpServerConfig): McpClient => {
+      createdServers.push(server.id);
+      return clients[server.id] ?? new MockMcpClient();
+    },
+    mcpAuditSink: (records) => auditRecords.push(...records)
+  });
+
+  assert.deepEqual(createdServers, ['atlassian']);
+  assert.deepEqual(clients.github.listToolRequests, []);
+  await ticketPort.comment('AD-701', 'Milestone V intake report handoff.');
+
+  assert.deepEqual(clients.atlassian.toolCallRequests.map((call) => call.toolName), [defaultJiraMcpToolNames.comment]);
+  assert.deepEqual(auditRecords.map((record) => `${record.port}.${record.action}:${record.status}`), [
+    'TicketPort.comment:started',
+    'TicketPort.comment:succeeded'
   ]);
 });
 

@@ -5,6 +5,7 @@ import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
 import { runScanCommand } from './commands/scan.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
+import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
 
 const HELP_TEXT = [
   'Agentic Delivery',
@@ -21,10 +22,10 @@ const HELP_TEXT = [
   '',
   'Commands:',
   '  init        Copy config/workspace.example.yml to config/workspace.yml.',
-  '  scan        List mock Jira backlog tickets.',
+  '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local mock plan and run state for one ticket.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
-  '  worker      Process queued mock backlog tickets with concurrency, retry, and safe stop limits.',
+  '  worker      Process queued Jira backlog tickets with concurrency, retry, and safe stop limits.',
   '  status      Inspect existing local run state and next action.',
   '  quality     Run local repository quality gates and write a quality report.',
   '',
@@ -39,11 +40,14 @@ export interface CliProgramIO {
   readonly stderr: (text: string) => void;
 }
 
+export type CliRuntimeMcpOptions = Pick<RuntimeProviderFactoryOptions, 'mcpClients' | 'createMcpClient' | 'mcpAllowlist' | 'mcpAuditSink'>;
+
 export interface CliProgramOptions {
   readonly cwd?: string;
   readonly configPath?: string;
   readonly io?: CliProgramIO;
   readonly initTemplatePath?: string;
+  readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
 }
 
 export interface CliProgram {
@@ -86,7 +90,7 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
       }
 
       if (args[0] === 'scan') {
-        return runScanCommand({ cwd: options.cwd, configPath: options.configPath, io });
+        return runScanCommand({ cwd: options.cwd, configPath: options.configPath, io, runtimeMcp: options.runtimeMcp });
       }
 
       if (args[0] === 'plan') {
@@ -125,7 +129,8 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
           maxBackoffMs: parsed.maxBackoffMs,
           maxCycles: parsed.maxCycles,
           baseBackoffMs: parsed.baseBackoffMs,
-          pollIntervalMs: parsed.pollIntervalMs
+          pollIntervalMs: parsed.pollIntervalMs,
+          runtimeMcp: options.runtimeMcp
         });
       }
 

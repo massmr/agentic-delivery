@@ -1,6 +1,7 @@
 import type { WorkspaceConfig } from '../config/index.js';
 import type { DeliveryRunStateRecord, DeliveryTicket } from '../domain/index.js';
 import { assertAdapterAllowedForAction } from '../policy/index.js';
+import type { TicketPort } from '../ports/index.js';
 import { createWorkspaceAdapters } from '../providers/index.js';
 import {
   JsonRunStateStore,
@@ -64,6 +65,7 @@ export interface RunAgentWorkerLoopInput {
   readonly shouldStop?: (() => boolean) | undefined;
   readonly abortSignal?: AbortSignal | undefined;
   readonly stateStore?: RunStateStore | undefined;
+  readonly ticketPort?: TicketPort | undefined;
   readonly processTicket?: ((input: AgentWorkerProcessTicketInput) => Promise<AgentWorkerProcessTicketResult>) | undefined;
 }
 
@@ -85,12 +87,13 @@ export async function runAgentWorkerLoop(input: RunAgentWorkerLoopInput): Promis
   const pollIntervalMs = nonNegativeInteger(input.pollIntervalMs ?? 0, 'pollIntervalMs');
   const stopWhenIdle = input.stopWhenIdle ?? true;
   const sleep = input.sleep ?? defaultSleep;
-  const adapters = createWorkspaceAdapters({ config: input.config });
+  const ticketPort = input.ticketPort ?? createWorkspaceAdapters({ config: input.config }).jira;
   const processTicket =
     input.processTicket ??
     ((ticketInput: AgentWorkerProcessTicketInput) =>
       runEndToEndMockDelivery({
         ticketKey: ticketInput.ticket.ref.key,
+        ticket: ticketInput.ticket,
         config: input.config,
         rootPath,
         runId: ticketInput.runId,
@@ -112,7 +115,7 @@ export async function runAgentWorkerLoop(input: RunAgentWorkerLoopInput): Promis
 
     cycles += 1;
 
-    const backlog = await adapters.jira.listBacklog();
+    const backlog = await ticketPort.listBacklog();
 
     for (const ticket of backlog) {
       if (!seenTicketKeys.has(ticket.ref.key)) {
@@ -127,9 +130,10 @@ export async function runAgentWorkerLoop(input: RunAgentWorkerLoopInput): Promis
     }
 
     const cycleTickets = pendingTickets.splice(0, pendingTickets.length);
-    const cycle = await processTicketsWithConcurrency(cycleTickets, concurrencyLimit, getStopReason, async (ticket) =>
-      processTicketWithRetry({ ticket, retryPolicy, now, sleep, stateStore, processTicket, getStopReason })
-    );
+    const cycle = await processTicketsWithConcurrency(cycleTickets, concurrencyLimit, getStopReason, async (ticket) => {
+      const detailedTicket = await ticketPort.getTicket(ticket.ref.key);
+      return processTicketWithRetry({ ticket: detailedTicket, retryPolicy, now, sleep, stateStore, processTicket, getStopReason });
+    });
     results.push(...cycle.results);
 
     if (cycle.stoppedReason !== undefined) {

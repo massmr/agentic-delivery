@@ -104,6 +104,8 @@ Responsibilities:
 - Transition ticket status where configured.
 - Attach run summaries.
 
+Current runtime intake can route `agentic scan` and worker backlog intake through `createRuntimeTicketPort(...)`. Mock Jira remains the default, while explicit `jira.mode: mcp` runtime wiring uses injected MCP clients, discovery, allowlist validation, and audit capture. No Jira REST adapter or live MCP session startup is part of the runtime path.
+
 Required methods:
 
 ```ts
@@ -224,6 +226,7 @@ The worker loop processes queued backlog tickets through the same typed ports an
 Required behavior:
 
 - Pull backlog tickets through `TicketPort.listBacklog` and de-duplicate ticket keys within the worker invocation.
+- Fetch ticket details through `TicketPort.getTicket` before processing, allowing Jira MCP intake while keeping processing mock/local until later worker-provider milestones.
 - Respect `max_concurrent_tickets` from workspace config unless a stricter CLI option is provided.
 - Bound execution with safe stop conditions: idle queue, max cycles, explicit stop callback, and abort signal.
 - Support deterministic retry/backoff through injectable sleep so tests do not wait or call live services.

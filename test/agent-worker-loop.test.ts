@@ -11,6 +11,7 @@ import {
   type DeliveryRunStateRecord,
   type DeliveryTicket,
   type RunStateStore,
+  type TicketPort,
   type WorkspaceConfig
 } from '../src/index.js';
 
@@ -116,6 +117,49 @@ test('agent worker does not let requested concurrency bypass the workspace limit
   assert.equal(summary.started, 2);
   assert.equal(summary.succeeded, 2);
   assert.equal(maxActive, 1);
+});
+
+test('agent worker intake uses typed TicketPort listing and detail fetching', async () => {
+  const store = new MemoryRunStateStore();
+  const getTicketCalls: string[] = [];
+  const processedSummaries: string[] = [];
+  const ticketPort: TicketPort = {
+    async listBacklog() {
+      return [
+        createTicket('AD-201', 'Queued summary'),
+        createTicket('AD-201', 'Duplicate queued summary'),
+        createTicket('AD-202', 'Second queued summary')
+      ];
+    },
+    async getTicket(key: string) {
+      getTicketCalls.push(key);
+      return createTicket(key, `Detailed summary for ${key}`);
+    },
+    async comment() {
+      throw new Error('worker intake must not comment on Jira tickets');
+    }
+  };
+
+  const summary = await runAgentWorkerLoop({
+    config,
+    ticketPort,
+    stateStore: store,
+    now: fixedClock(),
+    processTicket: async (input) => {
+      processedSummaries.push(input.ticket.summary);
+      return {
+        runId: input.runId,
+        state: createState(input.ticket, input.runId, 'PRODUCTION_PR_OPENED')
+      };
+    }
+  });
+
+  assert.equal(summary.queued, 2);
+  assert.equal(summary.started, 2);
+  assert.equal(summary.succeeded, 2);
+  assert.deepEqual(getTicketCalls, ['AD-201', 'AD-202']);
+  assert.deepEqual(processedSummaries.sort(), ['Detailed summary for AD-201', 'Detailed summary for AD-202']);
+  assert.equal(store.writes.filter((state) => state.state === 'PRODUCTION_PR_OPENED').length, 2);
 });
 
 test('agent worker retries failed tickets with deterministic backoff and escalates after exhaustion', async () => {
@@ -391,4 +435,21 @@ function createState(ticket: DeliveryTicket, runId: string, state: DeliveryRunSt
   }
 
   return transitioned;
+}
+
+function createTicket(key: string, summary: string): DeliveryTicket {
+  return {
+    ref: {
+      provider: 'jira',
+      key,
+      url: `https://jira.example.test/browse/${key}`
+    },
+    summary,
+    description: `${summary} description`,
+    status: 'To Do',
+    priority: 'medium',
+    labels: ['mcp-intake'],
+    createdAt: '2026-06-04T10:00:00.000Z',
+    updatedAt: '2026-06-04T10:05:00.000Z'
+  };
 }
