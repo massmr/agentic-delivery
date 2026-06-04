@@ -40,7 +40,7 @@ Current capabilities:
 - Railway staging verification boundary for deployment state and service URLs.
 - OpenCode execution contract with subprocess guardrails.
 - Local quality-gate runner.
-- Worker loop with bounded concurrency, retry, and escalation policy.
+- Foreground `ewokbot worker start` runtime with bounded or continuous operation, dry-run preview, workspace locking, graceful shutdown, and restart-safe state reuse.
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
 
@@ -177,11 +177,29 @@ Run local quality gates for a repository:
 node dist/src/cli/index.js quality ./path/to/repo --ticket-key LK-101 --run-id local-checks
 ```
 
-Process the mock backlog through the worker:
+Preview the mock backlog without writing run state or touching providers:
 
 ```bash
-node dist/src/cli/index.js worker --concurrency 1 --max-cycles 1 --max-attempts 2
+node dist/src/cli/index.js worker start --dry-run
 ```
+
+Process the mock backlog through one foreground worker cycle:
+
+```bash
+node dist/src/cli/index.js worker start --once --concurrency 1 --max-attempts 2
+```
+
+Run the worker as a foreground VPS process:
+
+```bash
+node dist/src/cli/index.js worker start
+```
+
+`worker start` acquires a workspace lock at `runs/worker.lock` before it opens provider adapters, so two workers cannot process the same workspace concurrently. It logs startup mode, provider modes, lock lifecycle, cycle summaries, restart-safety decisions, and the human-only production boundary in operator-readable text.
+
+Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects.
+
+The legacy `worker` command remains available for compatibility with existing local and test workflows.
 
 ## Configuration
 
@@ -308,7 +326,6 @@ The test suite is intentionally mock-heavy. New provider work should add contrac
 
 Near-term direction:
 
-- long-running VPS worker runtime,
 - CLI control commands for status, runs, pause/resume, and approval,
 - real provider smoke runs with explicit operator approval,
 - richer GitHub, Jira, Railway, and Vercel integrations.

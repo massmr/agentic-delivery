@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Milestones AA and AB from `docs/plans/approved-backlog.md` are complete.
+1. Milestones AA, AB, and AC from `docs/plans/approved-backlog.md` are complete.
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
-3. The next approved implementation milestone is Milestone AC: Long-Running Worker Runtime.
+3. The next approved implementation milestone is Milestone AD: CLI Control Plane.
 4. Do not implement later worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
@@ -15,13 +15,15 @@ Use:
 Read AGENTS.md, then execute docs/prompts/opencode-next-step.md.
 ```
 
-## After Milestone AB
+## After Milestone AC
 
-Completed through Milestone AB. Workspace config supports `mock`, `real`, and selected `mcp` provider modes, adapter factories keep mock connectors as the default, real Jira/GitHub/Railway factories fail fast before live adapters are implemented, shared MCP client infrastructure exists without live provider calls, Jira, GitHub, and Railway MCP operations now have typed ports with audit capture and configurable tool names where applicable, native fallback contracts explicitly define when MCP, native, subprocess, mock, and human-only surfaces are allowed, the mock-safe agent worker loop can process queued backlog tickets with concurrency, retry/backoff, escalation, durable state updates, and safe stop limits, runtime MCP wiring can resolve configured MCP servers to injected or constructed clients, Jira intake for `agentic scan` and worker backlog processing can use a runtime-injected Jira MCP `TicketPort` while preserving the mock default, `agentic worker` can start in explicit MCP mode with injected runtime clients after validating Jira/GitHub/Railway tool readiness and fallback contracts before queue processing, OpenCode execution now has a typed subprocess-first contract with safe command arguments, workspace cwd validation, environment allowlists, timeout/cancellation handling, sanitized logs, fake-executor tests, and actionable run-state/report summaries, GitHub develop handoff now uses `CodeHostPort` for branch metadata, PR creation, comments, and checks while keeping actual branch push on local git/native fallback with persistent operation-ledger idempotency under the run directory, Railway staging verification now validates MCP deployment precision, service URL evidence, deployment status, and smoke checks before allowing production PR preparation, CLI onboarding exposes `ewokbot`, `ewok`, and `agentic` aliases, generates mock-safe setup files, records Railway/Vercel monitor choices, writes secret placeholders only, and `ewokbot doctor` now reports local PASS/WARN/FAIL readiness for tools, config, `.env`, provider keys, repository paths, branch settings, and static quality gates without live calls.
+Completed through Milestone AC. Workspace config supports `mock`, `real`, and selected `mcp` provider modes, adapter factories keep mock connectors as the default, real Jira/GitHub/Railway factories fail fast before live adapters are implemented, shared MCP client infrastructure exists without live provider calls, Jira, GitHub, and Railway MCP operations now have typed ports with audit capture and configurable tool names where applicable, native fallback contracts explicitly define when MCP, native, subprocess, mock, and human-only surfaces are allowed, the mock-safe agent worker loop can process queued backlog tickets with concurrency, retry/backoff, escalation, durable state updates, and safe stop limits, runtime MCP wiring can resolve configured MCP servers to injected or constructed clients, Jira intake for `agentic scan` and worker backlog processing can use a runtime-injected Jira MCP `TicketPort` while preserving the mock default, `agentic worker` can start in explicit MCP mode with injected runtime clients after validating Jira/GitHub/Railway tool readiness and fallback contracts before queue processing, OpenCode execution now has a typed subprocess-first contract with safe command arguments, workspace cwd validation, environment allowlists, timeout/cancellation handling, sanitized logs, fake-executor tests, and actionable run-state/report summaries, GitHub develop handoff now uses `CodeHostPort` for branch metadata, PR creation, comments, and checks while keeping actual branch push on local git/native fallback with persistent operation-ledger idempotency under the run directory, Railway staging verification now validates MCP deployment precision, service URL evidence, deployment status, and smoke checks before allowing production PR preparation, CLI onboarding exposes `ewokbot`, `ewok`, and `agentic` aliases, generates mock-safe setup files, records Railway/Vercel monitor choices, writes secret placeholders only, and `ewokbot doctor` now reports local PASS/WARN/FAIL readiness for tools, config, `.env`, provider keys, repository paths, branch settings, and static quality gates without live calls.
+
+Milestone AC added `ewokbot worker start`, `--once`, `--dry-run`, foreground continuous polling, workspace locking, graceful shutdown, operator-readable logs, and conservative restart state reuse that avoids duplicate side effects.
 
 Architecture direction changed after review and Milestone N is complete: external SaaS integrations are MCP-first, with native/subprocess/mock adapters kept as fallbacks behind typed business ports. Do not implement Jira REST as the next milestone.
 
-Next approved work: Milestone AC from `docs/plans/approved-backlog.md`.
+Next approved work: Milestone AD from `docs/plans/approved-backlog.md`.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -47,8 +49,8 @@ The next milestones should move in this order:
 
 1. AA - Interactive CLI Onboarding For VPS Setup. Completed.
 2. AB - Doctor And Local Readiness Checks. Completed.
-3. AC - Long-Running Worker Runtime. Next approved work.
-4. AD - CLI Control Plane.
+3. AC - Long-Running Worker Runtime. Completed.
+4. AD - CLI Control Plane. Next approved work.
 5. AE - First Real Provider Smoke Run.
 
 Non-goals for the immediate next milestone:

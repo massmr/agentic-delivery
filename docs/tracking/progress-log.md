@@ -2,6 +2,16 @@
 
 ## 2026-06-04
 
+Completed Milestone AC Long-Running Worker Runtime:
+
+- Added the operator-facing `ewokbot worker start` command while preserving the legacy `ewokbot worker` path for compatibility.
+- Added `--once` for one worker cycle and `--dry-run` for read-only backlog preview with no run-state writes, operation-ledger writes, provider mutations, git operations, PRs, or deployments.
+- Added an atomic workspace lock at `runs/worker.lock` with owner-token release, live-worker contention errors, and stale dead-PID recovery before provider adapters are opened.
+- Added a foreground runtime with continuous polling defaults, bounded `--max-cycles` support, graceful `SIGINT`/`SIGTERM` abort wiring, lock cleanup, and operator-readable startup, lock, dry-run, state reuse, summary, and human-only production boundary logs.
+- Added conservative restart safety: backlog tickets with existing persisted run state are skipped instead of creating duplicate runs or repeating side effects, including `PRODUCTION_PR_OPENED` states that remain human-only.
+- Added deterministic mock-only coverage for lock ownership, stale recovery, dry-run behavior, one-cycle start mode, bounded continuous cycles, abort cleanup, and restart duplicate prevention.
+- Preserved mock mode as the default and avoided daemonization, hosted workers, Telegram/WhatsApp/dashboard scope, live provider calls in tests, autonomous production merge, and autonomous production deployment.
+
 Completed Milestone AB Doctor And Local Readiness Checks:
 
 - Expanded `ewokbot doctor` from setup-file validation into a local readiness report with PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent, workspace config, `.env.example`, `.env`, GitHub, Jira, Railway, Vercel, repository paths, branch settings, and quality gate presence.

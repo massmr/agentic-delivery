@@ -169,6 +169,26 @@ export {
   recordStagingVerified,
   transitionDeliveryRunState
 } from './state/index.js';
+export {
+  WorkerLockHeldError,
+  acquireWorkerLock,
+  createStateAwareTicketPort,
+  createWorkerLogger,
+  getWorkerLockPath,
+  runWorkerRuntime
+} from './worker/index.js';
+export type {
+  AcquireWorkerLockOptions,
+  StateAwareTicketPortResult,
+  WorkerLockLease,
+  WorkerLockMetadata,
+  WorkerLogger,
+  WorkerLogLevel,
+  WorkerRuntimeMode,
+  WorkerRuntimeOptions,
+  WorkerRuntimeResult,
+  WorkerStateReuseDecision
+} from './worker/index.js';
 export type {
   BranchPolicy,
   BranchRef,

@@ -42,7 +42,8 @@ test('ewokbot --help prints the mock planning help output', async () => {
   assert.match(captured.stdout, /ewokbot scan/u);
   assert.match(captured.stdout, /ewokbot plan <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot run <ticket-key>/u);
-  assert.match(captured.stdout, /ewokbot worker \[--concurrency <n>\]/u);
+  assert.match(captured.stdout, /ewokbot worker start \[--once\] \[--dry-run\]/u);
+  assert.match(captured.stdout, /ewokbot worker \[--concurrency <n>\].*\(legacy\)/u);
   assert.match(captured.stdout, /ewokbot status <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
   assert.match(captured.stdout, /Create config\/workspace\.yml and \.env\.example/u);
@@ -127,11 +128,19 @@ test('built ewok alias prints help when invoked through a package-manager symlin
 
 test('agentic worker processes the mock backlog without credentials', async () => {
   const rootPath = mkdtempSync(join(tmpdir(), 'agentic-worker-cli-'));
-  mkdirSync(join(rootPath, 'config'));
-  writeFileSync(join(rootPath, 'config', 'workspace.yml'), workerConfigYaml, 'utf8');
   const captured = createCapturedIO();
+  const program = createCliProgram({ cwd: rootPath, io: captured.io });
 
-  const exitCode = await createCliProgram({ cwd: rootPath, configPath: 'config/workspace.yml', io: captured.io }).run([
+  const initExitCode = await program.run([
+    'node',
+    'agentic',
+    'init',
+    '--non-interactive',
+    '--deployment-monitor',
+    'railway'
+  ]);
+
+  const exitCode = await program.run([
     'node',
     'agentic',
     'worker',
@@ -143,7 +152,9 @@ test('agentic worker processes the mock backlog without credentials', async () =
     '1'
   ]);
 
+  assert.equal(initExitCode, 0);
   assert.equal(exitCode, 2);
+  assert.match(captured.stdout, /Created .*config\/workspace\.yml/u);
   assert.match(captured.stdout, /Worker Mode: mock/u);
   assert.match(captured.stdout, /Intake Mode: mock/u);
   assert.match(captured.stdout, /Provider Modes: Jira=mock, GitHub=mock, Railway=mock/u);

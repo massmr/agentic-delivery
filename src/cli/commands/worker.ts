@@ -8,7 +8,8 @@ import {
   type AgentWorkerRetryPolicy,
   type AgentWorkerRuntimeInfo
 } from '../../delivery/index.js';
-import { createRuntimeWorkspaceAdapters, createWorkspaceAdapters } from '../../providers/index.js';
+import { createRuntimeTicketPort, createRuntimeWorkspaceAdapters, createWorkspaceAdapters } from '../../providers/index.js';
+import { runWorkerRuntime, type WorkerRuntimeMode } from '../../worker/index.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface WorkerCommandOptions {
@@ -22,9 +23,15 @@ export interface WorkerCommandOptions {
   readonly baseBackoffMs?: number | undefined;
   readonly pollIntervalMs?: number | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
+  readonly workerMode?: WorkerRuntimeMode | undefined;
+  readonly once?: boolean | undefined;
+  readonly dryRun?: boolean | undefined;
 }
 
 export interface ParsedWorkerCommandOptions {
+  readonly workerMode: WorkerRuntimeMode;
+  readonly once?: boolean | undefined;
+  readonly dryRun?: boolean | undefined;
   readonly concurrencyLimit?: number | undefined;
   readonly maxAttempts?: number | undefined;
   readonly maxBackoffMs?: number | undefined;
@@ -35,9 +42,52 @@ export interface ParsedWorkerCommandOptions {
 
 export async function runWorkerCommand(options: WorkerCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
-  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.example.yml'));
+  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.yml'));
   const retryPolicy = buildRetryPolicy(options);
   const runtimeInfo = createAgentWorkerRuntimeInfo(config);
+
+  if (options.workerMode === 'start') {
+    const abortController = new AbortController();
+    const signalHandlers = createWorkerSignalHandlers(abortController);
+
+    try {
+      const result = await runWorkerRuntime({
+        config,
+        rootPath: cwd,
+        io: options.io,
+        runtimeInfo,
+        mode: 'start',
+        once: options.once,
+        dryRun: options.dryRun,
+        concurrencyLimit: options.concurrencyLimit,
+        maxCycles: options.maxCycles,
+        pollIntervalMs: options.pollIntervalMs,
+        retryPolicy,
+        abortSignal: abortController.signal,
+        createTicketPort: async () => {
+          if (runtimeInfo.mode === 'mcp') {
+            if (options.dryRun === true) {
+              return createRuntimeTicketPort({ config, ...options.runtimeMcp });
+            }
+
+            return (await createRuntimeWorkspaceAdapters({ config, ...options.runtimeMcp })).jira;
+          }
+
+          return createWorkspaceAdapters({ config }).jira;
+        }
+      });
+
+      writeWorkerRuntimeInfo(options.io, runtimeInfo);
+      if (result.summary !== undefined) {
+        writeWorkerSummary(options.io, result.summary);
+      }
+
+      return result.exitCode;
+    } finally {
+      signalHandlers.dispose();
+    }
+  }
+
   const adapters =
     runtimeInfo.mode === 'mcp'
       ? await createRuntimeWorkspaceAdapters({ config, ...options.runtimeMcp })
@@ -60,19 +110,35 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
 
 export function parseWorkerCommandOptions(args: readonly string[]): ParsedWorkerCommandOptions {
   const parsed: {
+    workerMode: WorkerRuntimeMode;
+    once?: boolean | undefined;
+    dryRun?: boolean | undefined;
     concurrencyLimit?: number | undefined;
     maxAttempts?: number | undefined;
     maxBackoffMs?: number | undefined;
     maxCycles?: number | undefined;
     baseBackoffMs?: number | undefined;
     pollIntervalMs?: number | undefined;
-  } = {};
+  } = { workerMode: 'legacy' };
 
-  for (let index = 0; index < args.length; index += 1) {
+  let optionStartIndex = 0;
+
+  if (args[0] === 'start') {
+    parsed.workerMode = 'start';
+    optionStartIndex = 1;
+  } else if (args[0] !== undefined && !args[0].startsWith('-')) {
+    throw new Error(`Unknown worker subcommand: ${args[0]}. Use 'worker start' or legacy 'worker' options.`);
+  }
+
+  for (let index = optionStartIndex; index < args.length; index += 1) {
     const flag = args[index];
     const value = args[index + 1];
 
-    if (flag === '--concurrency') {
+    if (flag === '--once') {
+      parsed.once = true;
+    } else if (flag === '--dry-run') {
+      parsed.dryRun = true;
+    } else if (flag === '--concurrency') {
       parsed.concurrencyLimit = parseIntegerOption(flag, value);
       index += 1;
     } else if (flag === '--max-attempts') {
@@ -90,6 +156,8 @@ export function parseWorkerCommandOptions(args: readonly string[]): ParsedWorker
     } else if (flag === '--poll-interval-ms') {
       parsed.pollIntervalMs = parseIntegerOption(flag, value);
       index += 1;
+    } else {
+      throw new Error(`Unknown worker option: ${flag}.`);
     }
   }
 
@@ -129,6 +197,19 @@ function writeWorkerSummary(io: CliProgramIO, summary: AgentWorkerLoopSummary): 
   for (const result of summary.results) {
     io.stdout(`- ${result.ticketKey}: ${result.status} after ${result.attempts} attempt(s) [${result.runIds.join(', ')}]\n`);
   }
+}
+
+function createWorkerSignalHandlers(abortController: AbortController): { readonly dispose: () => void } {
+  const abort = () => abortController.abort();
+  process.once('SIGINT', abort);
+  process.once('SIGTERM', abort);
+
+  return {
+    dispose() {
+      process.off('SIGINT', abort);
+      process.off('SIGTERM', abort);
+    }
+  };
 }
 
 function parseIntegerOption(flag: string, value: string | undefined): number | undefined {
