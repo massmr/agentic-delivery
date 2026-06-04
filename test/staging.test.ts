@@ -19,6 +19,7 @@ import {
   runStagingVerification,
   transitionDeliveryRunState,
   type DeliveryRunStateRecord,
+  type DeploymentPort,
   type DeploymentResult,
   type RepositoryConfig,
   type RepositoryRef,
@@ -154,6 +155,103 @@ test('runStagingVerification records FAILED for failed smoke checks and never re
   assert.equal(result.stagingDeployments[0]?.smokeChecks[1]?.status, 'failed');
 });
 
+test('runStagingVerification persists FAILED and a report when Railway polling fails', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const store = new MemoryRunStateStore();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository,
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway: new ThrowingRailwayConnector('Railway deployment polling timed out.'),
+    smokeVerifier: new FailIfCalledSmokeVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(rootPath),
+    now: fixedClock()
+  });
+  const report = await readFile(join(rootPath, getRunDirectoryPath(ticket.key, result.runId), 'staging-report.md'), 'utf8');
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'FAILED']);
+  assert.match(result.failure?.reason ?? '', /Railway deployment polling timed out/u);
+  assert.equal(result.stagingDeployments[0]?.status, 'failed');
+  assert.equal(result.stagingDeployments[0]?.serviceUrl, 'unavailable');
+  assert.match(report, /Railway deployment polling timed out/u);
+});
+
+test('runStagingVerification persists FAILED without smoke checks when service URL is missing', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const store = new MemoryRunStateStore();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository,
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway: new MissingServiceUrlRailwayConnector(),
+    smokeVerifier: new FailIfCalledSmokeVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(rootPath),
+    now: fixedClock()
+  });
+  const report = await readFile(join(rootPath, getRunDirectoryPath(ticket.key, result.runId), 'staging-report.md'), 'utf8');
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'FAILED']);
+  assert.match(result.failure?.reason ?? '', /service URL/i);
+  assert.equal(result.stagingDeployments[0]?.smokeChecks.length, 0);
+  assert.match(report, /Failure Summary/u);
+  assert.match(report, /service URL/i);
+});
+
+test('runStagingVerification preserves failed Railway deployment evidence without resolving service URL', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const store = new MemoryRunStateStore();
+  const railway = new FailedWithoutServiceUrlRailwayConnector();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository,
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway,
+    smokeVerifier: new FailIfCalledSmokeVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(rootPath),
+    now: fixedClock()
+  });
+  const deployment = result.stagingDeployments[0];
+  const report = await readFile(join(rootPath, getRunDirectoryPath(ticket.key, result.runId), 'staging-report.md'), 'utf8');
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'FAILED']);
+  assert.equal(railway.getServiceUrlCalls, 0);
+  assert.equal(deployment?.status, 'failed');
+  assert.equal(deployment?.ref.deploymentId, 'mock-agentic-delivery-cli-staging-develop-abc123');
+  assert.equal(deployment?.branch, 'develop');
+  assert.equal(deployment?.commitSha, 'abc123');
+  assert.equal(deployment?.serviceUrl, 'unavailable');
+  assert.match(result.failure?.reason ?? '', /finished with status failed/u);
+  assert.match(report, /Mock Railway deployment failed/u);
+});
+
+test('runStagingVerification verifies successful deployment whose service URL is returned separately', async (t) => {
+  const store = new MemoryRunStateStore();
+  const railway = new SuccessWithoutServiceUrlRailwayConnector();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository,
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway,
+    smokeVerifier: new MockSmokeUrlVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(await createTempRoot(t)),
+    now: fixedClock()
+  });
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'STAGING_VERIFIED']);
+  assert.equal(railway.getServiceUrlCalls, 1);
+  assert.equal(result.state, 'STAGING_VERIFIED');
+  assert.equal(result.stagingDeployments[0]?.serviceUrl, 'https://delivery-cli-staging.mock-railway.local');
+  assert.deepEqual(result.stagingDeployments[0]?.smokeChecks.map((check) => check.status), ['passed', 'passed']);
+});
+
 test('staging state helpers and production readiness guard enforce staging lifecycle', () => {
   const ready = createState('DEVELOP_CHECKS_PASSED');
   const deploying = recordStagingDeploying(ready, '2026-06-03T10:20:00.000Z');
@@ -263,4 +361,88 @@ class MemoryRunStateStore implements RunStateStore {
   async write(state: DeliveryRunStateRecord): Promise<void> {
     this.writes.push(state);
   }
+}
+
+class ThrowingRailwayConnector implements DeploymentPort {
+  constructor(private readonly message: string) {}
+
+  async waitForDeployment(): Promise<DeploymentResult> {
+    throw new Error(this.message);
+  }
+
+  async readDeployment(): Promise<DeploymentResult> {
+    throw new Error('readDeployment should not be called.');
+  }
+
+  async getServiceUrl(): Promise<string> {
+    throw new Error('getServiceUrl should not be called.');
+  }
+}
+
+class MissingServiceUrlRailwayConnector implements DeploymentPort {
+  async waitForDeployment(): Promise<DeploymentResult> {
+    return createDeployment('success');
+  }
+
+  async readDeployment(): Promise<DeploymentResult> {
+    return createDeployment('success');
+  }
+
+  async getServiceUrl(): Promise<string> {
+    throw new Error('Railway staging deployment service URL is missing.');
+  }
+}
+
+class FailedWithoutServiceUrlRailwayConnector implements DeploymentPort {
+  getServiceUrlCalls = 0;
+
+  async waitForDeployment(): Promise<DeploymentResult> {
+    return createDeploymentWithoutServiceUrl('failed');
+  }
+
+  async readDeployment(): Promise<DeploymentResult> {
+    return createDeploymentWithoutServiceUrl('failed');
+  }
+
+  async getServiceUrl(): Promise<string> {
+    this.getServiceUrlCalls += 1;
+    throw new Error('getServiceUrl should not be called for failed Railway deployments.');
+  }
+}
+
+class SuccessWithoutServiceUrlRailwayConnector implements DeploymentPort {
+  getServiceUrlCalls = 0;
+
+  async waitForDeployment(): Promise<DeploymentResult> {
+    return createDeploymentWithoutServiceUrl('success');
+  }
+
+  async readDeployment(): Promise<DeploymentResult> {
+    return createDeploymentWithoutServiceUrl('success');
+  }
+
+  async getServiceUrl(): Promise<string> {
+    this.getServiceUrlCalls += 1;
+    return 'https://delivery-cli-staging.mock-railway.local';
+  }
+}
+
+class FailIfCalledSmokeVerifier {
+  async verify(): Promise<never> {
+    throw new Error('Smoke verifier should not run when staging service URL is unavailable.');
+  }
+}
+
+function createDeploymentWithoutServiceUrl(status: DeploymentResult['status']): DeploymentResult {
+  const deployment = createDeployment(status);
+  return {
+    ref: deployment.ref,
+    status: deployment.status,
+    branch: deployment.branch,
+    commitSha: deployment.commitSha,
+    smokeChecks: deployment.smokeChecks,
+    startedAt: deployment.startedAt,
+    finishedAt: deployment.finishedAt,
+    summary: deployment.summary
+  } as unknown as DeploymentResult;
 }

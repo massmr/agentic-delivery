@@ -2,6 +2,13 @@
 
 ## 2026-06-04
 
+Completed Milestone Z Railway Staging Verification:
+
+- Hardened staging verification so Railway polling errors, missing or invalid service URLs, failed deployment statuses, and failed smoke checks persist actionable `FAILED` state and write `staging-report.md` evidence.
+- Added Railway MCP precision guards for branch, commit SHA, deployment reference, staging environment, and HTTP(S) service URL validation before staging evidence is trusted.
+- Added mock-only tests for Railway provider errors, missing service URLs before smoke checks, MCP deployment identity mismatches, MCP service URL validation, and production readiness blocking.
+- Preserved Railway MCP-first typed `DeploymentPort` behavior, native fallback as a documented precision-gap boundary only, mock default execution, human-only production controls, and no live Railway/MCP/deployed-service calls.
+
 Completed Milestone Y GitHub Delivery Workflow:
 
 - Added a deterministic operation ledger with stable input hashing, completed-operation lookup, and a local JSON-backed implementation stored under each run directory for restart-safe delivery handoff idempotency.

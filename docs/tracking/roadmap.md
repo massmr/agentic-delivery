@@ -78,6 +78,7 @@ Status legend:
 - `[x]` Railway connector interface
 - `[x]` Railway MCP DeploymentPort
 - `[x]` Staging deployment polling
+- `[x]` Railway staging verification hardening
 - `[x]` Smoke checks
 - `[x]` Production PR gate
 - `[x]` End-to-end mock run command

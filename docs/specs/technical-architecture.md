@@ -149,6 +149,8 @@ Responsibilities:
 - Read deployment status.
 - Resolve staging URLs.
 
+Staging verification uses this port for Railway deployment polling and service URL lookup. Railway MCP results must precisely match the requested branch, commit SHA, deployment reference, and staging environment before smoke verification can run. Missing, invalid, or non-HTTP(S) service URLs fail staging before smoke checks. Failed polling, failed deployment status, missing URLs, and failed smoke checks persist `FAILED` state plus staging report evidence and block production PR preparation.
+
 Required methods:
 
 ```ts

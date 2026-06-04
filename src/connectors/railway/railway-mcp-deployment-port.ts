@@ -53,7 +53,9 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
       environment: input.environment
     });
 
-    return readDeploymentResult(execution.result.content);
+    const deployment = readDeploymentResult(execution.result.content);
+    assertMatchingDeploymentWaitResult(deployment, input);
+    return deployment;
   }
 
   async readDeployment(input: ReadDeploymentInput): Promise<DeploymentResult> {
@@ -61,7 +63,9 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
       ref: toDeploymentRefJson(input.ref)
     });
 
-    return readDeploymentResult(execution.result.content);
+    const deployment = readDeploymentResult(execution.result.content);
+    assertMatchingDeploymentRef(deployment.ref, input.ref);
+    return deployment;
   }
 
   async getServiceUrl(input: ServiceUrlInput): Promise<string> {
@@ -69,7 +73,7 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
       ref: toDeploymentRefJson(input.ref)
     });
 
-    return readServiceUrl(execution.result.content);
+    return assertHttpServiceUrl(readServiceUrl(execution.result.content));
   }
 
   private async callRailwayTool(configuredToolName: string, action: 'waitForDeployment' | 'readDeployment' | 'getServiceUrl', argumentsObject: JsonObject): Promise<McpToolCallExecutionResult> {
@@ -127,7 +131,7 @@ function readDeploymentResult(content: JsonValue | undefined): DeploymentResult 
     status: readDeploymentStatus(deployment.status ?? deployment.deploymentStatus),
     branch: readString(deployment.branch ?? deployment.branchName, 'content.deployment.branch'),
     commitSha: readString(deployment.commitSha ?? deployment.commit_sha, 'content.deployment.commitSha'),
-    serviceUrl: readString(deployment.serviceUrl ?? deployment.service_url, 'content.deployment.serviceUrl'),
+    serviceUrl: readOptionalString(deployment.serviceUrl ?? deployment.service_url, 'content.deployment.serviceUrl') ?? 'unavailable',
     smokeChecks: readSmokeChecks(deployment.smokeChecks ?? deployment.smoke_checks),
     startedAt: readString(deployment.startedAt ?? deployment.started_at, 'content.deployment.startedAt'),
     ...(deployment.finishedAt === undefined && deployment.finished_at === undefined ? {} : { finishedAt: readString(deployment.finishedAt ?? deployment.finished_at, 'content.deployment.finishedAt') }),
@@ -173,6 +177,60 @@ function readServiceUrl(content: JsonValue | undefined): string {
   const value = deployment.serviceUrl ?? deployment.service_url;
 
   return readString(value, 'content.deployment.serviceUrl');
+}
+
+function assertMatchingDeploymentWaitResult(deployment: DeploymentResult, input: WaitForDeploymentInput): void {
+  if (deployment.branch !== input.branch) {
+    throw new Error(`Railway MCP deployment result branch ${deployment.branch} does not match requested branch ${input.branch}.`);
+  }
+
+  if (deployment.commitSha !== input.commitSha) {
+    throw new Error(`Railway MCP deployment result commit ${deployment.commitSha} does not match requested commit ${input.commitSha}.`);
+  }
+
+  if (deployment.ref.environment !== input.environment) {
+    throw new Error(`Railway MCP deployment result environment ${deployment.ref.environment} does not match requested environment ${input.environment}.`);
+  }
+}
+
+function assertMatchingDeploymentRef(actual: DeploymentRef, expected: DeploymentRef): void {
+  if (actual.projectId !== expected.projectId) {
+    throw new Error(`Railway MCP deployment ref projectId ${actual.projectId} does not match requested projectId ${expected.projectId}.`);
+  }
+
+  if (actual.serviceId !== expected.serviceId) {
+    throw new Error(`Railway MCP deployment ref serviceId ${actual.serviceId} does not match requested serviceId ${expected.serviceId}.`);
+  }
+
+  if (actual.deploymentId !== expected.deploymentId) {
+    throw new Error(`Railway MCP deployment ref deploymentId ${actual.deploymentId} does not match requested deploymentId ${expected.deploymentId}.`);
+  }
+
+  if (actual.environment !== expected.environment) {
+    throw new Error(`Railway MCP deployment ref environment ${actual.environment} does not match requested environment ${expected.environment}.`);
+  }
+}
+
+function assertHttpServiceUrl(serviceUrl: string): string {
+  const url = parseServiceUrl(serviceUrl);
+
+  if (url !== undefined && (url.protocol === 'http:' || url.protocol === 'https:')) {
+    return serviceUrl;
+  }
+
+  throw new Error('content.deployment.serviceUrl must be an HTTP(S) URL.');
+}
+
+function parseServiceUrl(serviceUrl: string): URL | undefined {
+  try {
+    return new URL(serviceUrl);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      return undefined;
+    }
+
+    throw error;
+  }
 }
 
 function readDeploymentStatus(value: JsonValue | undefined): DeploymentStatus {
@@ -242,6 +300,14 @@ function readString(value: JsonValue | undefined, path: string): string {
   }
 
   return value;
+}
+
+function readOptionalString(value: JsonValue | undefined, path: string): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return readString(value, path);
 }
 
 function readPositiveInteger(value: JsonValue | undefined, path: string): number {

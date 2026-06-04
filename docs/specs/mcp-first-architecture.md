@@ -147,6 +147,8 @@ ProductionControl mergeProductionPullRequest/deployProduction
   -> human-only; no autonomous adapter allowed
 ```
 
+Railway staging verification treats those precision gaps as blocking evidence requirements. MCP deployment results must match the requested branch, commit SHA, deployment reference, and staging environment, and service URLs must be HTTP(S), before staging can become verified.
+
 Native fallback must not become a general bypass around MCP. It is a narrow contract for local runtime responsibilities and provider precision gaps that MCP cannot yet model.
 
 ## Safety Policy
