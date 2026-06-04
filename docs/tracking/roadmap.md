@@ -85,6 +85,7 @@ Status legend:
 - `[x]` Worker loop
 - `[x]` Concurrency limits
 - `[x]` Retry and escalation policy
+- `[x]` Worker MCP mode
 
 ## Optional Dashboard
 

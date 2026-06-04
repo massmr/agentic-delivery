@@ -2,6 +2,17 @@
 
 ## 2026-06-04
 
+Completed Milestone W Worker MCP Mode:
+
+- Added explicit worker runtime mode metadata so the worker distinguishes mock mode from MCP mode and reports worker, intake, and provider modes to operators.
+- Wired `agentic worker` to full runtime workspace MCP readiness when Jira, GitHub, or Railway is configured with `mode: mcp`, while preserving mock mode as the default.
+- Validated configured MCP clients, discovered tools, typed allowlists, and Native Fallback Contracts before queue processing begins in MCP mode.
+- Preserved existing queue, concurrency cap, retry/backoff, escalation, safe stop, abort, and durable run-state behavior.
+- Added mock-only tests for default mock worker output, injected `MockMcpClient` MCP mode, missing client/tool startup failures before side effects, and unsupported real provider modes.
+- Avoided OpenCode execution hardening, GitHub delivery workflow, Railway staging verification, remote pushes, production merges, production deployments, credentials, and live provider/MCP calls.
+
+## 2026-06-04 Earlier - Milestone V
+
 Completed Milestone V Real Jira Intake:
 
 - Added a Jira-only runtime `TicketPort` factory with `createRuntimeTicketPort(...)`, preserving mock defaults while validating Jira MCP clients, discovered tools, and typed allowlists before intake use.

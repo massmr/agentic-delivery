@@ -100,6 +100,9 @@ test('agentic worker processes the mock backlog without credentials', async () =
   ]);
 
   assert.equal(exitCode, 2);
+  assert.match(captured.stdout, /Worker Mode: mock/u);
+  assert.match(captured.stdout, /Intake Mode: mock/u);
+  assert.match(captured.stdout, /Provider Modes: Jira=mock, GitHub=mock, Railway=mock/u);
   assert.match(captured.stdout, /Agent worker loop completed/u);
   assert.match(captured.stdout, /Queued: 2/u);
   assert.match(captured.stdout, /Succeeded: 1/u);

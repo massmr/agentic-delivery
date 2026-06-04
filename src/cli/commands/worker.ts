@@ -1,8 +1,14 @@
 import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/index.js';
-import { runAgentWorkerLoop, type AgentWorkerLoopSummary, type AgentWorkerRetryPolicy } from '../../delivery/index.js';
-import { createRuntimeTicketPort } from '../../providers/index.js';
+import {
+  createAgentWorkerRuntimeInfo,
+  runAgentWorkerLoop,
+  type AgentWorkerLoopSummary,
+  type AgentWorkerRetryPolicy,
+  type AgentWorkerRuntimeInfo
+} from '../../delivery/index.js';
+import { createRuntimeWorkspaceAdapters, createWorkspaceAdapters } from '../../providers/index.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface WorkerCommandOptions {
@@ -31,17 +37,22 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
   const cwd = options.cwd ?? process.cwd();
   const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.example.yml'));
   const retryPolicy = buildRetryPolicy(options);
-  const ticketPort = await createRuntimeTicketPort({ config, ...options.runtimeMcp });
+  const runtimeInfo = createAgentWorkerRuntimeInfo(config);
+  const adapters =
+    runtimeInfo.mode === 'mcp'
+      ? await createRuntimeWorkspaceAdapters({ config, ...options.runtimeMcp })
+      : createWorkspaceAdapters({ config });
   const summary = await runAgentWorkerLoop({
     config,
     rootPath: cwd,
-    ticketPort,
+    ticketPort: adapters.jira,
     concurrencyLimit: options.concurrencyLimit,
     maxCycles: options.maxCycles,
     pollIntervalMs: options.pollIntervalMs,
     retryPolicy
   });
 
+  writeWorkerRuntimeInfo(options.io, runtimeInfo);
   writeWorkerSummary(options.io, summary);
 
   return summary.escalated > 0 || summary.failed > 0 ? 2 : 0;
@@ -95,6 +106,14 @@ function buildRetryPolicy(options: WorkerCommandOptions): Partial<AgentWorkerRet
     ...(options.baseBackoffMs === undefined ? {} : { baseBackoffMs: options.baseBackoffMs }),
     ...(options.maxBackoffMs === undefined ? {} : { maxBackoffMs: options.maxBackoffMs })
   };
+}
+
+function writeWorkerRuntimeInfo(io: CliProgramIO, runtimeInfo: AgentWorkerRuntimeInfo): void {
+  io.stdout(`Worker Mode: ${runtimeInfo.mode}\n`);
+  io.stdout(`Intake Mode: ${runtimeInfo.intakeMode}\n`);
+  io.stdout(
+    `Provider Modes: Jira=${runtimeInfo.providerModes.jira}, GitHub=${runtimeInfo.providerModes.github}, Railway=${runtimeInfo.providerModes.railway}\n`
+  );
 }
 
 function writeWorkerSummary(io: CliProgramIO, summary: AgentWorkerLoopSummary): void {

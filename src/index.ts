@@ -43,7 +43,14 @@ export {
   defaultRailwayMcpToolNames
 } from './connectors/railway/index.js';
 export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
-export { runAgentWorkerLoop, runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
+export {
+  createAgentWorkerRuntimeInfo,
+  runAgentWorkerLoop,
+  runDevelopPullRequestHandoff,
+  runEndToEndMockDelivery,
+  runProductionPullRequestPreparation,
+  runStagingVerification
+} from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
 export { LocalGitAdapter, buildWorkingBranchName, runGitCommand } from './git/index.js';
 export {
@@ -181,7 +188,10 @@ export type {
   AgentWorkerLoopSummary,
   AgentWorkerProcessTicketInput,
   AgentWorkerProcessTicketResult,
+  AgentWorkerProviderModes,
   AgentWorkerRetryPolicy,
+  AgentWorkerRuntimeInfo,
+  AgentWorkerRuntimeMode,
   AgentWorkerStopReason,
   AgentWorkerTicketResult,
   AgentWorkerTicketStatus,

@@ -13,6 +13,19 @@ import { runEndToEndMockDelivery } from './end-to-end-run.js';
 
 export type AgentWorkerTicketStatus = 'succeeded' | 'failed' | 'escalated';
 export type AgentWorkerStopReason = 'idle' | 'max-cycles' | 'stop-condition' | 'aborted';
+export type AgentWorkerRuntimeMode = 'mock' | 'mcp';
+
+export interface AgentWorkerProviderModes {
+  readonly jira: 'mock' | 'mcp';
+  readonly github: 'mock' | 'mcp';
+  readonly railway: 'mock' | 'mcp';
+}
+
+export interface AgentWorkerRuntimeInfo {
+  readonly mode: AgentWorkerRuntimeMode;
+  readonly intakeMode: 'mock' | 'mcp';
+  readonly providerModes: AgentWorkerProviderModes;
+}
 
 export interface AgentWorkerRetryPolicy {
   readonly maxAttempts: number;
@@ -76,7 +89,7 @@ const defaultRetryPolicy: AgentWorkerRetryPolicy = {
 };
 
 export async function runAgentWorkerLoop(input: RunAgentWorkerLoopInput): Promise<AgentWorkerLoopSummary> {
-  assertWorkerFallbackContracts();
+  assertWorkerFallbackContracts(createAgentWorkerRuntimeInfo(input.config).mode);
 
   const rootPath = input.rootPath ?? process.cwd();
   const now = input.now ?? (() => new Date());
@@ -152,6 +165,36 @@ export async function runAgentWorkerLoop(input: RunAgentWorkerLoopInput): Promis
   }
 
   return summarizeWorkerLoop({ cycles, queued: seenTicketKeys.size, results, stoppedReason });
+}
+
+export function createAgentWorkerRuntimeInfo(config: WorkspaceConfig): AgentWorkerRuntimeInfo {
+  const providerModes = createAgentWorkerProviderModes(config);
+  const configuredModes = [providerModes.jira, providerModes.github, providerModes.railway] as const;
+  const mode = configuredModes.some((providerMode) => providerMode === 'mcp') ? 'mcp' : 'mock';
+
+  assertWorkerFallbackContracts(mode);
+
+  return {
+    mode,
+    intakeMode: providerModes.jira,
+    providerModes
+  };
+}
+
+function createAgentWorkerProviderModes(config: WorkspaceConfig): AgentWorkerProviderModes {
+  return {
+    jira: requireSupportedWorkerProviderMode('Jira', config.jira.mode),
+    github: requireSupportedWorkerProviderMode('GitHub', config.github.mode),
+    railway: requireSupportedWorkerProviderMode('Railway', config.railway.mode)
+  };
+}
+
+function requireSupportedWorkerProviderMode(provider: string, mode: string): 'mock' | 'mcp' {
+  if (mode === 'mock' || mode === 'mcp') {
+    return mode;
+  }
+
+  throw new Error(`${provider} worker mode supports mock or explicit MCP providers only. '${mode}' is not part of Milestone W Worker MCP Mode.`);
 }
 
 async function processTicketsWithConcurrency(
@@ -416,12 +459,28 @@ function createWorkerRunId(ticketKey: string, date: Date, attempt: number): stri
   return `${ticketKey}-${timestamp}-worker-attempt-${attempt}`;
 }
 
-function assertWorkerFallbackContracts(): void {
-  assertAdapterAllowedForAction('TicketPort', 'listBacklog', 'mock');
-  assertAdapterAllowedForAction('TicketPort', 'getTicket', 'mock');
+function assertWorkerFallbackContracts(mode: AgentWorkerRuntimeMode): void {
+  const externalAdapter = mode === 'mcp' ? 'mcp' : 'mock';
+
+  assertAdapterAllowedForAction('TicketPort', 'listBacklog', externalAdapter);
+  assertAdapterAllowedForAction('TicketPort', 'getTicket', externalAdapter);
+
+  if (mode === 'mcp') {
+    assertAdapterAllowedForAction('CodeHostPort', 'createBranch', 'mcp');
+    assertAdapterAllowedForAction('CodeHostPort', 'openPullRequest', 'mcp');
+    assertAdapterAllowedForAction('CodeHostPort', 'getChecks', 'mcp');
+    assertAdapterAllowedForAction('CodeHostPort', 'commentOnPullRequest', 'mcp');
+    assertAdapterAllowedForAction('DeploymentPort', 'waitForDeployment', 'mcp');
+    assertAdapterAllowedForAction('DeploymentPort', 'readDeployment', 'mcp');
+    assertAdapterAllowedForAction('DeploymentPort', 'getServiceUrl', 'mcp');
+  }
+
   assertAdapterAllowedForAction('CodeHostPort', 'pushBranch', 'mock');
+  assertAdapterAllowedForAction('CodeHostPort', 'pushBranch', 'subprocess');
   assertAdapterAllowedForAction('QualityGateRunner', 'runRequiredGates', 'mock');
+  assertAdapterAllowedForAction('QualityGateRunner', 'runRequiredGates', 'subprocess');
   assertAdapterAllowedForAction('DevRunnerPort', 'runOpenCode', 'mock');
+  assertAdapterAllowedForAction('DevRunnerPort', 'runOpenCode', 'subprocess');
 }
 
 async function defaultSleep(durationMs: number): Promise<void> {

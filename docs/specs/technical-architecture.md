@@ -227,6 +227,8 @@ Required behavior:
 
 - Pull backlog tickets through `TicketPort.listBacklog` and de-duplicate ticket keys within the worker invocation.
 - Fetch ticket details through `TicketPort.getTicket` before processing, allowing Jira MCP intake while keeping processing mock/local until later worker-provider milestones.
+- Distinguish mock and MCP worker modes from workspace provider config. If any external provider is explicitly configured for MCP mode, startup validates runtime MCP clients, discovered tools, typed allowlists, and Native Fallback Contracts before the queue starts.
+- Report worker mode, intake mode, and Jira/GitHub/Railway provider modes in operator output.
 - Respect `max_concurrent_tickets` from workspace config unless a stricter CLI option is provided.
 - Bound execution with safe stop conditions: idle queue, max cycles, explicit stop callback, and abort signal.
 - Support deterministic retry/backoff through injectable sleep so tests do not wait or call live services.
