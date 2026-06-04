@@ -1,5 +1,21 @@
 # Progress Log
 
+## 2026-06-05
+
+Resolved Milestone AE P1 acceptance blocker:
+
+- Added a smoke-only run collision guard so `ewokbot smoke <ticket-key> --confirm-real-provider-smoke --run-id <run-id>` refuses an existing `runs/<ticket-key>/<run-id>/` directory or `state.json` after the Jira ticket read but before run-state writes, plan reports, git/OpenCode/quality work, GitHub/Railway provider calls, or operation-ledger writes.
+- Added fake-only tests covering both an existing state file and an existing run directory, including evidence that the existing state is preserved and no local git, GitHub, Railway, quality, report, or ledger side effects occur.
+
+Completed Milestone AE First Real Provider Smoke Run:
+
+- Added `ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]` as an explicit single-ticket real-provider smoke command while preserving the existing mock `ewokbot run` behavior and its `config/workspace.example.yml` default.
+- Added fail-fast smoke preflight ordering: missing confirmation stops before doctor/config/MCP/run-state/git/OpenCode/PR/deployment/ledger/provider writes; doctor FAIL checks stop before config/adapters; non-MCP Jira/GitHub/Railway modes stop before runtime adapters or side effects.
+- Added a typed smoke delivery orchestration path that loads `config/workspace.yml`, validates runtime MCP readiness through `createRuntimeWorkspaceAdapters`, reads one Jira ticket through `TicketPort.getTicket` without listing backlog, requires exactly one selected repository, creates run state only after preflight, then reuses local git branch creation, OpenCode runner, local quality gates, `runDevelopPullRequestHandoff`, `runStagingVerification`, and `runProductionPullRequestPreparation`.
+- Added an HTTP smoke verifier for the real command path and kept tests on `MockSmokeUrlVerifier` plus fake MCP clients, fake local git, fake quality runner, and mock OpenCode so tests make no live MCP, provider, network, package manager, provider CLI, OpenCode subprocess, remote git, production merge, or production deployment calls.
+- Added operator-readable smoke output for scope, phases, provider modes, run id, reports, operation boundary, and the human-only production PR boundary.
+- Preserved the operation ledger used by develop PR handoff and avoided full backlog automation, multi-repo delivery, daemonization, Telegram/WhatsApp/dashboard work, secrets, uncontracted REST fallbacks, production merge, and production deployment.
+
 ## 2026-06-04
 
 Completed Milestone AD CLI Control Plane:

@@ -98,12 +98,14 @@ export {
   createRailwayMcpToolRequirements,
   defaultRailwayMcpToolNames
 } from './connectors/railway/index.js';
-export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
+export { HttpSmokeUrlVerifier, MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
 export {
+  RealProviderSmokePreflightError,
   createAgentWorkerRuntimeInfo,
   runAgentWorkerLoop,
   runDevelopPullRequestHandoff,
   runEndToEndMockDelivery,
+  runRealProviderSmokeRun,
   runProductionPullRequestPreparation,
   runStagingVerification
 } from './delivery/index.js';
@@ -267,7 +269,7 @@ export type {
 export type { JiraConnector, JiraMcpAuditSink, JiraMcpTicketPortOptions, JiraMcpToolNames } from './connectors/jira/index.js';
 export type { CodeHostPort, DeploymentPort, TicketPort } from './ports/index.js';
 export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
-export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
+export type { HttpSmokeUrlVerifierOptions, MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
 export type {
   AgentWorkerLoopSummary,
   AgentWorkerProcessTicketInput,
@@ -281,10 +283,13 @@ export type {
   AgentWorkerTicketStatus,
   DevelopPullRequestHandoffInput,
   EndToEndMockDeliveryResult,
+  RealProviderSmokeRunResult,
   RunAgentWorkerLoopInput,
   RunEndToEndMockDeliveryInput,
+  RunRealProviderSmokeRunInput,
   RunProductionPullRequestPreparationInput,
-  RunStagingVerificationInput
+  RunStagingVerificationInput,
+  SmokeQualityRunner
 } from './delivery/index.js';
 export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, PushLocalBranchInput } from './git/index.js';
 export type {

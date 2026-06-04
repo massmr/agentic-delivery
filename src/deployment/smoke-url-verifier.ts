@@ -58,6 +58,60 @@ export class MockSmokeUrlVerifier implements SmokeUrlVerifier {
   }
 }
 
+export interface HttpSmokeUrlVerifierOptions {
+  readonly timeoutMs?: number | undefined;
+  readonly fetch?: typeof fetch | undefined;
+}
+
+export class HttpSmokeUrlVerifier implements SmokeUrlVerifier {
+  private readonly fetchImpl: typeof fetch;
+  private readonly timeoutMs: number;
+
+  constructor(options: HttpSmokeUrlVerifierOptions = {}) {
+    this.fetchImpl = options.fetch ?? fetch;
+    this.timeoutMs = options.timeoutMs ?? 15000;
+  }
+
+  async verify(input: SmokeUrlVerificationInput): Promise<readonly SmokeCheckResult[]> {
+    const urls = input.urls.length === 0 ? ['/'] : input.urls;
+    const results: SmokeCheckResult[] = [];
+
+    for (const url of urls) {
+      results.push(await this.verifyUrl(input.serviceUrl, url));
+    }
+
+    return results;
+  }
+
+  private async verifyUrl(serviceUrl: string, url: string): Promise<SmokeCheckResult> {
+    const absoluteUrl = toAbsoluteSmokeUrl(serviceUrl, url);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+
+    try {
+      const response = await this.fetchImpl(absoluteUrl, { method: 'GET', signal: controller.signal });
+      const status = response.ok ? 'passed' : 'failed';
+
+      return {
+        url: absoluteUrl,
+        status,
+        statusCode: response.status,
+        summary: status === 'passed'
+          ? `HTTP smoke check passed with status ${response.status}.`
+          : `HTTP smoke check failed with status ${response.status}.`
+      };
+    } catch (error) {
+      return {
+        url: absoluteUrl,
+        status: 'failed',
+        summary: `HTTP smoke check failed: ${error instanceof Error ? error.message : String(error)}`
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
 export function toAbsoluteSmokeUrl(serviceUrl: string, url: string): string {
   if (/^https?:\/\//u.test(url)) {
     return url;

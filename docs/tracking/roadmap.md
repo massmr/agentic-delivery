@@ -108,6 +108,7 @@ Status legend:
 - `[x]` VPS-oriented worker start command
 - `[x]` Worker lock and graceful shutdown
 - `[x]` CLI run inspection and approval commands
+- `[x]` Explicit first real-provider smoke run command
 
 ## Future Control Surfaces
 

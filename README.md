@@ -44,6 +44,7 @@ Current capabilities:
 - Foreground `ewokbot worker start` runtime with bounded or continuous operation, dry-run preview, workspace locking, graceful shutdown, and restart-safe state reuse.
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
+- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one real-provider MCP smoke run through production PR preparation only.
 
 Default behavior is safe:
 
@@ -167,6 +168,14 @@ Run one mock ticket end to end:
 node dist/src/cli/index.js run LK-101
 ```
 
+Run one explicitly confirmed real-provider smoke ticket after `config/workspace.yml` and local readiness are prepared:
+
+```bash
+node dist/src/cli/index.js smoke LK-101 --confirm-real-provider-smoke
+```
+
+The smoke command uses `config/workspace.yml` by default, refuses to start without `--confirm-real-provider-smoke`, runs `ewokbot doctor` checks before side effects, requires Jira, GitHub, and Railway to be configured as `mcp`, reads exactly one Jira ticket through `TicketPort.getTicket`, and requires planning to select exactly one repository. After preflight passes it creates local run state, creates a local git branch, invokes the configured OpenCode runner, runs local quality gates, opens the develop PR through the typed code host port, verifies Railway staging, and prepares a production PR for human review. It does not list the full backlog, merge production, or deploy production.
+
 Inspect persisted run state:
 
 ```bash
@@ -243,7 +252,7 @@ ewokbot init --non-interactive --deployment-monitor both
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode through runtime-injected MCP clients.
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode through runtime-injected MCP clients. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and continues to load `config/workspace.example.yml` by default.
 
 Example Jira MCP configuration:
 
@@ -269,7 +278,7 @@ mcp_servers:
       - https://mcp.atlassian.com/v1/mcp/authv2
 ```
 
-The public CLI does not start live MCP sessions, OAuth flows, or network clients by itself yet. MCP clients are wired through runtime factories and tests currently use mock clients.
+The public CLI can now execute one explicitly confirmed real-provider smoke path when MCP clients are available through the runtime factory. Tests still use mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
 
 See:
 
@@ -352,8 +361,8 @@ The test suite is intentionally mock-heavy. New provider work should add contrac
 
 Near-term direction:
 
-- CLI control commands for status, runs, pause/resume, and approval,
-- real provider smoke runs with explicit operator approval,
+- completed CLI control commands for status, runs, pause/resume, and approval,
+- one explicit real-provider smoke command with operator confirmation,
 - richer GitHub, Jira, Railway, and Vercel integrations.
 
 Track detailed planning in:

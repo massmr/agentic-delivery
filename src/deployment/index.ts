@@ -1,2 +1,2 @@
-export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './smoke-url-verifier.js';
-export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './smoke-url-verifier.js';
+export { HttpSmokeUrlVerifier, MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './smoke-url-verifier.js';
+export type { HttpSmokeUrlVerifierOptions, MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './smoke-url-verifier.js';

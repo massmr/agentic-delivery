@@ -16,6 +16,8 @@ import { runPlanCommand } from './commands/plan.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
 import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
 import { runScanCommand } from './commands/scan.js';
+import { parseSmokeCommandOptions, runSmokeCommand } from './commands/smoke.js';
+import type { SmokeCommandDeliveryOptions } from './commands/smoke.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
@@ -34,6 +36,7 @@ const HELP_TEXT = [
   '  ewokbot scan',
   '  ewokbot plan <ticket-key>',
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
+  '  ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]',
   '  ewokbot runs',
   '  ewokbot inspect <run-id>',
   '  ewokbot pause',
@@ -52,6 +55,7 @@ const HELP_TEXT = [
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local mock plan and run state for one ticket.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
+  '  smoke       Execute one explicitly confirmed real-provider single-ticket smoke run.',
   '  runs        List persisted local runs without contacting providers.',
   '  inspect     Show detailed local run state, reports, control intent, and next action.',
   '  pause       Pause workspace worker processing using runs/control.json.',
@@ -84,6 +88,7 @@ export interface CliProgramOptions {
   readonly initPrompter?: InitPrompter;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
+  readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
 }
 
 export interface CliProgram {
@@ -167,6 +172,27 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runRunCommand(parsed.ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runId: parsed.runId });
+      }
+
+      if (args[0] === 'smoke') {
+        const parsed = parseSmokeCommandOptions(args.slice(1));
+
+        if (parsed.ticketKey === undefined || parsed.ticketKey.trim().length === 0) {
+          io.stderr('Missing ticket key for smoke command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runSmokeCommand(parsed.ticketKey, {
+          cwd: options.cwd,
+          configPath: options.configPath,
+          io,
+          runId: parsed.runId,
+          confirmed: parsed.confirmed,
+          doctorOptions: options.doctorOptions,
+          runtimeMcp: options.runtimeMcp,
+          delivery: options.smokeDelivery
+        });
       }
 
       if (args[0] === 'runs') {
