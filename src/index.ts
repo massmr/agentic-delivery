@@ -31,7 +31,7 @@ export { GitHubMcpCodeHostPort, MockGitHubConnector, buildDevelopPullRequestBody
 export { JiraMcpTicketPort, MockJiraConnector, defaultJiraMcpToolNames } from './connectors/jira/index.js';
 export { MockRailwayConnector, RailwayMcpDeploymentPort, defaultRailwayMcpToolNames } from './connectors/railway/index.js';
 export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
-export { runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
+export { runAgentWorkerLoop, runDevelopPullRequestHandoff, runEndToEndMockDelivery, runProductionPullRequestPreparation, runStagingVerification } from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
 export { LocalGitAdapter, buildWorkingBranchName, runGitCommand } from './git/index.js';
 export {
@@ -160,7 +160,21 @@ export type { JiraConnector, JiraMcpAuditSink, JiraMcpTicketPortOptions, JiraMcp
 export type { CodeHostPort, DeploymentPort, TicketPort } from './ports/index.js';
 export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
 export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
-export type { DevelopPullRequestHandoffInput, EndToEndMockDeliveryResult, RunEndToEndMockDeliveryInput, RunProductionPullRequestPreparationInput, RunStagingVerificationInput } from './delivery/index.js';
+export type {
+  AgentWorkerLoopSummary,
+  AgentWorkerProcessTicketInput,
+  AgentWorkerProcessTicketResult,
+  AgentWorkerRetryPolicy,
+  AgentWorkerStopReason,
+  AgentWorkerTicketResult,
+  AgentWorkerTicketStatus,
+  DevelopPullRequestHandoffInput,
+  EndToEndMockDeliveryResult,
+  RunAgentWorkerLoopInput,
+  RunEndToEndMockDeliveryInput,
+  RunProductionPullRequestPreparationInput,
+  RunStagingVerificationInput
+} from './delivery/index.js';
 export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner } from './git/index.js';
 export type {
   CreateMcpToolCallAuditRecordInput,

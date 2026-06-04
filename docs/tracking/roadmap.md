@@ -79,10 +79,10 @@ Status legend:
 
 ## Autonomous Worker
 
-- `[ ]` Ticket queue
-- `[ ]` Worker loop
-- `[ ]` Concurrency limits
-- `[ ]` Retry and escalation policy
+- `[x]` Ticket queue
+- `[x]` Worker loop
+- `[x]` Concurrency limits
+- `[x]` Retry and escalation policy
 
 ## Optional Dashboard
 

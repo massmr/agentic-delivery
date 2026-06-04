@@ -5,7 +5,8 @@
 - Runtime: Node.js.
 - Language: TypeScript.
 - Interface: CLI first.
-- Future interface: worker process and dashboard.
+- Current interface: CLI plus mock-safe worker process.
+- Future interface: dashboard.
 - State storage for MVP: local SQLite or JSONL-backed state store.
 - Configuration: YAML.
 - Development runner: OpenCode.
@@ -23,6 +24,7 @@ MCP is the preferred control plane for external SaaS providers such as Jira, Git
 ```text
 CLI
   -> Agent Runtime
+    -> Agent Worker Loop
     -> State Machine
     -> Decision Policy
     -> Operation Ledger
@@ -214,6 +216,20 @@ Required run fields:
 - timestamps
 - failure reason
 - human action needed reason
+
+## Agent Worker Loop
+
+The worker loop processes queued backlog tickets through the same typed ports and delivery orchestration as one-shot runs. It is a runtime-owned coordinator, not a provider adapter.
+
+Required behavior:
+
+- Pull backlog tickets through `TicketPort.listBacklog` and de-duplicate ticket keys within the worker invocation.
+- Respect `max_concurrent_tickets` from workspace config unless a stricter CLI option is provided.
+- Bound execution with safe stop conditions: idle queue, max cycles, explicit stop callback, and abort signal.
+- Support deterministic retry/backoff through injectable sleep so tests do not wait or call live services.
+- Escalate exhausted retries and human-gated ticket results to `NEEDS_HUMAN` instead of bypassing production controls.
+- Persist worker attempt state before each ticket attempt and persist returned run state after the ticket processor completes.
+- Keep mock mode default. Tests and local worker runs must not require credentials, OAuth, webhooks, live provider calls, remote pushes, production merge, or production deployment.
 
 ## Branch Policy
 

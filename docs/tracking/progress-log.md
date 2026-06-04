@@ -2,6 +2,17 @@
 
 ## 2026-06-04
 
+Completed Milestone T Agent Worker Loop:
+
+- Added a mock-safe `runAgentWorkerLoop(...)` delivery coordinator that queues backlog tickets, de-duplicates tickets within an invocation, respects concurrency limits, and stops on idle, max cycles, explicit stop callbacks, or abort signals.
+- Added deterministic retry/backoff and escalation behavior with injectable sleep, preserving human-only production boundaries and escalating exhausted or human-gated tickets to `NEEDS_HUMAN`.
+- Persisted worker attempt state and returned ticket run state through the existing run-state store so worker progress remains auditable.
+- Added the public `agentic worker` CLI command with safe concurrency, retry, cycle, and polling options while keeping mock mode as the default and avoiding credentials or live provider calls.
+- Added worker-loop and CLI tests for queue behavior, concurrency, retries, escalation, safe stops, durable state writes, and mock-only execution.
+- Documented worker behavior in README and technical architecture, and updated tracking to mark Milestone T complete.
+
+## 2026-06-04 Earlier - Milestone S
+
 Completed Milestone S Native Fallback Contracts:
 
 - Added a typed `nativeFallbackContracts` policy surface under `src/policy` with explicit MCP, native, subprocess, mock, and human-only adapter rules.
@@ -9,7 +20,7 @@ Completed Milestone S Native Fallback Contracts:
 - Added tests for the contract matrix, disallowed adapters, undeclared operations, and Milestone S required policy surfaces without live API calls or credentials.
 - Documented the fallback rules in README, MCP-first architecture, technical architecture, and quality gate specs.
 
-## 2026-06-04 Earlier
+## 2026-06-04 Earlier - Milestone R
 
 Completed Milestone R Railway MCP DeploymentPort:
 

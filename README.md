@@ -31,9 +31,9 @@ Jira backlog
 
 ## Current Phase
 
-This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, provider adapter design boundaries, shared MCP client foundation, MCP-backed Jira TicketPort, GitHub CodeHostPort, Railway DeploymentPort, and tested native fallback contracts for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock or MCP-backed GitHub develop PR handoffs, verify mock or MCP-backed Railway deployment state and service URLs, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, discover and authorize mock MCP tools, audit MCP tool calls, map MCP timeout/auth/session errors, map Atlassian MCP Jira search/get/comment tools behind `TicketPort`, and write resumable run state without provider credentials. GitHub MCP currently covers branch creation, pull requests, checks, and comments; actual branch pushing remains on the local git/native or subprocess fallback path until a precise MCP push contract exists. Railway MCP is read-oriented for deployment state and service URL lookups; native Railway fallback is allowed only when MCP lacks required polling, metadata, or service URL precision.
+This repository now includes the config, domain, state, report, mock planning, local quality-gate, OpenCode runner, local git/GitHub handoff, mock Railway staging verification, local run-status foundations, resume guard policy, multi-repo safety guard, provider adapter design boundaries, shared MCP client foundation, MCP-backed Jira TicketPort, GitHub CodeHostPort, Railway DeploymentPort, tested native fallback contracts, and a mock-safe agent worker loop for the orchestrator. It can initialize and validate a local workspace configuration, scan deterministic mock Jira backlog tickets, plan one ticket, process queued mock backlog tickets with concurrency and retry limits, select candidate repositories, run local repository quality gates, build deterministic working branch names, create local-only git branches, prepare mock or MCP-backed GitHub develop PR handoffs, verify mock or MCP-backed Railway deployment state and service URLs, write staging reports, inspect existing run state, identify automatically resumable states, stop safely when one ticket maps to multiple repositories, discover and authorize mock MCP tools, audit MCP tool calls, map MCP timeout/auth/session errors, map Atlassian MCP Jira search/get/comment tools behind `TicketPort`, and write resumable run state without provider credentials. GitHub MCP currently covers branch creation, pull requests, checks, and comments; actual branch pushing remains on the local git/native or subprocess fallback path until a precise MCP push contract exists. Railway MCP is read-oriented for deployment state and service URL lookups; native Railway fallback is allowed only when MCP lacks required polling, metadata, or service URL precision.
 
-The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command now executes one deterministic mock ticket run through production PR preparation for human approval.
+The current implementation is still local and mock-only. It makes no real Jira, GitHub, Railway, or OpenCode provider calls, performs no remote git fetch/pull/push, and never merges or deploys production. The public `agentic run <ticket-key>` command executes one deterministic mock ticket run through production PR preparation for human approval. The public `agentic worker` command processes the deterministic mock backlog queue with bounded concurrency, retry/backoff, escalation, and safe stop limits.
 
 Start with:
 
@@ -97,6 +97,14 @@ Run one mock ticket end to end:
 ```bash
 node dist/src/cli/index.js run LK-101
 ```
+
+Process the mock backlog queue with the worker loop:
+
+```bash
+node dist/src/cli/index.js worker --concurrency 1 --max-cycles 1 --max-attempts 2
+```
+
+`agentic worker` reads backlog tickets through the typed ticket port, keeps mock providers as the default, de-duplicates tickets within the invocation, enforces bounded concurrency, and stops safely when the queue is idle unless additional cycles are requested. `--concurrency` can only lower or match the workspace `max_concurrent_tickets` policy; it cannot raise that cap. Safe options are `--concurrency`, `--max-cycles`, `--max-attempts`, `--base-backoff-ms`, `--max-backoff-ms`, and `--poll-interval-ms`.
 
 Inspect an existing run state:
 
@@ -183,6 +191,8 @@ The final report summarizes the selected repositories, branch refs, implementati
 
 If mock planning selects more than one repository, `agentic run <ticket-key>` stops before branch creation or implementation, persists `NEEDS_HUMAN`, writes the plan report, and exits non-zero with a reason. Multi-repo sub-runs are not implemented yet; split the Jira ticket or choose one repository before continuing.
 
+`agentic worker` uses the same mock-safe delivery path for each queued ticket. It persists worker attempt state before processing, writes returned ticket run state, retries failed tickets with deterministic backoff, escalates exhausted or human-gated tickets to `NEEDS_HUMAN`, and returns a non-zero exit code when any ticket escalates. It does not make live provider calls, request credentials, push remote branches, merge production pull requests, or deploy production.
+
 `agentic status <ticket-key> [--run-id <run-id>]` reads existing local `runs/<ticket-key>/<run-id>/state.json` files without provider credentials. When `--run-id` is omitted, it lists known runs for the ticket and selects the latest run by persisted `updatedAt` timestamp. The status output summarizes state, next action, repositories, branches, PRs, quality, staging, failures, and required human action.
 
 Resume policy is currently exposed as library helpers only: `canResumeState(state)` and `assertStateResumable(state)`. Automatic resume is allowed for active lifecycle states from `DISCOVERED` through `STAGING_VERIFIED`. It is blocked for terminal or human-gated states: `FAILED`, `NEEDS_HUMAN`, `SKIPPED`, `PRODUCTION_PR_OPENED`, and `DONE`. The guard has no side effects and does not call providers, rerun commands, merge production, or trigger a resume command.
@@ -217,6 +227,10 @@ Milestone M adds real provider adapter design boundaries without live calls. Wor
 Milestone O adds the shared MCP client foundation without live provider calls. The exported `src/mcp` APIs include MCP server config helpers, `McpClient`, deterministic `MockMcpClient`, tool discovery, tool allowlist enforcement for typed port/action pairs, audit record creation, allowed tool-call execution with audit records, and timeout/auth/session error mapping. Tests use only mock MCP clients and do not start OAuth, network, or live MCP server sessions.
 
 Milestone P adds a typed `TicketPort` boundary and a Jira MCP adapter for Atlassian MCP search, issue fetch, and comment capabilities. Raw MCP tool names stay inside the Jira adapter/config layer, can be overridden per workspace, and missing tools raise actionable `McpToolNotFoundError`s. The adapter preserves MCP audit records through an optional typed audit sink, and MCP-mode project keys are validated before JQL construction. Tests use only `MockMcpClient` with no live Jira, OAuth, or MCP server calls. `JiraConnector` remains compatible with `TicketPort` for existing planning and run code.
+
+Milestone S adds tested Native Fallback Contracts under `src/policy`. The policy defines when MCP, native, subprocess, mock, and human-only surfaces are allowed for Jira, GitHub, Railway, local workspace git, filesystem writes, quality gates, OpenCode execution, and production controls. It preserves MCP-first external SaaS behavior while making local/subprocess fallback boundaries explicit.
+
+Milestone T adds the mock-safe `agentic worker` backlog processor. The worker queues mock backlog tickets, honors concurrency and max-cycle stop limits, supports deterministic retry/backoff and escalation, persists attempt and returned run states, and exposes a safe CLI command without live provider calls, credentials, remote pushes, production merge, or production deployment.
 
 Repository entries in `config/workspace.yml` can define staging smoke checks with `staging_smoke_urls`. Use an empty array to intentionally skip smoke checks for a repository:
 

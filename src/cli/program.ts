@@ -4,6 +4,7 @@ import { parseQualityCommandOptions, runQualityCommand } from './commands/qualit
 import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
 import { runScanCommand } from './commands/scan.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
+import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 
 const HELP_TEXT = [
   'Agentic Delivery',
@@ -14,6 +15,7 @@ const HELP_TEXT = [
   '  agentic scan',
   '  agentic plan <ticket-key>',
   '  agentic run <ticket-key> [--run-id <run-id>]',
+  '  agentic worker [--concurrency <n>] [--max-cycles <n>] [--max-attempts <n>] [--poll-interval-ms <ms>]',
   '  agentic status <ticket-key> [--run-id <run-id>]',
   '  agentic quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
@@ -22,6 +24,7 @@ const HELP_TEXT = [
   '  scan        List mock Jira backlog tickets.',
   '  plan        Create a local mock plan and run state for one ticket.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
+  '  worker      Process queued mock backlog tickets with concurrency, retry, and safe stop limits.',
   '  status      Inspect existing local run state and next action.',
   '  quality     Run local repository quality gates and write a quality report.',
   '',
@@ -108,6 +111,22 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runRunCommand(parsed.ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runId: parsed.runId });
+      }
+
+      if (args[0] === 'worker') {
+        const parsed = parseWorkerCommandOptions(args.slice(1));
+
+        return runWorkerCommand({
+          cwd: options.cwd,
+          configPath: options.configPath,
+          io,
+          concurrencyLimit: parsed.concurrencyLimit,
+          maxAttempts: parsed.maxAttempts,
+          maxBackoffMs: parsed.maxBackoffMs,
+          maxCycles: parsed.maxCycles,
+          baseBackoffMs: parsed.baseBackoffMs,
+          pollIntervalMs: parsed.pollIntervalMs
+        });
       }
 
       if (args[0] === 'status') {
