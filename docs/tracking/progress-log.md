@@ -158,3 +158,13 @@ Completed Milestone P Jira MCP TicketPort:
 - Corrected Milestone P before moving to Milestone Q by preserving MCP audit records through an optional Jira MCP audit sink, allowing configurable Jira MCP tool names with Atlassian defaults, and validating MCP-mode Jira project keys before JQL construction.
 - Tightened the Milestone P Jira MCP acceptance gap by sharing project-key validation between workspace parsing and `JiraMcpTicketPort` construction, rejecting invalid keys before any MCP call while keeping valid uppercase keys like `LK`, `LK2`, and `LK_API` supported.
 - Verified the validation refactor with `pnpm typecheck` and `pnpm test`.
+
+Completed Milestone Q GitHub MCP CodeHostPort:
+
+- Added a typed `CodeHostPort` boundary under `src/ports` and kept `GitHubConnector` compatible with that surface.
+- Added `GitHubMcpCodeHostPort`, which maps MCP branch, pull-request, checks, and comment tools into the GitHub connector contract while keeping raw tool names private to the adapter.
+- Extended workspace config with GitHub `mode: mcp`, optional top-level `mcp_servers`, configurable GitHub MCP tool names, and MCP-mode server validation.
+- Updated provider factory behavior so mock remains the default, real GitHub remains fail-fast/no live adapter, and MCP GitHub requires an injected `McpClient` keyed by configured server id.
+- Added mock-only tests for GitHub MCP branch/PR/check/comment flows, missing tools, GitHub MCP config parsing, and factory selection.
+- Verified the Milestone Q implementation with `pnpm typecheck`, `pnpm test`, and `pnpm build`.
+- Corrected the Milestone Q GitHub MCP acceptance gap by removing unsafe metadata-only pushBranch support, keeping pushBranch on the native/local git fallback path, and adding default GitHub MCP tool-name coverage alongside the existing custom-name tests.

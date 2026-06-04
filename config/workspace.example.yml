@@ -15,6 +15,12 @@ github:
   mode: mock
   organization: your-org
 
+# GitHub can also run in MCP mode with an injected MCP client:
+# github:
+#   mode: mcp
+#   organization: your-org
+#   mcp_server: github
+
 railway:
   mode: mock
   staging_branch: develop

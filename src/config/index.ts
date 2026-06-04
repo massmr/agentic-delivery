@@ -8,6 +8,8 @@ export {
 export type {
   DevRunnerProvider,
   DevRunnerWorkspaceConfig,
+  GitHubMcpToolNameConfig,
+  GitHubProviderMode,
   GitHubWorkspaceConfig,
   JiraMcpToolNameConfig,
   JiraWorkspaceConfig,

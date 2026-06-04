@@ -1,6 +1,8 @@
 import type { WorkspaceConfig } from '../config/workspace-config.js';
 import { MockGitHubConnector } from '../connectors/github/mock-github-connector.js';
 import type { GitHubConnector } from '../connectors/github/github-connector.js';
+import { GitHubMcpCodeHostPort } from '../connectors/github/github-mcp-code-host-port.js';
+import type { GitHubMcpAuditSink } from '../connectors/github/github-mcp-code-host-port.js';
 import { MockJiraConnector } from '../connectors/jira/mock-jira-connector.js';
 import { JiraMcpTicketPort } from '../connectors/jira/jira-mcp-ticket-port.js';
 import type { JiraMcpAuditSink } from '../connectors/jira/jira-mcp-ticket-port.js';
@@ -21,6 +23,7 @@ export interface ProviderFactoryOptions {
   readonly mockTickets?: readonly DeliveryTicket[];
   readonly mcpClients?: Readonly<Record<string, McpClient | undefined>> | undefined;
   readonly jiraMcpAuditSink?: JiraMcpAuditSink | undefined;
+  readonly githubMcpAuditSink?: GitHubMcpAuditSink | undefined;
 }
 
 export interface WorkspaceAdapters {
@@ -107,6 +110,25 @@ export function createJiraConnector(options: ProviderFactoryOptions): JiraConnec
 export function createGitHubConnector(options: ProviderFactoryOptions): GitHubConnector {
   if (options.config.github.mode === 'mock') {
     return new MockGitHubConnector();
+  }
+
+  if (options.config.github.mode === 'mcp') {
+    const serverId = options.config.github.mcpServerId;
+    const client = serverId === undefined ? undefined : options.mcpClients?.[serverId];
+
+    if (serverId === undefined || client === undefined) {
+      throw new ProviderMcpClientError('GitHub', serverId ?? '');
+    }
+
+    const server = options.config.mcpServers.find((candidate) => candidate.id === serverId);
+
+    return new GitHubMcpCodeHostPort({
+      client,
+      serverId,
+      timeoutMs: server?.timeoutMs,
+      toolNames: options.config.github.mcpToolNames,
+      auditSink: options.githubMcpAuditSink
+    });
   }
 
   requireCredential(options.environment, 'GitHub', 'GITHUB_TOKEN');

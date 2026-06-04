@@ -30,3 +30,5 @@ When a milestone changes state, update:
 When blocked, update:
 
 - `risks-and-blockers.md`
+
+When a milestone intentionally keeps a capability on a local/native fallback instead of MCP, record that boundary in `progress-log.md` and the relevant user-facing README so the accepted contract stays explicit.

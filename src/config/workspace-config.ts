@@ -8,12 +8,20 @@ import { validateJiraProjectKeys } from '../connectors/jira/jira-project-key-val
 
 export type ProviderMode = 'mock' | 'real';
 export type JiraProviderMode = ProviderMode | 'mcp';
+export type GitHubProviderMode = ProviderMode | 'mcp';
 export type DevRunnerProvider = 'opencode';
 
 export interface JiraMcpToolNameConfig {
   readonly listBacklog: string;
   readonly getTicket: string;
   readonly comment: string;
+}
+
+export interface GitHubMcpToolNameConfig {
+  readonly createBranch: string;
+  readonly openPullRequest: string;
+  readonly getChecks: string;
+  readonly commentOnPullRequest: string;
 }
 
 export interface WorkspaceConfigIssue {
@@ -60,8 +68,10 @@ export interface JiraWorkspaceConfig {
 }
 
 export interface GitHubWorkspaceConfig {
-  readonly mode: ProviderMode;
+  readonly mode: GitHubProviderMode;
   readonly organization: string;
+  readonly mcpServerId?: string | undefined;
+  readonly mcpToolNames: GitHubMcpToolNameConfig;
 }
 
 export interface RailwayWorkspaceConfig {
@@ -105,6 +115,12 @@ const defaultJiraMcpToolNames: JiraMcpToolNameConfig = {
   listBacklog: 'searchJiraIssuesUsingJql',
   getTicket: 'getJiraIssue',
   comment: 'addCommentToJiraIssue'
+};
+const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
+  createBranch: 'createGitHubBranch',
+  openPullRequest: 'openGitHubPullRequest',
+  getChecks: 'getGitHubChecks',
+  commentOnPullRequest: 'commentOnGitHubPullRequest'
 };
 
 export async function loadWorkspaceConfig(filePath: string): Promise<WorkspaceConfig> {
@@ -191,6 +207,10 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
 
   if (parsedJira !== undefined && parsedMcpServers !== undefined) {
     validateJiraMcpServerReference(parsedJira, parsedMcpServers, issues);
+  }
+
+  if (parsedGitHub !== undefined && parsedMcpServers !== undefined) {
+    validateGitHubMcpServerReference(parsedGitHub, parsedMcpServers, issues);
   }
 
   if (
@@ -311,14 +331,56 @@ function validateJiraProjectKeysInWorkspaceConfig(projectKeys: readonly string[]
 }
 
 function parseGitHubConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): GitHubWorkspaceConfig | undefined {
-  const mode = readProviderMode(section, 'github', issues);
+  const mode = readGitHubProviderMode(section, issues);
   const organization = readNonEmptyString(section, 'github.organization', 'Set github.organization to the GitHub organization name.', issues);
+  const mcpServerId = mode === 'mcp'
+    ? readNonEmptyString(section, 'github.mcp_server', 'Set github.mcp_server to the id of a configured top-level mcp_servers entry.', issues)
+    : readOptionalNonEmptyString(section.mcp_server, 'github.mcp_server', 'Remove github.mcp_server unless github.mode is mcp, or set it to a non-empty MCP server id.', issues);
+  const mcpToolNames = parseGitHubMcpToolNames(section.mcp_tools, issues);
 
-  if (mode === undefined || organization === undefined) {
+  if (mode === undefined || organization === undefined || (mode === 'mcp' && mcpServerId === undefined)) {
     return undefined;
   }
 
-  return { mode, organization };
+  return { mode, organization, mcpServerId, mcpToolNames };
+}
+
+function parseGitHubMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[]): GitHubMcpToolNameConfig {
+  if (value === undefined) {
+    return defaultGitHubMcpToolNames;
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path: 'github.mcp_tools',
+      message: 'github.mcp_tools must be a YAML mapping when provided.',
+      action: 'Set github.mcp_tools.create_branch, open_pull_request, get_checks, and comment_pull_request to MCP tool names, or remove github.mcp_tools to use defaults.'
+    });
+    return defaultGitHubMcpToolNames;
+  }
+
+  return {
+    createBranch: readOptionalNonEmptyString(value.create_branch, 'github.mcp_tools.create_branch', 'Set github.mcp_tools.create_branch to the GitHub MCP branch-creation tool name.', issues) ?? defaultGitHubMcpToolNames.createBranch,
+    openPullRequest: readOptionalNonEmptyString(value.open_pull_request, 'github.mcp_tools.open_pull_request', 'Set github.mcp_tools.open_pull_request to the GitHub MCP pull-request tool name.', issues) ?? defaultGitHubMcpToolNames.openPullRequest,
+    getChecks: readOptionalNonEmptyString(value.get_checks, 'github.mcp_tools.get_checks', 'Set github.mcp_tools.get_checks to the GitHub MCP checks tool name.', issues) ?? defaultGitHubMcpToolNames.getChecks,
+    commentOnPullRequest: readOptionalNonEmptyString(value.comment_pull_request, 'github.mcp_tools.comment_pull_request', 'Set github.mcp_tools.comment_pull_request to the GitHub MCP comment tool name.', issues) ?? defaultGitHubMcpToolNames.commentOnPullRequest
+  };
+}
+
+function validateGitHubMcpServerReference(github: GitHubWorkspaceConfig, mcpServers: readonly McpServerConfig[], issues?: WorkspaceConfigIssue[]): void {
+  if (github.mode !== 'mcp' || github.mcpServerId === undefined) {
+    return;
+  }
+
+  if (mcpServers.some((candidate) => candidate.id === github.mcpServerId)) {
+    return;
+  }
+
+  issues?.push({
+    path: 'github.mcp_server',
+    message: `github.mcp_server references '${github.mcpServerId}', but no matching top-level mcp_servers entry exists.`,
+    action: 'Set github.mcp_server to the id of a configured top-level mcp_servers entry, or add a matching mcp_servers entry.'
+  });
 }
 
 function parseRailwayConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): RailwayWorkspaceConfig | undefined {
@@ -688,6 +750,21 @@ function readProviderMode(section: WorkspaceConfigInput, sectionPath: 'jira' | '
       path: `${sectionPath}.mode`,
       message: `${sectionPath}.mode must be 'mock' or 'real'.`,
       action: `Set ${sectionPath}.mode to 'mock' for local runs or 'real' only when the matching adapter credentials are available.`
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function readGitHubProviderMode(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): GitHubProviderMode | undefined {
+  const value = section.mode;
+
+  if (value !== 'mock' && value !== 'real' && value !== 'mcp') {
+    issues.push({
+      path: 'github.mode',
+      message: "github.mode must be 'mock', 'real', or 'mcp'.",
+      action: "Set github.mode to 'mock' for local runs, 'mcp' for an injected MCP-backed GitHub adapter, or 'real' only when the matching adapter credentials are available."
     });
     return undefined;
   }

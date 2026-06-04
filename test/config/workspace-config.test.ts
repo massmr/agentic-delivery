@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { loadWorkspaceConfig, parseWorkspaceConfig, WorkspaceConfigError } from '../../src/index.js';
+import { defaultGitHubMcpToolNames, loadWorkspaceConfig, parseWorkspaceConfig, WorkspaceConfigError } from '../../src/index.js';
 
 const exampleConfigPath = resolve('config/workspace.example.yml');
 
@@ -175,6 +175,26 @@ repos:
   assert.deepEqual(config.jira.projectKeys, ['LK', 'LK2', 'LK_API']);
 });
 
+test('workspace config accepts GitHub MCP settings', () => {
+  const config = parseWorkspaceConfig(workspaceWithGitHubMcp());
+
+  assert.equal(config.github.mode, 'mcp');
+  assert.equal(config.github.mcpServerId, 'github');
+  assert.deepEqual(config.github.mcpToolNames, {
+    createBranch: 'github.createBranch',
+    openPullRequest: 'github.openPullRequest',
+    getChecks: 'github.getChecks',
+    commentOnPullRequest: 'github.commentOnPullRequest'
+  });
+  assert.equal(config.mcpServers[0]?.id, 'github');
+});
+
+test('workspace config uses default GitHub MCP tool names when mcp_tools is omitted', () => {
+  const config = parseWorkspaceConfig(workspaceWithGitHubMcpDefaults());
+
+  assert.deepEqual(config.github.mcpToolNames, defaultGitHubMcpToolNames);
+});
+
 test('workspace config rejects invalid Jira MCP project keys', () => {
   for (const invalidKey of ['LK) OR status IS NOT EMPTY', 'lk', ' LK', '1LK', 'LK!']) {
     const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(`
@@ -229,6 +249,16 @@ repos:
   }
 });
 
+test('workspace config rejects GitHub MCP configs without a matching top-level server', () => {
+  const missingServerConfig = workspaceWithGitHubMcp().replace('  mcp_server: github\n', '  mcp_server: missing\n');
+
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(missingServerConfig));
+
+  assert.ok(error.issues.some((issue) => issue.path === 'github.mcp_server'));
+  assert.match(error.message, /github\.mcp_server references 'missing'/u);
+  assert.match(error.message, /add a matching mcp_servers entry/i);
+});
+
 test('workspace config rejects unknown provider modes', async () => {
   const source = await readFile(exampleConfigPath, 'utf8');
   const invalidProviderSource = source.replace('jira:\n  mode: mock', 'jira:\n  mode: live');
@@ -250,3 +280,104 @@ test('bad repository entry reports the exact repo field path', async () => {
   assert.match(error.message, /repos\[1\]\.local_path must be a non-empty string/u);
   assert.match(error.message, /Add at least one non-empty repository hint/u);
 });
+
+function workspaceWithGitHubMcp(): string {
+  return `
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - LK
+github:
+  mode: mcp
+  organization: agentic
+  mcp_server: github
+  mcp_tools:
+    create_branch: github.createBranch
+    open_pull_request: github.openPullRequest
+    get_checks: github.getChecks
+    comment_pull_request: github.commentOnPullRequest
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  github:
+    display_name: GitHub MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.github.com/v1/mcp
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+`;
+}
+
+function workspaceWithGitHubMcpDefaults(): string {
+  return `
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - LK
+github:
+  mode: mcp
+  organization: agentic
+  mcp_server: github
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  github:
+    display_name: GitHub MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.github.com/v1/mcp
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+`;
+}

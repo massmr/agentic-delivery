@@ -8,6 +8,8 @@ export {
 export type {
   DevRunnerProvider,
   DevRunnerWorkspaceConfig,
+  GitHubMcpToolNameConfig,
+  GitHubProviderMode,
   GitHubWorkspaceConfig,
   JiraMcpToolNameConfig,
   JiraWorkspaceConfig,
@@ -23,7 +25,7 @@ export type {
 } from './config/index.js';
 export { createCliProgram } from './cli/program.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
-export { MockGitHubConnector, buildDevelopPullRequestBody, buildProductionPullRequestBody } from './connectors/github/index.js';
+export { GitHubMcpCodeHostPort, MockGitHubConnector, buildDevelopPullRequestBody, buildProductionPullRequestBody, defaultGitHubMcpToolNames } from './connectors/github/index.js';
 export { JiraMcpTicketPort, MockJiraConnector, defaultJiraMcpToolNames } from './connectors/jira/index.js';
 export { MockRailwayConnector } from './connectors/railway/index.js';
 export { MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
@@ -136,12 +138,15 @@ export type {
   ChecksInput,
   CreateGitHubBranchInput,
   GitHubConnector,
+  GitHubMcpAuditSink,
+  GitHubMcpCodeHostPortOptions,
+  GitHubMcpToolNames,
   PullRequestCommentInput,
   PullRequestInput,
   PushGitHubBranchInput
 } from './connectors/github/index.js';
 export type { JiraConnector, JiraMcpAuditSink, JiraMcpTicketPortOptions, JiraMcpToolNames } from './connectors/jira/index.js';
-export type { TicketPort } from './ports/index.js';
+export type { CodeHostPort, TicketPort } from './ports/index.js';
 export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
 export type { MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
 export type { DevelopPullRequestHandoffInput, EndToEndMockDeliveryResult, RunEndToEndMockDeliveryInput, RunProductionPullRequestPreparationInput, RunStagingVerificationInput } from './delivery/index.js';
