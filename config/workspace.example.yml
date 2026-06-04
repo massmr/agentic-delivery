@@ -36,6 +36,14 @@ railway:
 dev_runner:
   provider: opencode
   command: opencode
+  args: []
+  timeout_ms: 1800000
+  env_var_names:
+    - PATH
+    - HOME
+    - TMPDIR
+    - TEMP
+    - TMP
   max_attempts: 2
 
 quality:

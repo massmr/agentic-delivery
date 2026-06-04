@@ -5,8 +5,10 @@ import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
 
 import {
+  MockOpenCodeRunner,
   OpenCodeSubprocessRunner,
   buildOpenCodeImplementationPrompt,
+  createNodeOpenCodeSubprocessExecutor,
   createDeliveryRunStateRecord,
   runOpenCodeImplementation,
   type BranchRef,
@@ -15,6 +17,10 @@ import {
   type DevRunInput,
   type DevRunResult,
   type DevRunner,
+  type OpenCodeSubprocessExecutor,
+  type OpenCodeSubprocessExecutorInput,
+  type OpenCodeSubprocessExecutorResult,
+  type OpenCodeProcessSpawner,
   type RepositoryConfig,
   type RunStateStore
 } from '../src/index.js';
@@ -121,73 +127,216 @@ test('buildOpenCodeImplementationPrompt renders deterministic ticket, repo, bran
   assert.match(prompt, /Do not push to production/u);
 });
 
-test('OpenCodeSubprocessRunner success mock reads stdin and logs stdout and stderr', async (t) => {
+test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted env', async (t) => {
   const rootPath = await createTempRoot(t);
+  const workingDirectory = join(rootPath, 'repo');
   const logPath = join(rootPath, 'runs', 'AD-123', 'run-1', 'implementation-log.md');
-  const result = await new OpenCodeSubprocessRunner({ now: fixedClock() }).run({
+  const calls: OpenCodeSubprocessExecutorInput[] = [];
+  const executor: OpenCodeSubprocessExecutor = async (input) => {
+    calls.push(input);
+    return { stdout: 'stdout-ok', stderr: 'stderr-ok', exitCode: 0 };
+  };
+  const secretArgs = ['run', '--no-network', '--token', 'plain-token-value', '--api_key=abc123', '--password', 'hunter2', 'sk-test-secret'];
+  const result = await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
     ticketKey: ticket.ref.key,
     runId: 'run-1',
     repository: repository.ref,
     branchName: branch.name,
     baseBranch: branch.baseBranch,
-    command: nodeEval("process.stdin.setEncoding('utf8');let input='';process.stdin.on('data',(chunk)=>{input+=chunk});process.stdin.on('end',()=>{console.log('stdin:'+input);console.error('stderr-ok')})"),
+    command: 'opencode',
+    commandArgs: secretArgs,
+    workingDirectory,
+    workspaceRoot: rootPath,
+    prompt: 'mock prompt',
+    implementationLogPath: logPath,
+    maxAttempts: 1,
+    timeoutMs: 30000,
+    environment: {
+      PATH: '/usr/bin',
+      HOME: '/tmp/home',
+      SECRET_TOKEN: 'do-not-pass'
+    },
+    environmentAllowlist: ['PATH', 'HOME']
+  });
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0]?.args, secretArgs);
+  assert.equal(calls[0]?.executable, 'opencode');
+  assert.equal(calls[0]?.cwd, workingDirectory);
+  assert.equal(calls[0]?.stdin, 'mock prompt');
+  assert.deepEqual(calls[0]?.env, { PATH: '/usr/bin', HOME: '/tmp/home' });
+  assert.equal(calls[0]?.timeoutMs, 30000);
+
+  const log = await readFile(logPath, 'utf8');
+  assert.equal(result.status, 'passed');
+  assert.match(result.command, /opencode run --no-network --token \[redacted\] --api_key=\[redacted\] --password \[redacted\] \[redacted\]/u);
+  assert.equal(result.attempts[0]?.command, result.command);
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.attempts[0]?.exitCode, 0);
+  assert.match(log, /stdout-ok/u);
+  assert.match(log, /stderr-ok/u);
+  assert.doesNotMatch(log, /do-not-pass/u);
+  assert.doesNotMatch(log, /plain-token-value/u);
+  assert.doesNotMatch(log, /abc123/u);
+  assert.doesNotMatch(log, /hunter2/u);
+  assert.doesNotMatch(log, /sk-test-secret/u);
+  assert.doesNotMatch(result.command, /plain-token-value|abc123|hunter2|sk-test-secret/u);
+});
+
+test('nodeOpenCodeSubprocessExecutor returns cancelled without spawning when already aborted', async () => {
+  const abortController = new AbortController();
+  abortController.abort();
+  let spawnCalls = 0;
+  const spawner: OpenCodeProcessSpawner = () => {
+    spawnCalls += 1;
+    throw new Error('pre-aborted execution should not spawn');
+  };
+
+  const result = await createNodeOpenCodeSubprocessExecutor(spawner)({
+    executable: 'opencode',
+    args: ['run'],
+    cwd: '/tmp',
+    env: {},
+    stdin: 'prompt',
+    abortSignal: abortController.signal
+  });
+
+  assert.equal(spawnCalls, 0);
+  assert.deepEqual(result, { stdout: '', stderr: '', exitCode: null, cancelled: true });
+});
+
+test('MockOpenCodeRunner redacts secret-like command args in persisted fields and log', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const logPath = join(rootPath, 'implementation-log.md');
+  const result = await new MockOpenCodeRunner({ now: fixedClock() }).run({
+    ticketKey: ticket.ref.key,
+    runId: 'run-1',
+    repository: repository.ref,
+    branchName: branch.name,
+    baseBranch: branch.baseBranch,
+    command: 'opencode',
+    commandArgs: ['run', '--secret', 'plain-secret-value', '--password=super-password', 'sk-mock-secret'],
     workingDirectory: rootPath,
+    workspaceRoot: rootPath,
     prompt: 'mock prompt',
     implementationLogPath: logPath,
     maxAttempts: 1
   });
 
   const log = await readFile(logPath, 'utf8');
-  assert.equal(result.status, 'passed');
-  assert.equal(result.attempts.length, 1);
-  assert.equal(result.attempts[0]?.exitCode, 0);
-  assert.match(log, /stdin:mock prompt/u);
-  assert.match(log, /stderr-ok/u);
+  assert.match(result.command, /--secret \[redacted\]/u);
+  assert.match(result.command, /--password=\[redacted\]/u);
+  assert.equal(result.attempts[0]?.command, result.command);
+  assert.doesNotMatch(result.command, /plain-secret-value|super-password|sk-mock-secret/u);
+  assert.doesNotMatch(log, /plain-secret-value|super-password|sk-mock-secret/u);
+  assert.match(log, /\[redacted\]/u);
 });
 
-test('OpenCodeSubprocessRunner failure mock records non-zero exit and failed result', async (t) => {
+test('OpenCodeSubprocessRunner rejects working directories outside the workspace root', async (t) => {
   const rootPath = await createTempRoot(t);
-  const logPath = join(rootPath, 'implementation-log.md');
-  const result = await new OpenCodeSubprocessRunner({ now: fixedClock() }).run({
+
+  await assert.rejects(() => new OpenCodeSubprocessRunner({ now: fixedClock(), executor: async () => ({ stdout: '', stderr: '', exitCode: 0 }) }).run({
     ticketKey: ticket.ref.key,
     runId: 'run-1',
     repository: repository.ref,
     branchName: branch.name,
     baseBranch: branch.baseBranch,
-    command: nodeEval("console.error('mock failure');process.exit(7)"),
-    workingDirectory: rootPath,
+    command: 'opencode',
+    workingDirectory: join(rootPath, '..', 'other-repo'),
+    workspaceRoot: rootPath,
     prompt: 'mock prompt',
-    implementationLogPath: logPath,
+    implementationLogPath: join(rootPath, 'implementation-log.md'),
     maxAttempts: 1
-  });
-
-  assert.equal(result.status, 'failed');
-  assert.equal(result.attempts[0]?.exitCode, 7);
-  assert.match(result.summary, /last exit code 7/u);
-  assert.match(await readFile(logPath, 'utf8'), /mock failure/u);
+  }), /working directory must stay inside workspace root/u);
 });
 
-test('OpenCodeSubprocessRunner retry skeleton records multiple attempts and log sections', async (t) => {
+test('OpenCodeSubprocessRunner records non-zero exits, retries, and redacts secret-like output', async (t) => {
   const rootPath = await createTempRoot(t);
   const logPath = join(rootPath, 'implementation-log.md');
-  const result = await new OpenCodeSubprocessRunner({ now: fixedClock() }).run({
+  const executor = createSequenceExecutor([
+    { stdout: 'token=first-secret', stderr: 'mock failure sk-test-secret', exitCode: 7 },
+    { stdout: 'second attempt', stderr: 'still failing', exitCode: 4 }
+  ]);
+  const result = await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
     ticketKey: ticket.ref.key,
     runId: 'run-1',
     repository: repository.ref,
     branchName: branch.name,
     baseBranch: branch.baseBranch,
-    command: nodeEval("console.log('retry attempt');process.exit(4)"),
+    command: 'opencode',
     workingDirectory: rootPath,
+    workspaceRoot: rootPath,
     prompt: 'mock prompt',
     implementationLogPath: logPath,
     maxAttempts: 2
   });
-  const log = await readFile(logPath, 'utf8');
 
+  const log = await readFile(logPath, 'utf8');
   assert.equal(result.status, 'failed');
   assert.equal(result.attempts.length, 2);
+  assert.equal(result.attempts[0]?.exitCode, 7);
+  assert.equal(result.attempts[1]?.exitCode, 4);
+  assert.match(result.summary, /last exit code 4/u);
   assert.match(log, /## Attempt 1/u);
   assert.match(log, /## Attempt 2/u);
+  assert.match(log, /token=\[redacted\]/u);
+  assert.match(log, /\[redacted\]/u);
+  assert.doesNotMatch(log, /first-secret/u);
+  assert.doesNotMatch(log, /sk-test-secret/u);
+});
+
+test('OpenCodeSubprocessRunner stops retrying after timeout', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const logPath = join(rootPath, 'implementation-log.md');
+  const executor = createSequenceExecutor([{ stdout: 'slow output', stderr: '', exitCode: null, timedOut: true, signal: 'SIGTERM' }]);
+  const result = await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
+    ticketKey: ticket.ref.key,
+    runId: 'run-1',
+    repository: repository.ref,
+    branchName: branch.name,
+    baseBranch: branch.baseBranch,
+    command: 'opencode',
+    workingDirectory: rootPath,
+    workspaceRoot: rootPath,
+    prompt: 'mock prompt',
+    implementationLogPath: logPath,
+    maxAttempts: 3,
+    timeoutMs: 10
+  });
+
+  assert.equal(executor.calls.length, 1);
+  assert.equal(result.status, 'timed_out');
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.attempts[0]?.timedOut, true);
+  assert.match(result.summary, /timed out/u);
+  assert.match(await readFile(logPath, 'utf8'), /Status: TIMED_OUT/u);
+});
+
+test('OpenCodeSubprocessRunner stops retrying after cancellation', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const logPath = join(rootPath, 'implementation-log.md');
+  const executor = createSequenceExecutor([{ stdout: '', stderr: 'operator stopped run', exitCode: null, cancelled: true, signal: 'SIGTERM' }]);
+  const abortController = new AbortController();
+  const result = await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
+    ticketKey: ticket.ref.key,
+    runId: 'run-1',
+    repository: repository.ref,
+    branchName: branch.name,
+    baseBranch: branch.baseBranch,
+    command: 'opencode',
+    workingDirectory: rootPath,
+    workspaceRoot: rootPath,
+    prompt: 'mock prompt',
+    implementationLogPath: logPath,
+    maxAttempts: 2,
+    abortSignal: abortController.signal
+  });
+
+  assert.equal(executor.calls.length, 1);
+  assert.equal(result.status, 'cancelled');
+  assert.equal(result.attempts.length, 1);
+  assert.equal(result.attempts[0]?.cancelled, true);
+  assert.match(await readFile(logPath, 'utf8'), /operator stopped run/u);
 });
 
 test('runOpenCodeImplementation writes IMPLEMENTING then failed state with actionable failure reason', async () => {
@@ -227,12 +376,22 @@ test('runOpenCodeImplementation writes IMPLEMENTING then failed state with actio
   assert.equal(result.state, 'FAILED');
   assert.equal(result.failure?.state, 'IMPLEMENTING');
   assert.match(result.failure?.reason ?? '', /implementation-log\.md/u);
-  assert.match(result.failure?.reason ?? '', /exit code: 9/u);
+  assert.match(result.failure?.reason ?? '', /Attempt 1 failed with exit code 9|Attempt 1 failed with exit code: 9/u);
   assert.equal(result.devRuns.length, 1);
 });
 
-function nodeEval(source: string): string {
-  return `${JSON.stringify(process.execPath)} -e ${JSON.stringify(source)}`;
+function createSequenceExecutor(results: readonly OpenCodeSubprocessExecutorResult[]): OpenCodeSubprocessExecutor & { readonly calls: readonly OpenCodeSubprocessExecutorInput[] } {
+  const calls: OpenCodeSubprocessExecutorInput[] = [];
+  const executor = (async (input: OpenCodeSubprocessExecutorInput) => {
+    calls.push(input);
+    return results[Math.min(calls.length - 1, results.length - 1)] ?? { stdout: '', stderr: '', exitCode: 1 };
+  }) as OpenCodeSubprocessExecutor & { readonly calls: readonly OpenCodeSubprocessExecutorInput[] };
+
+  Object.defineProperty(executor, 'calls', {
+    get: () => calls
+  });
+
+  return executor;
 }
 
 function fixedClock(): () => Date {

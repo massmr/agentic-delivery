@@ -166,6 +166,8 @@ Responsibilities:
 - Capture result.
 - Enforce retry policy.
 
+OpenCode execution is subprocess-first. The subprocess runner must use an executable plus argument array, validate the working directory against the configured workspace root, pass only allowlisted environment variables, enforce timeout and cancellation, capture stdout/stderr into implementation logs, redact secret-like output before persistence, and stop retrying after timeout or cancellation.
+
 Required methods:
 
 ```ts
@@ -252,6 +254,8 @@ Target branches:
 ## Quality Policy
 
 The orchestrator must not push or open a staging PR unless required local quality gates pass.
+
+OpenCode runner success does not bypass quality gates. Failed, timed-out, or cancelled runner attempts persist actionable run state and reports before stopping or escalating; later GitHub and staging steps remain blocked until required quality gates pass.
 
 Default required gates:
 

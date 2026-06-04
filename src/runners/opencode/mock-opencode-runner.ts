@@ -2,6 +2,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import type { DevRunInput, DevRunResult, DevRunner } from '../../domain/index.js';
+import { redactCommand } from './redaction.js';
 
 export interface MockOpenCodeRunnerOptions {
   readonly now?: () => Date;
@@ -31,7 +32,7 @@ export class MockOpenCodeRunner implements DevRunner {
       repository: input.repository,
       branchName: input.branchName,
       baseBranch: input.baseBranch,
-      command: input.command,
+      command: redactCommand(input.command, input.commandArgs ?? []),
       workingDirectory: input.workingDirectory,
       implementationLogPath: input.implementationLogPath,
       startedAt,
@@ -40,7 +41,7 @@ export class MockOpenCodeRunner implements DevRunner {
       attempts: [
         {
           attempt: 1,
-          command: input.command,
+          command: redactCommand(input.command, input.commandArgs ?? []),
           workingDirectory: input.workingDirectory,
           startedAt,
           finishedAt,
@@ -65,7 +66,7 @@ function renderMockImplementationLog(input: DevRunInput, startedAt: string, fini
     `- Branch: ${input.branchName}`,
     `- Base branch: ${input.baseBranch}`,
     `- Working directory: ${input.workingDirectory}`,
-    `- Command: ${input.command}`,
+    `- Command: ${redactCommand(input.command, input.commandArgs ?? [])}`,
     `- Started at: ${startedAt}`,
     `- Finished at: ${finishedAt}`,
     '',

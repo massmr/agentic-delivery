@@ -32,6 +32,9 @@ test('loads and validates config/workspace.example.yml', async () => {
   assert.equal(config.railway.mode, 'mock');
   assert.equal(config.devRunner.mode, 'mock');
   assert.equal(config.devRunner.provider, 'opencode');
+  assert.deepEqual(config.devRunner.args, []);
+  assert.equal(config.devRunner.timeoutMs, 1800000);
+  assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP']);
   assert.equal(config.devRunner.maxAttempts, 2);
   assert.equal(config.quality.defaultProfile, 'node');
   assert.equal(config.repos.length, 2);

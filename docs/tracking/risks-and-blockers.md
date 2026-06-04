@@ -6,7 +6,7 @@
 - Repository inference from Jira text may be unreliable without explicit repo fields or labels.
 - Quality gates may differ significantly across repositories.
 - Railway deployment verification may require project/service mapping not yet captured in config.
-- OpenCode runner behavior and output format need a stable contract.
+- Real OpenCode behavior may vary by local installation even though the runner contract is now typed and guarded.
 
 ## Current Blockers
 

@@ -202,9 +202,10 @@ function replaceDeployment(deployments: readonly DeploymentResult[], deployment:
 
 function summarizeDevRunFailure(result: DevRunResult): string {
   const lastAttempt = result.attempts[result.attempts.length - 1];
-  const exitCode = lastAttempt === undefined ? 'unknown' : String(lastAttempt.exitCode);
+  const lastSummary = lastAttempt?.summary ?? result.summary;
+  const exitCode = lastAttempt?.exitCode ?? 'unknown';
 
-  return `OpenCode implementation failed; review ${result.implementationLogPath} for details. Last exit code: ${exitCode}.`;
+  return `OpenCode implementation ${result.status}; review ${result.implementationLogPath} for details. Last exit code: ${exitCode}. Last attempt: ${lastSummary}`;
 }
 
 export function transitionDeliveryRunState(

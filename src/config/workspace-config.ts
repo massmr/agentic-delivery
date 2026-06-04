@@ -94,6 +94,9 @@ export interface DevRunnerWorkspaceConfig {
   readonly mode: ProviderMode;
   readonly provider: DevRunnerProvider;
   readonly command: string;
+  readonly args: readonly string[];
+  readonly timeoutMs: number;
+  readonly envVarNames: readonly string[];
   readonly maxAttempts: number;
 }
 
@@ -132,6 +135,8 @@ const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
   getChecks: 'getGitHubChecks',
   commentOnPullRequest: 'commentOnGitHubPullRequest'
 };
+const defaultDevRunnerTimeoutMs = 30 * 60 * 1000;
+const defaultDevRunnerEnvVarNames = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP'] as const;
 
 export async function loadWorkspaceConfig(filePath: string): Promise<WorkspaceConfig> {
   const source = await readFile(filePath, 'utf8');
@@ -454,13 +459,20 @@ function parseDevRunnerConfig(section: WorkspaceConfigInput, issues: WorkspaceCo
   const mode = readOptionalProviderMode(section, 'dev_runner', issues);
   const provider = readDevRunnerProvider(section, issues);
   const command = readNonEmptyString(section, 'dev_runner.command', 'Set dev_runner.command to the local OpenCode command.', issues);
+  const args = section.args === undefined
+    ? []
+    : readStringArray(section.args, 'dev_runner.args', 'Set dev_runner.args to an array of OpenCode command arguments.', issues);
+  const timeoutMs = section.timeout_ms === undefined ? defaultDevRunnerTimeoutMs : readPositiveInteger(section, 'dev_runner', 'timeout_ms', issues);
+  const envVarNames = section.env_var_names === undefined
+    ? defaultDevRunnerEnvVarNames
+    : readStringArray(section.env_var_names, 'dev_runner.env_var_names', 'Set dev_runner.env_var_names to an array of allowed environment variable names.', issues);
   const maxAttempts = readPositiveInteger(section, 'dev_runner', 'max_attempts', issues);
 
-  if (mode === undefined || provider === undefined || command === undefined || maxAttempts === undefined) {
+  if (mode === undefined || provider === undefined || command === undefined || args === undefined || timeoutMs === undefined || envVarNames === undefined || maxAttempts === undefined) {
     return undefined;
   }
 
-  return { mode, provider, command, maxAttempts };
+  return { mode, provider, command, args, timeoutMs, envVarNames, maxAttempts };
 }
 
 function parseQualityConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): QualityWorkspaceConfig | undefined {

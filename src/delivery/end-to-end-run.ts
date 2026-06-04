@@ -125,10 +125,14 @@ export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInpu
     branchName: branch.name,
     baseBranch: branch.baseBranch,
     command: input.config.devRunner.command,
+    commandArgs: input.config.devRunner.args,
     workingDirectory: repository.localPath,
     prompt: buildMockImplementationPrompt(ticket, repository, branch),
     implementationLogPath: join(rootPath, implementationLogPath),
-    maxAttempts: input.config.devRunner.maxAttempts
+    maxAttempts: input.config.devRunner.maxAttempts,
+    timeoutMs: input.config.devRunner.timeoutMs,
+    environment: process.env,
+    environmentAllowlist: input.config.devRunner.envVarNames
   });
   const implementedState: DeliveryRunStateRecord = {
     ...implementingState,

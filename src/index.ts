@@ -92,7 +92,14 @@ export {
   parseRepositoryQualityConfig
 } from './quality/index.js';
 export { MarkdownReportWriter, renderFinalReportMarkdown, renderQualityReportMarkdown, renderStagingReportMarkdown, renderTicketPlanMarkdown } from './reports/index.js';
-export { MockOpenCodeRunner, OpenCodeSubprocessRunner, buildOpenCodeImplementationPrompt, runOpenCodeImplementation } from './runners/index.js';
+export {
+  MockOpenCodeRunner,
+  OpenCodeSubprocessRunner,
+  buildOpenCodeImplementationPrompt,
+  createNodeOpenCodeSubprocessExecutor,
+  nodeOpenCodeSubprocessExecutor,
+  runOpenCodeImplementation
+} from './runners/index.js';
 export {
   ProviderCredentialError,
   ProviderMcpClientError,
@@ -169,6 +176,7 @@ export type {
   TicketProvider,
   TicketRef
 } from './domain/index.js';
+export type { OpenCodeProcessSpawner, OpenCodeSubprocessExecutor, OpenCodeSubprocessExecutorInput, OpenCodeSubprocessExecutorResult } from './runners/index.js';
 export type {
   ChecksInput,
   CreateGitHubBranchInput,

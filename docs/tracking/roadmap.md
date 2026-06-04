@@ -58,6 +58,7 @@ Status legend:
 
 - `[x]` OpenCode prompt builder
 - `[x]` OpenCode subprocess runner
+- `[x]` OpenCode execution contract
 - `[x]` Log capture
 - `[x]` Retry policy
 

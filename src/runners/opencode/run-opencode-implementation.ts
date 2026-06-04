@@ -13,6 +13,11 @@ export interface RunOpenCodeImplementationInput {
   readonly qualityGates?: readonly QualityGateDefinition[];
   readonly definitionOfDone: readonly string[];
   readonly command: string;
+  readonly commandArgs?: readonly string[] | undefined;
+  readonly timeoutMs?: number | undefined;
+  readonly environment?: Readonly<Record<string, string | undefined>> | undefined;
+  readonly environmentAllowlist?: readonly string[] | undefined;
+  readonly abortSignal?: AbortSignal | undefined;
   readonly rootPath: string;
   readonly stateStore: RunStateStore;
   readonly runner: DevRunner;
@@ -53,10 +58,16 @@ export async function runOpenCodeImplementation(input: RunOpenCodeImplementation
     branchName: input.branch.name,
     baseBranch: input.branch.baseBranch,
     command: input.command,
+    commandArgs: input.commandArgs ?? [],
     workingDirectory: input.repository.localPath,
+    workspaceRoot: input.rootPath,
     prompt,
     implementationLogPath: join(input.rootPath, getRunDirectoryPath(input.ticket.ref.key, input.state.runId), 'implementation-log.md'),
-    maxAttempts: input.maxAttempts
+    maxAttempts: input.maxAttempts,
+    timeoutMs: input.timeoutMs,
+    environment: input.environment,
+    environmentAllowlist: input.environmentAllowlist,
+    abortSignal: input.abortSignal
   });
   const completedAt = now().toISOString();
   const completedState = recordDevRunResult(implementingState, result, completedAt);

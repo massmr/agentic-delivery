@@ -2,6 +2,17 @@
 
 ## 2026-06-04
 
+Completed Milestone X OpenCode Execution Contract:
+
+- Hardened `OpenCodeSubprocessRunner` with an injectable subprocess executor, executable-plus-args command construction, workspace-root cwd validation, environment allowlists, timeout handling, cancellation handling, and secret-like output redaction.
+- Added typed runner contract fields for command args, workspace root, timeout, environment allowlist, abort signal, attempt signal, timed-out attempts, and cancelled attempts.
+- Added workspace config support for `dev_runner.args`, `dev_runner.timeout_ms`, and `dev_runner.env_var_names` while keeping mock mode and deterministic local tests as the default.
+- Replaced live child-process runner tests with fake executor tests covering success, non-zero retry, cwd guardrails, env allowlisting, timeout, cancellation, and log redaction.
+- Updated run-state failure summaries so failed, timed-out, and cancelled OpenCode runs remain actionable without bypassing required quality gates or production human approval.
+- Avoided real OpenCode execution in tests, OpenCode MCP work, GitHub delivery workflow, Railway staging verification, remote pushes, production merges, production deployments, and credentials.
+
+## 2026-06-04 Earlier - Milestone W
+
 Completed Milestone W Worker MCP Mode:
 
 - Added explicit worker runtime mode metadata so the worker distinguishes mock mode from MCP mode and reports worker, intake, and provider modes to operators.
