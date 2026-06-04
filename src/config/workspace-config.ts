@@ -5,10 +5,12 @@ import { parseDocument } from 'yaml';
 import type { McpServerConfig, McpServerTransport } from '../mcp/index.js';
 import { defaultMcpToolTimeoutMs } from '../mcp/index.js';
 import { validateJiraProjectKeys } from '../connectors/jira/jira-project-key-validation.js';
+import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
 
 export type ProviderMode = 'mock' | 'real';
 export type JiraProviderMode = ProviderMode | 'mcp';
 export type GitHubProviderMode = ProviderMode | 'mcp';
+export type RailwayProviderMode = ProviderMode | 'mcp';
 export type DevRunnerProvider = 'opencode';
 
 export interface JiraMcpToolNameConfig {
@@ -75,9 +77,17 @@ export interface GitHubWorkspaceConfig {
 }
 
 export interface RailwayWorkspaceConfig {
-  readonly mode: ProviderMode;
+  readonly mode: RailwayProviderMode;
   readonly stagingBranch: string;
   readonly productionBranch: string;
+  readonly mcpServerId?: string | undefined;
+  readonly mcpToolNames: RailwayMcpToolNameConfig;
+}
+
+export interface RailwayMcpToolNameConfig {
+  readonly waitForDeployment: string;
+  readonly readDeployment: string;
+  readonly getServiceUrl: string;
 }
 
 export interface DevRunnerWorkspaceConfig {
@@ -211,6 +221,10 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
 
   if (parsedGitHub !== undefined && parsedMcpServers !== undefined) {
     validateGitHubMcpServerReference(parsedGitHub, parsedMcpServers, issues);
+  }
+
+  if (parsedRailway !== undefined && parsedMcpServers !== undefined) {
+    validateRailwayMcpServerReference(parsedRailway, parsedMcpServers, issues);
   }
 
   if (
@@ -367,6 +381,27 @@ function parseGitHubMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[])
   };
 }
 
+function parseRailwayMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[]): RailwayMcpToolNameConfig {
+  if (value === undefined) {
+    return defaultRailwayMcpToolNames;
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path: 'railway.mcp_tools',
+      message: 'railway.mcp_tools must be a YAML mapping when provided.',
+      action: 'Set railway.mcp_tools.wait_for_deployment, read_deployment, and get_service_url to MCP tool names, or remove railway.mcp_tools to use defaults.'
+    });
+    return defaultRailwayMcpToolNames;
+  }
+
+  return {
+    waitForDeployment: readOptionalNonEmptyString(value.wait_for_deployment, 'railway.mcp_tools.wait_for_deployment', 'Set railway.mcp_tools.wait_for_deployment to the Railway MCP deployment polling tool name.', issues) ?? defaultRailwayMcpToolNames.waitForDeployment,
+    readDeployment: readOptionalNonEmptyString(value.read_deployment, 'railway.mcp_tools.read_deployment', 'Set railway.mcp_tools.read_deployment to the Railway MCP deployment lookup tool name.', issues) ?? defaultRailwayMcpToolNames.readDeployment,
+    getServiceUrl: readOptionalNonEmptyString(value.get_service_url, 'railway.mcp_tools.get_service_url', 'Set railway.mcp_tools.get_service_url to the Railway MCP service URL tool name.', issues) ?? defaultRailwayMcpToolNames.getServiceUrl
+  };
+}
+
 function validateGitHubMcpServerReference(github: GitHubWorkspaceConfig, mcpServers: readonly McpServerConfig[], issues?: WorkspaceConfigIssue[]): void {
   if (github.mode !== 'mcp' || github.mcpServerId === undefined) {
     return;
@@ -383,16 +418,36 @@ function validateGitHubMcpServerReference(github: GitHubWorkspaceConfig, mcpServ
   });
 }
 
+function validateRailwayMcpServerReference(railway: RailwayWorkspaceConfig, mcpServers: readonly McpServerConfig[], issues?: WorkspaceConfigIssue[]): void {
+  if (railway.mode !== 'mcp' || railway.mcpServerId === undefined) {
+    return;
+  }
+
+  if (mcpServers.some((candidate) => candidate.id === railway.mcpServerId)) {
+    return;
+  }
+
+  issues?.push({
+    path: 'railway.mcp_server',
+    message: `railway.mcp_server references '${railway.mcpServerId}', but no matching top-level mcp_servers entry exists.`,
+    action: 'Set railway.mcp_server to the id of a configured top-level mcp_servers entry, or add a matching mcp_servers entry.'
+  });
+}
+
 function parseRailwayConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): RailwayWorkspaceConfig | undefined {
-  const mode = readProviderMode(section, 'railway', issues);
+  const mode = readRailwayProviderMode(section, issues);
   const stagingBranch = readNonEmptyString(section, 'railway.staging_branch', 'Set railway.staging_branch to the staging branch name.', issues);
   const productionBranch = readNonEmptyString(section, 'railway.production_branch', 'Set railway.production_branch to the production branch name.', issues);
+  const mcpServerId = mode === 'mcp'
+    ? readNonEmptyString(section, 'railway.mcp_server', 'Set railway.mcp_server to the id of a configured top-level mcp_servers entry.', issues)
+    : readOptionalNonEmptyString(section.mcp_server, 'railway.mcp_server', 'Remove railway.mcp_server unless railway.mode is mcp, or set it to a non-empty MCP server id.', issues);
+  const mcpToolNames = parseRailwayMcpToolNames(section.mcp_tools, issues);
 
-  if (mode === undefined || stagingBranch === undefined || productionBranch === undefined) {
+  if (mode === undefined || stagingBranch === undefined || productionBranch === undefined || (mode === 'mcp' && mcpServerId === undefined)) {
     return undefined;
   }
 
-  return { mode, stagingBranch, productionBranch };
+  return { mode, stagingBranch, productionBranch, mcpServerId, mcpToolNames };
 }
 
 function parseDevRunnerConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): DevRunnerWorkspaceConfig | undefined {
@@ -765,6 +820,21 @@ function readGitHubProviderMode(section: WorkspaceConfigInput, issues: Workspace
       path: 'github.mode',
       message: "github.mode must be 'mock', 'real', or 'mcp'.",
       action: "Set github.mode to 'mock' for local runs, 'mcp' for an injected MCP-backed GitHub adapter, or 'real' only when the matching adapter credentials are available."
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
+function readRailwayProviderMode(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): RailwayProviderMode | undefined {
+  const value = section.mode;
+
+  if (value !== 'mock' && value !== 'real' && value !== 'mcp') {
+    issues.push({
+      path: 'railway.mode',
+      message: "railway.mode must be 'mock', 'real', or 'mcp'.",
+      action: "Set railway.mode to 'mock' for local runs, 'mcp' for an injected MCP-backed Railway adapter, or 'real' only when the matching adapter credentials are available."
     });
     return undefined;
   }

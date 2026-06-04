@@ -16,6 +16,8 @@ export type {
   JiraProviderMode,
   ProviderMode,
   QualityWorkspaceConfig,
+  RailwayMcpToolNameConfig,
+  RailwayProviderMode,
   RailwayWorkspaceConfig,
   WorkspaceConfig,
   WorkspaceConfigIssue,

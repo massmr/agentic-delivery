@@ -1,5 +1,6 @@
 import type { DeploymentResult, DeploymentStatus } from '../../domain/index.js';
-import type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './railway-connector.js';
+import type { ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from '../../ports/index.js';
+import type { RailwayConnector } from './railway-connector.js';
 
 export interface MockRailwayConnectorOptions {
   readonly status?: DeploymentStatus;

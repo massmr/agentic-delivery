@@ -1,5 +1,17 @@
 # Progress Log
 
+## 2026-06-04
+
+Completed Milestone R Railway MCP DeploymentPort:
+
+- Added a typed `DeploymentPort` boundary under `src/ports` and kept `RailwayConnector` compatible with that surface.
+- Added `RailwayMcpDeploymentPort`, which maps read-oriented Railway MCP tools into `waitForDeployment`, `readDeployment`, and `getServiceUrl` while keeping raw tool names private to the adapter.
+- Extended workspace config with Railway `mode: mcp`, optional top-level `mcp_servers`, configurable Railway MCP tool names, and MCP-mode server validation.
+- Updated provider factory behavior so mock remains the default, real Railway remains fail-fast/no live adapter, and MCP Railway requires an injected `McpClient` keyed by configured server id.
+- Added mock-only tests for Railway MCP deployment state, service URL lookup, audit capture, missing tools, Railway MCP config parsing, and factory selection.
+- Documented that Railway MCP is read-oriented and unsupported deployment actions remain on the native/local fallback path until the next fallback-contract milestone.
+- Verified the milestone with `pnpm typecheck`, `pnpm test`, and `pnpm build`.
+
 ## 2026-06-03
 
 Created initial project specifications and OpenCode execution material:

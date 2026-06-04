@@ -69,6 +69,7 @@ Status legend:
 ## Staging And Production
 
 - `[x]` Railway connector interface
+- `[x]` Railway MCP DeploymentPort
 - `[x]` Staging deployment polling
 - `[x]` Smoke checks
 - `[x]` Production PR gate

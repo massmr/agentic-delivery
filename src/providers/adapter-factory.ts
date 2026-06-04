@@ -8,6 +8,8 @@ import { JiraMcpTicketPort } from '../connectors/jira/jira-mcp-ticket-port.js';
 import type { JiraMcpAuditSink } from '../connectors/jira/jira-mcp-ticket-port.js';
 import type { JiraConnector } from '../connectors/jira/jira-connector.js';
 import { MockRailwayConnector } from '../connectors/railway/mock-railway-connector.js';
+import { RailwayMcpDeploymentPort } from '../connectors/railway/railway-mcp-deployment-port.js';
+import type { RailwayMcpAuditSink } from '../connectors/railway/railway-mcp-deployment-port.js';
 import type { RailwayConnector } from '../connectors/railway/railway-connector.js';
 import type { DeliveryTicket } from '../domain/ticket.js';
 import type { DevRunner } from '../domain/dev-runner.js';
@@ -24,6 +26,7 @@ export interface ProviderFactoryOptions {
   readonly mcpClients?: Readonly<Record<string, McpClient | undefined>> | undefined;
   readonly jiraMcpAuditSink?: JiraMcpAuditSink | undefined;
   readonly githubMcpAuditSink?: GitHubMcpAuditSink | undefined;
+  readonly railwayMcpAuditSink?: RailwayMcpAuditSink | undefined;
 }
 
 export interface WorkspaceAdapters {
@@ -138,6 +141,25 @@ export function createGitHubConnector(options: ProviderFactoryOptions): GitHubCo
 export function createRailwayConnector(options: ProviderFactoryOptions): RailwayConnector {
   if (options.config.railway.mode === 'mock') {
     return new MockRailwayConnector();
+  }
+
+  if (options.config.railway.mode === 'mcp') {
+    const serverId = options.config.railway.mcpServerId;
+    const client = serverId === undefined ? undefined : options.mcpClients?.[serverId];
+
+    if (serverId === undefined || client === undefined) {
+      throw new ProviderMcpClientError('Railway', serverId ?? '');
+    }
+
+    const server = options.config.mcpServers.find((candidate) => candidate.id === serverId);
+
+    return new RailwayMcpDeploymentPort({
+      client,
+      serverId,
+      timeoutMs: server?.timeoutMs,
+      toolNames: options.config.railway.mcpToolNames,
+      auditSink: options.railwayMcpAuditSink
+    });
   }
 
   requireCredential(options.environment, 'Railway', 'RAILWAY_TOKEN');

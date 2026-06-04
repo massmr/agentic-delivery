@@ -21,6 +21,13 @@ github:
 #   organization: your-org
 #   mcp_server: github
 
+# Railway can also run in MCP mode for deployment-state and service-url lookup:
+# railway:
+#   mode: mcp
+#   staging_branch: develop
+#   production_branch: main
+#   mcp_server: railway
+
 railway:
   mode: mock
   staging_branch: develop

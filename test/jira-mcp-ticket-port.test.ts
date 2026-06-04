@@ -264,7 +264,6 @@ test('workspace config accepts jira.mode mcp and top-level Atlassian mcp-remote 
     getTicket: toolNames.get,
     comment: toolNames.comment
   });
-  assert.throws(() => parseWorkspaceConfig(workspaceWithJiraMcp().replace('railway:\n  mode: mock', 'railway:\n  mode: mcp')), /railway\.mode must be 'mock' or 'real'/u);
 });
 
 test('workspace config accepts custom Jira MCP tool names', () => {

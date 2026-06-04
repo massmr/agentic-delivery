@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { test } from 'node:test';
 
-import { defaultGitHubMcpToolNames, loadWorkspaceConfig, parseWorkspaceConfig, WorkspaceConfigError } from '../../src/index.js';
+import { defaultGitHubMcpToolNames, defaultRailwayMcpToolNames, loadWorkspaceConfig, parseWorkspaceConfig, WorkspaceConfigError } from '../../src/index.js';
 
 const exampleConfigPath = resolve('config/workspace.example.yml');
 
@@ -189,6 +189,21 @@ test('workspace config accepts GitHub MCP settings', () => {
   assert.equal(config.mcpServers[0]?.id, 'github');
 });
 
+test('workspace config accepts Railway MCP settings', () => {
+  const config = parseWorkspaceConfig(workspaceWithRailwayMcp());
+
+  assert.equal(config.railway.mode, 'mcp');
+  assert.equal(config.railway.mcpServerId, 'railway');
+  assert.deepEqual(config.railway.mcpToolNames, defaultRailwayMcpToolNames);
+  assert.equal(config.mcpServers[0]?.id, 'railway');
+});
+
+test('workspace config uses default Railway MCP tool names when mcp_tools is omitted', () => {
+  const config = parseWorkspaceConfig(workspaceWithRailwayMcpDefaults());
+
+  assert.deepEqual(config.railway.mcpToolNames, defaultRailwayMcpToolNames);
+});
+
 test('workspace config uses default GitHub MCP tool names when mcp_tools is omitted', () => {
   const config = parseWorkspaceConfig(workspaceWithGitHubMcpDefaults());
 
@@ -256,6 +271,16 @@ test('workspace config rejects GitHub MCP configs without a matching top-level s
 
   assert.ok(error.issues.some((issue) => issue.path === 'github.mcp_server'));
   assert.match(error.message, /github\.mcp_server references 'missing'/u);
+  assert.match(error.message, /add a matching mcp_servers entry/i);
+});
+
+test('workspace config rejects Railway MCP configs without a matching top-level server', () => {
+  const missingServerConfig = workspaceWithRailwayMcp().replace('  mcp_server: railway\n', '  mcp_server: missing\n');
+
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(missingServerConfig));
+
+  assert.ok(error.issues.some((issue) => issue.path === 'railway.mcp_server'));
+  assert.match(error.message, /railway\.mcp_server references 'missing'/u);
   assert.match(error.message, /add a matching mcp_servers entry/i);
 });
 
@@ -332,6 +357,58 @@ repos:
       - api
     staging_smoke_urls: []
 `;
+}
+
+function workspaceWithRailwayMcp(): string {
+  return `
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - LK
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mcp
+  staging_branch: develop
+  production_branch: main
+  mcp_server: railway
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  railway:
+    display_name: Railway MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.railway.com/v1/mcp
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+`;
+}
+
+function workspaceWithRailwayMcpDefaults(): string {
+  return workspaceWithRailwayMcp();
 }
 
 function workspaceWithGitHubMcpDefaults(): string {
