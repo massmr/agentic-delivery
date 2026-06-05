@@ -12,7 +12,13 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, the approved next milestone is AH: Real Workspace Dry Run. Milestone AI is defined as the follow-up, but must not be started until AH has been implemented, reviewed, and accepted.
+At the time this prompt was prepared, Milestone AH: Real Workspace Dry Run is complete and accepted. Milestone AI: Controlled Single-Repository Dev Execution has been implemented and is awaiting human review/acceptance.
+
+AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
+
+AI must not open GitHub PRs, call Railway or Vercel, verify deployments, merge production, deploy production, or enable autonomous production automation.
+
+Do not start a later milestone until AI is reviewed and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step.
 
 ## Required Reading
 

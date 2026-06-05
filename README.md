@@ -36,6 +36,7 @@ Current capabilities:
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
 - Direct sibling Git repository discovery for parent workspace dry runs.
+- Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, and local quality evidence only.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
@@ -165,6 +166,14 @@ node dist/src/cli/index.js plan LK-101
 
 The planning command is a dry-run boundary. It reads exactly one ticket through the configured typed `TicketPort.getTicket`, can use Jira MCP when `.ewokbot/workspace.yml` selects `jira.mode: mcp`, selects candidate repositories from direct sibling Git discovery or explicit `repos: [...]`, and writes only local planning evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`. It does not create branches, run OpenCode, run package scripts, write an operation ledger, call GitHub, call Railway or Vercel, open pull requests, verify deployments, merge production, or deploy production.
 
+Execute one explicitly confirmed development-only ticket after planning selects exactly one repository:
+
+```bash
+node dist/src/cli/index.js run-dev LK-101 --confirm-dev-execution
+```
+
+The `run-dev` command reuses the Jira ticket intake and repository planning boundary, refuses to start without `--confirm-dev-execution`, prints the selected ticket, repository, branch, quality gates, evidence path, and local-only stop boundary before creating state or git/OpenCode/quality side effects, then creates a local branch only in the selected repository. It invokes the configured OpenCode runner through the existing execution contract, runs local quality gates, and writes implementation and quality evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`. It does not open GitHub pull requests, push branches, call Railway or Vercel, verify deployments, write an operation ledger, merge production, deploy production, or enable autonomous production automation.
+
 Run one mock ticket end to end:
 
 ```bash
@@ -265,7 +274,7 @@ ewokbot init --non-interactive --deployment-monitor both
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
 
 Example Jira MCP configuration:
 
@@ -298,10 +307,11 @@ First real smoke launch sequence after configuring local MCP/OAuth sessions:
 ```bash
 ewokbot doctor
 ewokbot scan
+ewokbot run-dev LK-101 --confirm-dev-execution
 ewokbot smoke LK-101 --confirm-real-provider-smoke
 ```
 
-`ewokbot scan`, `ewokbot worker start`, and `ewokbot smoke` all receive the public runtime MCP factory. Tests still use fake SDK/client factories or mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
+`ewokbot scan`, `ewokbot worker start`, `ewokbot run-dev`, and `ewokbot smoke` all receive the public runtime MCP factory. Tests still use fake SDK/client factories or mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
 
 See:
 

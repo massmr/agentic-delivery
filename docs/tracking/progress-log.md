@@ -2,6 +2,22 @@
 
 ## 2026-06-05
 
+Implemented Milestone AI Controlled Single-Repository Dev Execution review candidate:
+
+- Added `ewokbot run-dev <ticket-key> --confirm-dev-execution [--run-id <run-id>]` for one explicitly confirmed development-only ticket from the parent workspace.
+- Reused the AH Jira ticket intake and repository planning path while requiring exactly one selected repository before state writes, branch creation, OpenCode execution, or quality gates.
+- Printed the selected ticket, repository, branch, quality gates, run directory, and local-only stop boundary before delivery side effects.
+- Created a local branch only in the selected repository, invoked the existing OpenCode execution contract, ran local quality gates, and persisted plan, state, implementation log, quality report, and final local-only report evidence under `.ewokbot/runs/`.
+- Kept the command out of GitHub PR handoff, Railway/Vercel calls, deployment verification, operation ledgers, production merge, production deploy, Telegram, dashboard, daemonization, and autonomous production automation.
+- Added fake-only tests for missing confirmation, successful local execution, zero-repository guard, multi-repository guard, and existing-run collision, including assertions that GitHub/Railway MCP clients, remote git push, provider handoffs, staging reports, and operation ledgers are not touched.
+
+Accepted Milestone AH and prepared Milestone AI:
+
+- Marked AH Real Workspace Dry Run as complete and accepted after review.
+- Set AI Controlled Single-Repository Dev Execution as the next approved implementation milestone.
+- Clarified that AI must add `ewokbot run-dev <ticket-key> --confirm-dev-execution`, reuse AH planning, require exactly one selected repository, require explicit confirmation before side effects, create only a local branch, run OpenCode through the existing execution contract, run local quality gates, and persist local implementation/quality evidence.
+- Repeated AI non-goals: no GitHub PRs, Railway/Vercel calls, deployment verification, production merge, production deploy, or autonomous production automation.
+
 Implemented Milestone AH Real Workspace Dry Run review candidate:
 
 - Added fake-only coverage for a parent workspace containing multiple direct sibling Git repositories, proving `ewokbot doctor`, `ewokbot scan`, and `ewokbot plan <ticket-key>` operate from `.ewokbot/workspace.yml` without delivery side effects.

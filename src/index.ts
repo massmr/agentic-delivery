@@ -121,10 +121,13 @@ export {
 } from './connectors/railway/index.js';
 export { HttpSmokeUrlVerifier, MockSmokeUrlVerifier, toAbsoluteSmokeUrl } from './deployment/index.js';
 export {
+  DevelopmentRunPreflightError,
   RealProviderSmokePreflightError,
+  assertDevelopmentRunDoesNotExist,
   createAgentWorkerRuntimeInfo,
   runAgentWorkerLoop,
   runDevelopPullRequestHandoff,
+  runDevelopmentExecution,
   runEndToEndMockDelivery,
   runRealProviderSmokeRun,
   runProductionPullRequestPreparation,
@@ -306,9 +309,13 @@ export type {
   AgentWorkerTicketResult,
   AgentWorkerTicketStatus,
   DevelopPullRequestHandoffInput,
+  DevelopmentQualityRunner,
+  DevelopmentRunBoundary,
+  DevelopmentRunResult,
   EndToEndMockDeliveryResult,
   RealProviderSmokeRunResult,
   RunAgentWorkerLoopInput,
+  RunDevelopmentExecutionInput,
   RunEndToEndMockDeliveryInput,
   RunRealProviderSmokeRunInput,
   RunProductionPullRequestPreparationInput,

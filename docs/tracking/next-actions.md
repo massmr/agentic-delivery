@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Milestones AA, AB, AC, AD, AE, AF, and AG from `docs/plans/approved-backlog.md` are complete; AH is implemented and awaiting review/acceptance.
+1. Milestones AA, AB, AC, AD, AE, AF, AG, and AH from `docs/plans/approved-backlog.md` are complete and accepted.
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
-3. AI: Controlled Single-Repository Dev Execution is the planned follow-up after AH acceptance, but it is not approved to start yet.
+3. Milestone AI: Controlled Single-Repository Dev Execution has been implemented and is awaiting human review/acceptance.
 4. Do not implement later worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
@@ -35,7 +35,7 @@ AG changed the product layout so Ewokbot is launched from the parent directory t
 
 AG removed legacy fallback defaults. Root `config/workspace.yml`, root `.env`, root `.env.example`, and root `runs/` are not supported defaults; commands fail clearly if `.ewokbot/workspace.yml` is missing unless an explicit config path is supplied.
 
-Milestone AH - Real Workspace Dry Run is implemented and awaiting review/acceptance.
+Milestone AH - Real Workspace Dry Run is complete and accepted.
 
 AH proves the real operator flow from a parent multi-repository workspace without starting code generation or delivery side effects:
 
@@ -49,7 +49,18 @@ ewokbot plan <ticket-key>
 
 AH connects `.ewokbot/` setup, direct sibling Git repository discovery, Jira MCP intake, and ticket-to-repository planning. Doctor reports discovered sibling Git repository count and names, scan can read Jira backlog through the configured Jira MCP, and plan reads one ticket through `TicketPort.getTicket`, selects from discovered or explicit repositories, and persists only local planning evidence under `.ewokbot/runs/`. It does not create git branches, run OpenCode, run package scripts, write operation ledgers, call GitHub, call Railway/Vercel, open PRs, verify deployments, merge production, or deploy production.
 
-Milestone AI is defined in the approved backlog as the follow-up: Controlled Single-Repository Dev Execution. Do not start AI until AH is reviewed and accepted.
+Milestone AI - Controlled Single-Repository Dev Execution is implemented and awaiting review/acceptance.
+
+AI adds an explicitly confirmed development-only command:
+
+```bash
+cd <workspace-root>
+ewokbot run-dev <ticket-key> --confirm-dev-execution
+```
+
+AI reuses the AH dry-run path for Jira MCP ticket intake and repository planning, refuses execution unless exactly one repository is selected, prints the selected ticket/repository/branch/quality boundary before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and writes local implementation/quality evidence under `.ewokbot/runs/`.
+
+AI must stop after local development evidence. It must not open GitHub PRs, call Railway or Vercel, verify deployments, merge production, deploy production, or enable autonomous production automation.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -80,8 +91,8 @@ The next milestones should move in this order:
 5. AE - First Real Provider Smoke Run. Completed.
 6. AF - Real MCP Client Runtime Wiring. Completed.
 7. AG - Workspace Layout Migration To `.ewokbot/`. Completed.
-8. AH - Real Workspace Dry Run. Implemented; awaiting review/acceptance.
-9. AI - Controlled Single-Repository Dev Execution. Planned after AH acceptance.
+8. AH - Real Workspace Dry Run. Completed.
+9. AI - Controlled Single-Repository Dev Execution. Implemented; awaiting review/acceptance.
 
 Non-goals for the immediate next milestone:
 

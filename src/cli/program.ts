@@ -14,6 +14,8 @@ import { runInitCommand } from './commands/init.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runPlanCommand } from './commands/plan.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
+import { parseRunDevCommandOptions, runRunDevCommand } from './commands/run-dev.js';
+import type { RunDevCommandDeliveryOptions } from './commands/run-dev.js';
 import { parseRunCommandOptions, runRunCommand } from './commands/run.js';
 import { runScanCommand } from './commands/scan.js';
 import { parseSmokeCommandOptions, runSmokeCommand } from './commands/smoke.js';
@@ -37,6 +39,7 @@ const HELP_TEXT = [
   '  ewokbot scan',
   '  ewokbot plan <ticket-key>',
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
+  '  ewokbot run-dev <ticket-key> --confirm-dev-execution [--run-id <run-id>]',
   '  ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]',
   '  ewokbot runs',
   '  ewokbot inspect <run-id>',
@@ -56,6 +59,7 @@ const HELP_TEXT = [
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local dry-run plan through the configured typed TicketPort; no delivery side effects.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
+  '  run-dev     Execute one explicitly confirmed Jira ticket through local branch, OpenCode, and quality only.',
   '  smoke       Execute one explicitly confirmed real-provider single-ticket smoke run.',
   '  runs        List persisted local runs without contacting providers.',
   '  inspect     Show detailed local run state, reports, control intent, and next action.',
@@ -90,6 +94,7 @@ export interface CliProgramOptions {
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
   readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
+  readonly runDevDelivery?: RunDevCommandDeliveryOptions | undefined;
 }
 
 export interface CliProgram {
@@ -173,6 +178,26 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runRunCommand(parsed.ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runId: parsed.runId });
+      }
+
+      if (args[0] === 'run-dev') {
+        const parsed = parseRunDevCommandOptions(args.slice(1));
+
+        if (parsed.ticketKey === undefined || parsed.ticketKey.trim().length === 0) {
+          io.stderr('Missing ticket key for run-dev command.\n\n');
+          printHelp();
+          return 1;
+        }
+
+        return runRunDevCommand(parsed.ticketKey, {
+          cwd: options.cwd,
+          configPath: options.configPath,
+          io,
+          runId: parsed.runId,
+          confirmed: parsed.confirmed,
+          runtimeMcp: options.runtimeMcp,
+          delivery: options.runDevDelivery
+        });
       }
 
       if (args[0] === 'smoke') {
