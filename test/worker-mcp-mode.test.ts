@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -8,16 +8,19 @@ import {
   McpToolNotFoundError,
   MockMcpClient,
   RuntimeMcpClientResolutionError,
+  RuntimeMcpUnsupportedTransportError,
   createAgentWorkerRuntimeInfo,
   createCliProgram,
   createMockMcpTool,
+  createPublicCliRuntimeMcp,
   defaultGitHubMcpToolNames,
   defaultJiraMcpToolNames,
   defaultRailwayMcpToolNames,
   type JsonObject,
   parseWorkspaceConfig,
   type CliProgramIO,
-  type McpToolCallAuditRecord
+  type McpToolCallAuditRecord,
+  getWorkerLockPath
 } from '../src/index.js';
 
 test('agentic worker runs explicit MCP mode with injected clients after provider readiness checks', async () => {
@@ -84,6 +87,31 @@ test('agentic worker refuses MCP mode before queue side effects when a runtime c
 
   assert.equal(captured.stdout, '');
   assert.equal(captured.stderr, '');
+});
+
+test('agentic worker start rejects unsupported public MCP transport before lock side effects', async () => {
+  const rootPath = createWorkspaceRoot(workerMcpConfigYaml);
+  const captured = createCapturedIO();
+  const runtime = createPublicCliRuntimeMcp();
+
+  await assert.rejects(
+    () =>
+      createCliProgram({
+        cwd: rootPath,
+        configPath: 'config/workspace.yml',
+        io: captured.io,
+        runtimeMcp: runtime.runtimeMcp
+      }).run(['node', 'agentic', 'worker', 'start', '--once']),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpUnsupportedTransportError);
+      assert.equal(error.serverId, 'atlassian');
+      return true;
+    }
+  );
+
+  assert.equal(captured.stdout, '');
+  assert.equal(captured.stderr, '');
+  assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
 });
 
 test('agentic worker refuses MCP mode before tool calls when a required provider tool is missing', async () => {

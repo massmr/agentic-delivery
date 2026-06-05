@@ -248,13 +248,13 @@ Required behavior:
 
 Runtime behavior:
 
-- Acquire `runs/worker.lock` before opening provider adapters or listing backlog tickets. The lock is created atomically, records owner metadata, rejects a second live worker in the same workspace, and recovers stale dead-PID locks.
+- Acquire `runs/worker.lock` before listing backlog tickets. The lock is created atomically, records owner metadata, rejects a second live worker in the same workspace, and recovers stale dead-PID locks.
 - Support `--dry-run` as a read-only backlog preview. Dry-run mode may list configured backlog tickets through the ticket intake port, but it must not write run state, write operation ledgers, invoke the ticket processor, run OpenCode, run git, push branches, create PRs, read checks, verify deployments, or touch production controls.
 - Support `--once` for one worker cycle and default `worker start` to a foreground continuous polling process with a safe poll interval. `--max-cycles` can bound the foreground process for troubleshooting and tests.
 - Wire `SIGINT` and `SIGTERM` to the worker abort signal, stop accepting future cycles, print a shutdown summary, and release the workspace lock in cleanup.
 - Before processing a backlog ticket, inspect the latest persisted run state under `runs/<ticket>/<run-id>/state.json`. If any prior run exists, preserve that state and skip automatic processing for Milestone AC so restarts do not create duplicate side effects. Production PR states remain human-only and must never resume into merge or deployment.
 - Emit operator-readable logs for startup, mode, provider modes, lock lifecycle, stale lock recovery, dry-run results, state reuse decisions, cycle summaries, shutdown, and the human-only production boundary. Logs must not include secret values.
-- In MCP mode, validate required MCP clients, discovered tools, typed allowlists, and fallback contracts only after lock acquisition. Dry-run MCP intake validates only the Jira read tools needed for the preview.
+- In MCP mode, validate runtime MCP clients, discovered tools, typed allowlists, and fallback contracts before acquiring `runs/worker.lock`. This validation remains before run state writes, Jira reads, git, OpenCode, PRs, Railway checks, operation-ledger writes, and provider mutations. Dry-run MCP intake validates only the Jira read tools needed for the preview.
 - Preserve mock mode as the default and keep tests deterministic with injected clients, clocks, sleeps, and filesystem roots.
 
 ## Branch Policy

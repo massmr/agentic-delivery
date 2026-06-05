@@ -1,4 +1,5 @@
 export { MockMcpClient, createMockMcpTool } from './mock-mcp-client.js';
+export { RuntimeMcpClientStartupError, RuntimeMcpUnsupportedTransportError, createSdkRuntimeMcpClient } from './sdk-runtime-mcp-client.js';
 export { callAllowedMcpTool } from './tool-call.js';
 export { assertMcpToolAllowed, findMcpToolAllowlistRule } from './allowlist.js';
 export { createMcpToolCallAuditRecord } from './audit.js';
@@ -20,6 +21,13 @@ export { isJsonObject } from './json.js';
 export type { McpCallToolInput, McpClient, McpListToolsInput, McpToolCallResult, McpToolDefinition } from './client.js';
 export type { JsonArray, JsonObject, JsonPrimitive, JsonValue } from './json.js';
 export type { MockMcpToolHandler, MockMcpToolRegistration } from './mock-mcp-client.js';
+export type {
+  CreateSdkRuntimeMcpClientOptions,
+  RuntimeMcpRequestOptions,
+  RuntimeMcpSdkClient,
+  RuntimeMcpSdkTransport,
+  RuntimeMcpStdioTransportParameters
+} from './sdk-runtime-mcp-client.js';
 export type { McpToolCallExecutionResult } from './tool-call.js';
 export type { McpToolAllowlistRule, McpToolAuthorization, McpToolPolicyContext, McpToolSafety } from './allowlist.js';
 export type { CreateMcpToolCallAuditRecordInput, McpToolCallAuditRecord, McpToolCallAuditStatus } from './audit.js';

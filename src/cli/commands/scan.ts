@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/workspace-config.js';
@@ -13,7 +14,8 @@ export interface ScanCommandOptions {
 
 export async function runScanCommand(options: ScanCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
-  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.example.yml'));
+  const configPath = resolveScanConfigPath(cwd, options.configPath);
+  const config = await loadWorkspaceConfig(configPath);
   const jira = await createRuntimeTicketPort({ config, ...options.runtimeMcp });
   const tickets = await jira.listBacklog();
 
@@ -24,4 +26,17 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<numbe
   }
 
   return 0;
+}
+
+function resolveScanConfigPath(cwd: string, configPath: string | undefined): string {
+  if (configPath !== undefined) {
+    return resolve(cwd, configPath);
+  }
+
+  const workspaceConfigPath = resolve(cwd, 'config/workspace.yml');
+  if (existsSync(workspaceConfigPath)) {
+    return workspaceConfigPath;
+  }
+
+  return resolve(cwd, 'config/workspace.example.yml');
 }

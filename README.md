@@ -230,7 +230,7 @@ Run the worker as a foreground VPS process:
 node dist/src/cli/index.js worker start
 ```
 
-`worker start` acquires a workspace lock at `runs/worker.lock` before it opens provider adapters, so two workers cannot process the same workspace concurrently. It logs startup mode, provider modes, lock lifecycle, cycle summaries, restart-safety decisions, and the human-only production boundary in operator-readable text.
+`worker start` acquires a workspace lock at `runs/worker.lock` before it processes work, so two workers cannot process the same workspace concurrently. In MCP mode, runtime MCP setup is validated before the lock is created, run state is written, Jira is read, git/OpenCode/PR/deployment work starts, or provider mutations occur. It logs startup mode, provider modes, lock lifecycle, cycle summaries, restart-safety decisions, and the human-only production boundary in operator-readable text.
 
 Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects. If `runs/control.json` marks the workspace paused, the worker exits before opening ticket providers or starting delivery work.
 
@@ -252,7 +252,7 @@ ewokbot init --non-interactive --deployment-monitor both
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode through runtime-injected MCP clients. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and continues to load `config/workspace.example.yml` by default.
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. The public CLI constructs supported stdio MCP clients from `config/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and continues to load `config/workspace.example.yml` by default.
 
 Example Jira MCP configuration:
 
@@ -278,7 +278,17 @@ mcp_servers:
       - https://mcp.atlassian.com/v1/mcp/authv2
 ```
 
-The public CLI can now execute one explicitly confirmed real-provider smoke path when MCP clients are available through the runtime factory. Tests still use mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
+For Milestone AF, public runtime construction supports stdio MCP servers (`command` plus optional `args`). HTTP MCP server entries remain parsed by configuration but fail fast as unsupported by the public runtime until a later approved milestone adds and tests that transport. The CLI passes a restricted environment allowlist to MCP subprocesses: standard local process variables plus any `mcp_servers.<id>.env_var_names` entries.
+
+First real smoke launch sequence after configuring local MCP/OAuth sessions:
+
+```bash
+ewokbot doctor
+ewokbot scan
+ewokbot smoke LK-101 --confirm-real-provider-smoke
+```
+
+`ewokbot scan`, `ewokbot worker start`, and `ewokbot smoke` all receive the public runtime MCP factory. Tests still use fake SDK/client factories or mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
 
 See:
 

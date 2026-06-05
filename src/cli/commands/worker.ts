@@ -9,6 +9,7 @@ import {
   type AgentWorkerRuntimeInfo
 } from '../../delivery/index.js';
 import { createRuntimeTicketPort, createRuntimeWorkspaceAdapters, createWorkspaceAdapters } from '../../providers/index.js';
+import type { TicketPort } from '../../ports/index.js';
 import { runWorkerRuntime, type WorkerRuntimeMode } from '../../worker/index.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
@@ -47,6 +48,7 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
   const runtimeInfo = createAgentWorkerRuntimeInfo(config);
 
   if (options.workerMode === 'start') {
+    const preflightTicketPort = runtimeInfo.mode === 'mcp' ? await createWorkerStartTicketPort({ config, runtimeMcp: options.runtimeMcp, dryRun: options.dryRun }) : undefined;
     const abortController = new AbortController();
     const signalHandlers = createWorkerSignalHandlers(abortController);
 
@@ -65,6 +67,10 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
         retryPolicy,
         abortSignal: abortController.signal,
         createTicketPort: async () => {
+          if (preflightTicketPort !== undefined) {
+            return preflightTicketPort;
+          }
+
           if (runtimeInfo.mode === 'mcp') {
             if (options.dryRun === true) {
               return createRuntimeTicketPort({ config, ...options.runtimeMcp });
@@ -106,6 +112,18 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
   writeWorkerSummary(options.io, summary);
 
   return summary.escalated > 0 || summary.failed > 0 ? 2 : 0;
+}
+
+async function createWorkerStartTicketPort(options: {
+  readonly config: Awaited<ReturnType<typeof loadWorkspaceConfig>>;
+  readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
+  readonly dryRun?: boolean | undefined;
+}): Promise<TicketPort> {
+  if (options.dryRun === true) {
+    return createRuntimeTicketPort({ config: options.config, ...options.runtimeMcp });
+  }
+
+  return (await createRuntimeWorkspaceAdapters({ config: options.config, ...options.runtimeMcp })).jira;
 }
 
 export function parseWorkerCommandOptions(args: readonly string[]): ParsedWorkerCommandOptions {

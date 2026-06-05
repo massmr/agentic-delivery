@@ -2,6 +2,21 @@
 
 ## 2026-06-05
 
+Completed Milestone AF Real MCP Client Runtime Wiring:
+
+- Added a public stdio MCP runtime client adapter backed by the Model Context Protocol SDK and exposed through the repo `McpClient` interface, including safe environment allowlisting, lifecycle cleanup, tool discovery/result normalization, unsupported-transport errors, and startup errors with server context.
+- Wired the public CLI entrypoint to pass a constructed `createMcpClient` factory into scan, worker, and smoke while preserving existing test injection seams and mock defaults.
+- Updated `ewokbot scan` to prefer `config/workspace.yml` when present and fall back to `config/workspace.example.yml` for mock exploration.
+- Hardened `ewokbot worker start` in MCP mode so runtime MCP readiness is validated before the worker lock, run state, Jira reads, git, OpenCode, PRs, Railway checks, ledger writes, or provider mutations.
+- Added fake-only coverage for SDK client construction, env allowlisting, result normalization, unsupported HTTP runtime configs, startup failures, public scan runtime construction, and worker-start fail-before-lock behavior.
+- Preserved production merge and production deployment as human-only, kept tests free of live MCP/OAuth/provider/network/OpenCode/git side effects, and left HTTP runtime transport support for a later approved milestone.
+
+Prepared Milestone AF Real MCP Client Runtime Wiring:
+
+- Added AF to the approved backlog as the next milestone after AE so the public CLI can construct real MCP clients from `config/workspace.yml` instead of relying on test-only MCP injection.
+- Defined AF acceptance around fail-fast MCP runtime setup, clear operator errors, mock-safe defaults, fake-only tests, and no production merge or deployment automation.
+- Updated next actions and roadmap so OpenCode can continue from the approved milestone rather than inventing post-AE work.
+
 Resolved Milestone AE P1 acceptance blocker:
 
 - Added a smoke-only run collision guard so `ewokbot smoke <ticket-key> --confirm-real-provider-smoke --run-id <run-id>` refuses an existing `runs/<ticket-key>/<run-id>/` directory or `state.json` after the Jira ticket read but before run-state writes, plan reports, git/OpenCode/quality work, GitHub/Railway provider calls, or operation-ledger writes.

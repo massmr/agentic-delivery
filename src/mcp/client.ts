@@ -25,4 +25,5 @@ export interface McpToolCallResult {
 export interface McpClient {
   listTools(input: McpListToolsInput): Promise<readonly McpToolDefinition[]>;
   callTool(input: McpCallToolInput): Promise<McpToolCallResult>;
+  close?(): Promise<void>;
 }

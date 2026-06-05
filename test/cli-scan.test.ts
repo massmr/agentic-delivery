@@ -8,10 +8,13 @@ import {
   McpToolNotFoundError,
   MockMcpClient,
   RuntimeMcpClientResolutionError,
+  createPublicCliRuntimeMcp,
   createCliProgram,
   createMockMcpTool,
   defaultJiraMcpToolNames,
-  type McpToolCallAuditRecord
+  type McpToolCallAuditRecord,
+  type RuntimeMcpSdkClient,
+  type RuntimeMcpSdkTransport
 } from '../src/index.js';
 
 test('agentic scan lists mock Jira backlog tickets', async () => {
@@ -52,6 +55,34 @@ test('agentic scan lists Jira MCP backlog tickets when runtime clients are injec
     'TicketPort.listBacklog:started',
     'TicketPort.listBacklog:succeeded'
   ]);
+});
+
+test('agentic scan constructs public runtime MCP clients from workspace config', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithJiraMcp());
+  const captured = createCapturedIO();
+  const sdkClient = new ScanSdkClient();
+  const runtime = createPublicCliRuntimeMcp({
+    clientFactory: () => sdkClient,
+    transportFactory: () => ({ close: async () => undefined })
+  });
+
+  try {
+    const exitCode = await createCliProgram({
+      cwd: rootPath,
+      configPath: 'config/workspace.yml',
+      io: captured.io,
+      runtimeMcp: runtime.runtimeMcp
+    }).run(['node', 'agentic', 'scan']);
+
+    assert.equal(exitCode, 0);
+    assert.match(captured.stdout, /Found 1 Jira backlog tickets/u);
+    assert.match(captured.stdout, /AD-704/u);
+    assert.deepEqual(sdkClient.callToolNames, [defaultJiraMcpToolNames.listBacklog]);
+  } finally {
+    await runtime.close();
+  }
+
+  assert.equal(sdkClient.closed, true);
 });
 
 test('agentic scan surfaces empty Jira MCP backlog without side effects', async () => {
@@ -192,6 +223,37 @@ function jiraIssue(key: string, summary: string) {
       updated: '2026-06-04T10:05:00.000Z'
     }
   };
+}
+
+class ScanSdkClient implements RuntimeMcpSdkClient {
+  readonly callToolNames: string[] = [];
+  closed = false;
+
+  async connect(_transport: RuntimeMcpSdkTransport): Promise<void> {
+    return;
+  }
+
+  async listTools(): Promise<unknown> {
+    return {
+      tools: [
+        { name: defaultJiraMcpToolNames.listBacklog, description: 'List Jira backlog', inputSchema: { type: 'object' } },
+        { name: defaultJiraMcpToolNames.getTicket, description: 'Get Jira issue', inputSchema: { type: 'object' } },
+        { name: defaultJiraMcpToolNames.comment, description: 'Comment on Jira issue', inputSchema: { type: 'object' } }
+      ]
+    };
+  }
+
+  async callTool(input: { readonly name: string }): Promise<unknown> {
+    this.callToolNames.push(input.name);
+    return {
+      structuredContent: { issues: [jiraIssue('AD-704', 'Scan through public runtime MCP factory')] },
+      isError: false
+    };
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
 }
 
 function workspaceWithJiraMcp(): string {

@@ -56,7 +56,9 @@ export type {
   OperationLedgerSuccessInput
 } from './agent/index.js';
 export { createCliProgram } from './cli/program.js';
-export type { CliProgram, CliProgramIO, CliProgramOptions } from './cli/program.js';
+export { createPublicCliRuntimeMcp } from './cli/runtime-mcp.js';
+export type { CliProgram, CliProgramIO, CliProgramOptions, CliRuntimeMcpOptions } from './cli/program.js';
+export type { CreatePublicCliRuntimeMcpOptions, PublicCliRuntimeMcp } from './cli/runtime-mcp.js';
 export {
   createOnboardingFiles,
   defaultSetupSelections,
@@ -116,11 +118,14 @@ export {
   McpToolAllowlistError,
   McpToolCallTimeoutError,
   McpToolNotFoundError,
+  RuntimeMcpClientStartupError,
+  RuntimeMcpUnsupportedTransportError,
   assertMcpToolAllowed,
   callAllowedMcpTool,
   createHttpMcpServerConfig,
   createMcpToolCallAuditRecord,
   createMockMcpTool,
+  createSdkRuntimeMcpClient,
   createStdioMcpServerConfig,
   defaultMcpToolTimeoutMs,
   discoverMcpTools,
@@ -294,6 +299,7 @@ export type {
 export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, PushLocalBranchInput } from './git/index.js';
 export type {
   CreateMcpToolCallAuditRecordInput,
+  CreateSdkRuntimeMcpClientOptions,
   DiscoveredMcpTool,
   JsonArray,
   JsonObject,
@@ -318,7 +324,11 @@ export type {
   McpToolPolicyContext,
   McpToolSafety,
   MockMcpToolHandler,
-  MockMcpToolRegistration
+  MockMcpToolRegistration,
+  RuntimeMcpRequestOptions,
+  RuntimeMcpSdkClient,
+  RuntimeMcpSdkTransport,
+  RuntimeMcpStdioTransportParameters
 } from './mcp/index.js';
 export type { TicketPlan } from './planning/index.js';
 export type { AdapterKind, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';

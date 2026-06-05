@@ -496,3 +496,26 @@ Acceptance:
 - The run can be tested with one real ticket and one configured repository.
 - Every provider write is auditable and idempotency-protected.
 - Production remains human-approved.
+
+### Milestone AF: Real MCP Client Runtime Wiring
+
+Goal:
+
+Make the public CLI capable of constructing real MCP clients from `config/workspace.yml` so `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` can be run from an operator machine or VPS without test-only client injection.
+
+Build:
+
+- A runtime MCP client adapter/factory that turns configured `mcp_servers` entries into `McpClient` instances for Jira, GitHub, and Railway.
+- CLI wiring so `createCliProgram().run(process.argv)` can pass a real `createMcpClient` implementation into scan, worker, and smoke commands when providers are configured as `mcp`.
+- A fail-fast readiness path for unsupported MCP server shapes, missing local MCP bridge dependencies, missing OAuth/session material, unavailable commands, missing tools, and disallowed tools.
+- Operator-readable errors that explain which MCP server/provider failed and what to configure next.
+- Tests that use fake process/client factories only and do not start live MCP servers, open OAuth flows, call provider services, run OpenCode, push git, or hit deployed URLs.
+- Documentation for the first real smoke launch sequence after AF.
+
+Acceptance:
+
+- The CLI no longer fails with `MCP runtime requires an injected or constructed McpClient` when valid supported MCP server config is present.
+- Missing or unsupported MCP runtime setup fails before Jira reads, run-state writes, git, OpenCode, PRs, Railway checks, operation-ledger writes, or provider mutations.
+- Mock mode remains the default and still works without credentials, MCP servers, or network access.
+- Existing injected mock MCP tests continue to pass.
+- Production merge and production deployment remain human-only.

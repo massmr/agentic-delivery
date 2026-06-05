@@ -29,6 +29,7 @@ Status legend:
 - `[x]` MCP-first business port architecture
 - `[x]` MCP client foundation
 - `[x]` Runtime MCP wiring
+- `[x]` Real MCP client runtime construction
 - `[x]` Jira MCP TicketPort
 - `[x]` Native fallback contracts
 - `[x]` Operation ledger
@@ -109,6 +110,7 @@ Status legend:
 - `[x]` Worker lock and graceful shutdown
 - `[x]` CLI run inspection and approval commands
 - `[x]` Explicit first real-provider smoke run command
+- `[x]` Public CLI real MCP client wiring for smoke/scan/worker
 
 ## Future Control Surfaces
 
