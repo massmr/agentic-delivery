@@ -323,6 +323,10 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     assert.doesNotMatch(captured.stderr, new RegExp(secret, 'u'));
   }
   assert.deepEqual(answers, []);
+  assert.equal(asked.some((question) => question.includes('Development runner:\n  1. Mock\n  2. OpenCode\nChoose [1]:')), true);
+  assert.equal(asked.some((question) => question.includes('OpenCode-specific env vars:\n  1. None\n  2. OPENCODE_API_KEY\n  3. Custom comma-separated list\nChoose [1]:')), true);
+  assert.equal(asked.some((question) => question.includes('Ticket provider:\n  1. Mock\n  2. Jira MCP\nChoose [1]:')), true);
+  assert.equal(asked.some((question) => question.includes('Deployment/CI monitor:\n  1. None\n  2. Railway\n  3. Vercel\n  4. Railway and Vercel')), true);
   assert.equal(asked.some((question) => question.includes('JIRA_EMAIL value')), true);
   assert.equal(asked.some((question) => question.includes('Jira MCP server id')), true);
   assert.equal(asked.some((question) => question.includes('GitHub MCP command')), true);
@@ -375,11 +379,11 @@ test('ewokbot init interactive-style mock wizard skips provider credential and M
   assert.equal(selections.codeHostProvider, 'mock');
   assert.equal(selections.deploymentMonitor, 'none');
   assert.equal(asked.some((question) => question.includes('JIRA_EMAIL')), false);
-  assert.equal(asked.some((question) => question.includes('Jira MCP')), false);
+  assert.equal(asked.some((question) => question.includes('Jira MCP server')), false);
   assert.equal(asked.some((question) => question.includes('GITHUB_TOKEN')), false);
-  assert.equal(asked.some((question) => question.includes('GitHub MCP')), false);
+  assert.equal(asked.some((question) => question.includes('GitHub MCP command')), false);
   assert.equal(asked.some((question) => question.includes('RAILWAY_TOKEN')), false);
-  assert.equal(asked.some((question) => question.includes('Railway MCP')), false);
+  assert.equal(asked.some((question) => question.includes('Railway MCP env_var_names')), false);
   assert.equal(asked.some((question) => question.includes('VERCEL_TOKEN')), false);
   assert.deepEqual(selections.envValues, {});
 });

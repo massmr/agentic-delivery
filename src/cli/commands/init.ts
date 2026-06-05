@@ -1,6 +1,6 @@
 import { accessSync, constants, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { delimiter, dirname, join } from 'node:path';
-import { createInterface } from 'node:readline/promises';
+import { createInterface } from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { createOnboardingFiles, defaultSetupSelections, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
@@ -217,30 +217,52 @@ function readFlagValue(args: readonly string[], index: number, flag: string, cho
 
 async function promptForSelections(defaults: SetupSelections): Promise<SetupSelections> {
   const readline = createInterface({ input, output });
+  const keepAlive = setInterval(() => undefined, 60_000);
+
+  input.resume();
 
   try {
-    return promptForSelectionsWithQuestioner(defaults, (question) => readline.question(question));
+    return await promptForSelectionsWithQuestioner(defaults, (question) => askReadline(readline, question));
   } finally {
+    clearInterval(keepAlive);
     readline.close();
+    input.pause();
   }
 }
 
 export async function promptForSelectionsWithQuestioner(defaults: SetupSelections, ask: InitQuestioner): Promise<SetupSelections> {
   const envValues: Record<string, string | undefined> = { ...(defaults.envValues ?? {}) };
-  const devRunnerMode = parseDevRunnerMode((await ask('Development runner (mock, opencode) [mock]: ')).trim() || (defaults.devRunnerMode ?? 'mock'));
-  const includeOhMyOpenAgent = isYes(await ask('Include oh-my-openagent setup notes? (y/N): '));
+  const devRunnerMode = await askChoice(ask, 'Development runner', [
+    { label: 'Mock', value: 'mock' as const },
+    { label: 'OpenCode', value: 'opencode' as const }
+  ], defaults.devRunnerMode ?? 'mock');
+  const includeOhMyOpenAgent = await askChoice(ask, 'Include oh-my-openagent setup notes?', [
+    { label: 'No', value: false },
+    { label: 'Yes', value: true }
+  ], false);
   let opencodeCommand = defaults.opencodeCommand;
   let opencodeEnvVarNames = defaults.opencodeEnvVarNames ?? [];
   let modelProviderEnvVarNames = defaults.modelProviderEnvVarNames ?? [];
 
   if (devRunnerMode === 'opencode') {
     opencodeCommand = (await ask(`OpenCode command [${defaults.opencodeCommand ?? 'opencode'}]: `)).trim() || defaults.opencodeCommand;
-    opencodeEnvVarNames = parseCsv(await ask('OpenCode env var names, comma-separated (optional): '));
-    modelProviderEnvVarNames = parseCsv(await ask('Model/provider API key env var names for OpenCode, comma-separated (optional): '));
+    opencodeEnvVarNames = await askEnvVarPreset(ask, 'OpenCode-specific env vars', [
+      { label: 'None', value: [] },
+      { label: 'OPENCODE_API_KEY', value: ['OPENCODE_API_KEY'] }
+    ], []);
+    modelProviderEnvVarNames = await askEnvVarPreset(ask, 'Model/provider API key env vars for OpenCode', [
+      { label: 'None', value: [] },
+      { label: 'OPENAI_API_KEY', value: ['OPENAI_API_KEY'] },
+      { label: 'ANTHROPIC_API_KEY', value: ['ANTHROPIC_API_KEY'] },
+      { label: 'OPENAI_API_KEY and ANTHROPIC_API_KEY', value: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'] }
+    ], []);
     await collectEnvValues(ask, envValues, [...opencodeEnvVarNames, ...modelProviderEnvVarNames]);
   }
 
-  const ticketProvider = parseTicketProvider((await ask('Ticket provider (mock, jira-mcp) [mock]: ')).trim() || (defaults.ticketProvider ?? 'mock'));
+  const ticketProvider = await askChoice(ask, 'Ticket provider', [
+    { label: 'Mock', value: 'mock' as const },
+    { label: 'Jira MCP', value: 'jira-mcp' as const }
+  ], defaults.ticketProvider ?? 'mock');
   let jiraBaseUrl = defaults.jiraBaseUrl;
   let jiraProjectKeys = defaults.jiraProjectKeys;
   let jiraMcpServer = defaults.jiraMcpServer;
@@ -253,7 +275,10 @@ export async function promptForSelectionsWithQuestioner(defaults: SetupSelection
     jiraMcpServer = await promptForMcpServer(ask, 'Jira MCP', defaults.jiraMcpServer ?? defaultJiraMcpServer);
   }
 
-  const codeHostProvider = parseCodeHostProvider((await ask('Code host provider (mock, github-mcp) [mock]: ')).trim() || (defaults.codeHostProvider ?? 'mock'));
+  const codeHostProvider = await askChoice(ask, 'Code host provider', [
+    { label: 'Mock', value: 'mock' as const },
+    { label: 'GitHub MCP', value: 'github-mcp' as const }
+  ], defaults.codeHostProvider ?? 'mock');
   let githubOrganization = defaults.githubOrganization;
   let githubMcpServer = defaults.githubMcpServer;
 
@@ -263,12 +288,20 @@ export async function promptForSelectionsWithQuestioner(defaults: SetupSelection
     githubMcpServer = await promptForMcpServer(ask, 'GitHub MCP', defaults.githubMcpServer ?? defaultGitHubMcpServer);
   }
 
-  const deploymentMonitor = parseDeploymentMonitor((await ask('Deployment/CI monitor (none, railway, vercel, both) [railway]: ')).trim() || defaults.deploymentMonitor);
+  const deploymentMonitor = await askChoice(ask, 'Deployment/CI monitor', [
+    { label: 'None', value: 'none' as const },
+    { label: 'Railway', value: 'railway' as const },
+    { label: 'Vercel', value: 'vercel' as const },
+    { label: 'Railway and Vercel', value: 'both' as const }
+  ], defaults.deploymentMonitor);
   let railwayProvider = defaults.railwayProvider;
   let railwayMcpServer = defaults.railwayMcpServer;
 
   if (deploymentMonitor === 'railway' || deploymentMonitor === 'both') {
-    railwayProvider = parseRailwayProvider((await ask('Railway provider when selected (mock, railway-mcp) [mock]: ')).trim() || (defaults.railwayProvider ?? 'mock'));
+    railwayProvider = await askChoice(ask, 'Railway provider', [
+      { label: 'Mock', value: 'mock' as const },
+      { label: 'Railway MCP', value: 'railway-mcp' as const }
+    ], defaults.railwayProvider ?? 'mock');
 
     if (railwayProvider === 'railway-mcp') {
       envValues.RAILWAY_TOKEN = await askSecret(ask, 'RAILWAY_TOKEN value: ');
@@ -320,17 +353,76 @@ async function askSecret(ask: InitQuestioner, question: string): Promise<string>
   return (await ask(question)).trim();
 }
 
-function isYes(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  return normalized === 'y' || normalized === 'yes';
-}
-
 function withDefaultList(values: readonly string[], fallback: readonly string[] | undefined): readonly string[] {
   return values.length === 0 ? fallback ?? [] : values;
 }
 
 function parseCsv(value: string): readonly string[] {
   return value.split(',').map((part) => part.trim()).filter((part) => part.length > 0);
+}
+
+interface ChoiceOption<T extends string | boolean> {
+  readonly label: string;
+  readonly value: T;
+}
+
+interface EnvVarPreset {
+  readonly label: string;
+  readonly value: readonly string[];
+}
+
+async function askChoice<T extends string | boolean>(ask: InitQuestioner, label: string, options: readonly ChoiceOption<T>[], defaultValue: T): Promise<T> {
+  const defaultIndex = Math.max(0, options.findIndex((option) => option.value === defaultValue));
+  const prompt = [
+    `${label}:`,
+    ...options.map((option, index) => `  ${index + 1}. ${option.label}`),
+    `Choose [${defaultIndex + 1}]: `
+  ].join('\n');
+
+  while (true) {
+    const answer = (await ask(prompt)).trim();
+
+    if (answer.length === 0) {
+      return options[defaultIndex].value;
+    }
+
+    const numeric = Number.parseInt(answer, 10);
+
+    if (Number.isInteger(numeric) && numeric >= 1 && numeric <= options.length) {
+      return options[numeric - 1].value;
+    }
+
+    const match = options.find((option) => String(option.value).toLowerCase() === answer.toLowerCase() || option.label.toLowerCase() === answer.toLowerCase());
+
+    if (match !== undefined) {
+      return match.value;
+    }
+  }
+}
+
+async function askEnvVarPreset(
+  ask: InitQuestioner,
+  label: string,
+  presets: readonly EnvVarPreset[],
+  defaultValue: readonly string[]
+): Promise<readonly string[]> {
+  const customValue = '__custom__';
+  const choice = await askChoice<string>(ask, label, [
+    ...presets.map((preset) => ({ label: preset.label, value: preset.value.join(',') })),
+    { label: 'Custom comma-separated list', value: customValue }
+  ], defaultValue.join(','));
+
+  if (choice === customValue) {
+    return parseCsv(await ask(`${label} custom env var names, comma-separated: `));
+  }
+
+  return parseCsv(choice);
+}
+
+function askReadline(readline: ReturnType<typeof createInterface>, question: string): Promise<string> {
+  return new Promise((resolve) => {
+    readline.question(question, resolve);
+  });
 }
 
 function defaultCommandExists(command: string): boolean {
