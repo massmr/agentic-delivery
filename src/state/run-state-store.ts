@@ -6,6 +6,7 @@ import type { DeploymentResult } from '../domain/deployment.js';
 import type { PullRequestRef } from '../domain/pull-request.js';
 import type { BranchRef } from '../domain/run.js';
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
+import { getEwokbotRunDirectoryPath, getEwokbotRunStateFilePath } from '../workspace-layout.js';
 
 export interface CreateDeliveryRunStateRecordInput {
   readonly runId: string;
@@ -21,11 +22,11 @@ export interface RunStateStore {
 }
 
 export function getRunDirectoryPath(ticketKey: string, runId: string): string {
-  return join('runs', ticketKey, runId);
+  return getEwokbotRunDirectoryPath(ticketKey, runId);
 }
 
 export function getRunStateFilePath(ticketKey: string, runId: string): string {
-  return join(getRunDirectoryPath(ticketKey, runId), 'state.json');
+  return getEwokbotRunStateFilePath(ticketKey, runId);
 }
 
 export function createDeliveryRunStateRecord(input: CreateDeliveryRunStateRecordInput): DeliveryRunStateRecord {

@@ -49,7 +49,7 @@ Build:
 - YAML config loader.
 - Config validation.
 - Domain types for tickets, repos, runs, quality gates, PRs, deployments.
-- `ewokbot init` to copy `config/workspace.example.yml`.
+- `ewokbot init` to create `.ewokbot/workspace.yml`.
 
 Acceptance:
 

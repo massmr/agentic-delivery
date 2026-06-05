@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/index.js';
 import { getRunStateFilePath } from '../state/index.js';
+import { ewokbotRunsDirectory } from '../workspace-layout.js';
 
 export interface RunStatusLookupOptions {
   readonly rootPath?: string;
@@ -30,7 +31,7 @@ export async function readRunState(rootPath: string, ticketKey: string, runId: s
 }
 
 export async function listRunIdsForTicket(rootPath: string, ticketKey: string): Promise<readonly string[]> {
-  const ticketRunDirectory = join(rootPath, 'runs', ticketKey);
+  const ticketRunDirectory = join(rootPath, ewokbotRunsDirectory, ticketKey);
 
   try {
     const entries = await readdir(ticketRunDirectory, { withFileTypes: true });
@@ -51,7 +52,7 @@ export async function findLatestRunState(rootPath: string, ticketKey: string): P
   const runIds = await listRunIdsForTicket(rootPath, ticketKey);
 
   if (runIds.length === 0) {
-    throw new Error(`No runs found for ${ticketKey}. Expected run state under runs/${ticketKey}/<run-id>/state.json.`);
+    throw new Error(`No runs found for ${ticketKey}. Expected run state under ${ewokbotRunsDirectory}/${ticketKey}/<run-id>/state.json.`);
   }
 
   const states = await Promise.all(runIds.map(async (runId) => readRunState(rootPath, ticketKey, runId)));

@@ -5,6 +5,7 @@ export {
   parseWorkspaceConfig,
   validateWorkspaceConfig
 } from './workspace-config.js';
+export { createDiscoveredRepositoryConfig, discoverSiblingGitDirectories } from './repository-discovery.js';
 export type {
   DevRunnerProvider,
   DevRunnerWorkspaceConfig,
@@ -21,7 +22,9 @@ export type {
   RailwayWorkspaceConfig,
   WorkspaceConfig,
   WorkspaceConfigIssue,
+  WorkspaceConfigParseOptions,
   WorkspaceConfigValidationResult,
   WorkspaceRepositoryConfig,
   WorkspaceSettings
 } from './workspace-config.js';
+export type { RepositoryDiscoveryMode, RepositoryDiscoveryOptions, WorkspaceRepositoryDiscoveryConfig } from './repository-discovery.js';

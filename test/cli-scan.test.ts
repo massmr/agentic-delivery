@@ -36,7 +36,7 @@ test('agentic scan lists Jira MCP backlog tickets when runtime clients are injec
 
   const exitCode = await createCliProgram({
     cwd: rootPath,
-    configPath: 'config/workspace.yml',
+    configPath: '.ewokbot/workspace.yml',
     io: captured.io,
     runtimeMcp: {
       mcpClients: { atlassian: client },
@@ -69,7 +69,7 @@ test('agentic scan constructs public runtime MCP clients from workspace config',
   try {
     const exitCode = await createCliProgram({
       cwd: rootPath,
-      configPath: 'config/workspace.yml',
+      configPath: '.ewokbot/workspace.yml',
       io: captured.io,
       runtimeMcp: runtime.runtimeMcp
     }).run(['node', 'agentic', 'scan']);
@@ -92,7 +92,7 @@ test('agentic scan surfaces empty Jira MCP backlog without side effects', async 
 
   const exitCode = await createCliProgram({
     cwd: rootPath,
-    configPath: 'config/workspace.yml',
+    configPath: '.ewokbot/workspace.yml',
     io: captured.io,
     runtimeMcp: { mcpClients: { atlassian: client } }
   }).run(['node', 'agentic', 'scan']);
@@ -108,7 +108,7 @@ test('agentic scan fails Jira MCP readiness before falling back to mock or REST'
   const captured = createCapturedIO();
 
   await assert.rejects(
-    () => createCliProgram({ cwd: rootPath, configPath: 'config/workspace.yml', io: captured.io }).run(['node', 'agentic', 'scan']),
+    () => createCliProgram({ cwd: rootPath, configPath: '.ewokbot/workspace.yml', io: captured.io }).run(['node', 'agentic', 'scan']),
     (error: unknown) => {
       assert.ok(error instanceof RuntimeMcpClientResolutionError);
       assert.equal(error.provider, 'Jira');
@@ -126,7 +126,7 @@ test('agentic scan fails Jira MCP readiness before falling back to mock or REST'
   await assert.rejects(
     () => createCliProgram({
       cwd: rootPath,
-      configPath: 'config/workspace.yml',
+      configPath: '.ewokbot/workspace.yml',
       io: captured.io,
       runtimeMcp: { mcpClients: { atlassian: client } }
     }).run(['node', 'agentic', 'scan']),
@@ -155,7 +155,7 @@ test('agentic scan surfaces inaccessible Jira MCP projects without fallback side
   await assert.rejects(
     () => createCliProgram({
       cwd: rootPath,
-      configPath: 'config/workspace.yml',
+      configPath: '.ewokbot/workspace.yml',
       io: captured.io,
       runtimeMcp: { mcpClients: { atlassian: client } }
     }).run(['node', 'agentic', 'scan']),
@@ -191,8 +191,8 @@ function createCapturedIO() {
 
 function createWorkspaceRoot(config: string): string {
   const rootPath = mkdtempSync(join(tmpdir(), 'agentic-scan-'));
-  mkdirSync(join(rootPath, 'config'));
-  writeFileSync(join(rootPath, 'config/workspace.yml'), config);
+  mkdirSync(join(rootPath, '.ewokbot'));
+  writeFileSync(join(rootPath, '.ewokbot', 'workspace.yml'), config);
   return rootPath;
 }
 
@@ -295,7 +295,7 @@ mcp_servers:
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
+    local_path: ./frontend
     default_branch: develop
     production_branch: main
     quality_profile: node

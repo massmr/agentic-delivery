@@ -519,3 +519,51 @@ Acceptance:
 - Mock mode remains the default and still works without credentials, MCP servers, or network access.
 - Existing injected mock MCP tests continue to pass.
 - Production merge and production deployment remain human-only.
+
+### Milestone AG: Workspace Layout Migration To `.ewokbot/`
+
+Goal:
+
+Make Ewokbot run from the parent directory that already contains the target repository or repositories, with all Ewokbot-owned config, secrets, state, logs, and cache under a local `.ewokbot/` directory. Remove the old root-level `config/workspace.yml`, `.env`, `.env.example`, and `runs/` layout instead of keeping legacy fallback behavior.
+
+Target layout:
+
+```text
+<workspace-root>/
+  service-a/
+    .git/
+  service-b/
+    .git/
+  app-mobile/
+    .git/
+  .ewokbot/
+    workspace.yml
+    .env
+    .env.example
+    runs/
+    logs/
+    cache/
+```
+
+Build:
+
+- Change `ewokbot init` to create `.ewokbot/workspace.yml`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/`.
+- Stop generating root `.env.example`, root `.env`, root `config/workspace.yml`, and root `runs/`.
+- Generate repository discovery config by default: `repos.discovery: sibling-git-directories` with `exclude: []`.
+- Discover direct sibling directories with `.git/`, ignore `.ewokbot/`, hidden directories, `node_modules/`, non-Git directories, nested repos, and excluded names; sort discovered repositories deterministically.
+- Update all CLI commands to load `.ewokbot/workspace.yml` by default.
+- Update all state, reports, run controls, operation ledgers, worker locks, and log reads/writes to live under `.ewokbot/runs/`.
+- Keep discovered and explicit repository paths relative to the workspace root as siblings of `.ewokbot/`.
+- Update doctor/setup validation to inspect `.ewokbot/.env.example`, `.ewokbot/.env`, `.ewokbot/workspace.yml`, and repository paths from the workspace root.
+- Remove fallback lookup for `config/workspace.yml`, root `.env`, root `.env.example`, and root `runs/`.
+- Update README, specs, runbooks, prompts, tracking docs, and tests to describe the `.ewokbot/` layout.
+
+Acceptance:
+
+- A fresh `ewokbot init` in a directory containing repos creates only `.ewokbot/` owned files and directories.
+- Fresh init does not generate fake repository names; it watches all direct sibling Git repositories by default through discovery mode.
+- `doctor`, `scan`, `worker`, `smoke`, `status`, `runs`, `inspect`, `logs`, `pause`, `resume`, `approve`, `reject`, and `quality` use `.ewokbot/` paths by default.
+- Tests assert that root-level legacy files and directories are not created or read.
+- No command silently falls back to `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/`.
+- Existing mock mode and fake-only MCP tests continue to pass after path migration.
+- Production merge and production deployment remain human-only.

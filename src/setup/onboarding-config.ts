@@ -59,16 +59,8 @@ quality:
   default_profile: node
 
 repos:
-  - name: frontend
-    url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
-    default_branch: develop
-    production_branch: main
-    quality_profile: node
-    hints:
-      - frontend
-    staging_smoke_urls:
-      - /health
+  discovery: sibling-git-directories
+  exclude: []
 `;
 }
 

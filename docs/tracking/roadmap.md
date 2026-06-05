@@ -96,6 +96,7 @@ Status legend:
 ## Productized CLI And VPS Runtime
 
 - `[x]` npm-installable CLI experience with `ewokbot` and `ewok` binaries
+- `[x]` `.ewokbot/` workspace-local config, state, logs, and cache layout
 - `[x]` Interactive first-run onboarding
 - `[x]` Provider capability setup model
 - `[x]` OpenCode setup detection

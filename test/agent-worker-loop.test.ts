@@ -44,7 +44,7 @@ quality:
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
+    local_path: ./frontend
     default_branch: develop
     production_branch: main
     quality_profile: node

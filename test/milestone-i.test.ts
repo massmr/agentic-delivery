@@ -86,8 +86,8 @@ const qualityReport = {
       finishedAt: '2026-06-03T10:01:01.000Z',
       durationMs: 1000,
       exitCode: 0,
-      stdoutLogPath: 'runs/LK-101/run-1/quality-logs/test.stdout.log',
-      stderrLogPath: 'runs/LK-101/run-1/quality-logs/test.stderr.log',
+      stdoutLogPath: '.ewokbot/runs/LK-101/run-1/quality-logs/test.stdout.log',
+      stderrLogPath: '.ewokbot/runs/LK-101/run-1/quality-logs/test.stderr.log',
       status: 'passed',
       summary: 'Mock local quality gates passed.'
     }
@@ -211,25 +211,25 @@ test('MarkdownReportWriter writes final report with all major run evidence', asy
   const writer = new MarkdownReportWriter(rootPath);
   const state = recordProductionPullRequestOpened(createState('STAGING_VERIFIED'), createProductionPullRequest(201), '2026-06-03T10:04:00.000Z');
   const relativePath = await writer.writeFinal(ticket.ref.key, 'run-1', state, {
-    planReportPath: 'runs/LK-101/run-1/plan.md',
-    implementationLogPath: 'runs/LK-101/run-1/implementation-log.md',
-    qualityReportPath: 'runs/LK-101/run-1/quality-report.md',
-    stagingReportPath: 'runs/LK-101/run-1/staging-report.md'
+    planReportPath: '.ewokbot/runs/LK-101/run-1/plan.md',
+    implementationLogPath: '.ewokbot/runs/LK-101/run-1/implementation-log.md',
+    qualityReportPath: '.ewokbot/runs/LK-101/run-1/quality-report.md',
+    stagingReportPath: '.ewokbot/runs/LK-101/run-1/staging-report.md'
   });
   const body = await readFile(join(rootPath, relativePath), 'utf8');
 
   assert.equal(relativePath, join(getRunDirectoryPath(ticket.ref.key, 'run-1'), 'final-report.md'));
   assert.equal(body, renderFinalReportMarkdown(ticket.ref.key, 'run-1', state, {
-    planReportPath: 'runs/LK-101/run-1/plan.md',
-    implementationLogPath: 'runs/LK-101/run-1/implementation-log.md',
-    qualityReportPath: 'runs/LK-101/run-1/quality-report.md',
-    stagingReportPath: 'runs/LK-101/run-1/staging-report.md'
+    planReportPath: '.ewokbot/runs/LK-101/run-1/plan.md',
+    implementationLogPath: '.ewokbot/runs/LK-101/run-1/implementation-log.md',
+    qualityReportPath: '.ewokbot/runs/LK-101/run-1/quality-report.md',
+    stagingReportPath: '.ewokbot/runs/LK-101/run-1/staging-report.md'
   }));
   assert.match(body, /Final State: PRODUCTION_PR_OPENED/u);
   assert.match(body, /Selected Repositories/u);
-  assert.match(body, /Implementation Log: runs\/LK-101\/run-1\/implementation-log\.md/u);
-  assert.match(body, /Quality Report: runs\/LK-101\/run-1\/quality-report\.md/u);
-  assert.match(body, /Staging Report: runs\/LK-101\/run-1\/staging-report\.md/u);
+  assert.match(body, /Implementation Log: .ewokbot\/runs\/LK-101\/run-1\/implementation-log\.md/u);
+  assert.match(body, /Quality Report: .ewokbot\/runs\/LK-101\/run-1\/quality-report\.md/u);
+  assert.match(body, /Staging Report: .ewokbot\/runs\/LK-101\/run-1\/staging-report\.md/u);
   assert.match(body, /Target: main/u);
   assert.match(body, /Production merge remains human-only/u);
 });
@@ -245,7 +245,7 @@ test('MockOpenCodeRunner writes deterministic implementation log and passed resu
     command: 'opencode',
     workingDirectory: repository.localPath,
     prompt: 'deterministic prompt',
-    implementationLogPath: join(rootPath, 'runs', ticket.ref.key, 'run-1', 'implementation-log.md'),
+    implementationLogPath: join(rootPath, '.ewokbot', 'runs', ticket.ref.key, 'run-1', 'implementation-log.md'),
     maxAttempts: 2
   } satisfies DevRunInput;
   const result = await new MockOpenCodeRunner({ now: fixedClock() }).run(input);
@@ -263,10 +263,10 @@ test('agentic run creates complete mock run folder and reaches PRODUCTION_PR_OPE
   const workspacePath = await createTempRoot(t, 'agentic-cli-run-');
   const captured = createCapturedIO();
 
-  await mkdir(join(workspacePath, 'config'));
-  await writeFile(join(workspacePath, 'config', 'workspace.yml'), workspaceConfigYaml(), 'utf8');
+  await mkdir(join(workspacePath, '.ewokbot'));
+  await writeFile(join(workspacePath, '.ewokbot', 'workspace.yml'), workspaceConfigYaml(), 'utf8');
 
-  const exitCode = await createCliProgram({ cwd: workspacePath, configPath: 'config/workspace.yml', io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspacePath, configPath: '.ewokbot/workspace.yml', io: captured.io }).run([
     'node',
     'agentic',
     'run',
@@ -277,10 +277,10 @@ test('agentic run creates complete mock run folder and reaches PRODUCTION_PR_OPE
 
   assert.equal(exitCode, 0);
   assert.match(captured.stdout, /Final State: PRODUCTION_PR_OPENED/u);
-  assert.match(captured.stdout, /Final Report: runs\/LK-101\/mock-run-1\/final-report\.md/u);
+  assert.match(captured.stdout, /Final Report: .ewokbot\/runs\/LK-101\/mock-run-1\/final-report\.md/u);
   assert.equal(captured.stderr, '');
 
-  const runRoot = join(workspacePath, 'runs', 'LK-101', 'mock-run-1');
+  const runRoot = join(workspacePath, '.ewokbot', 'runs', 'LK-101', 'mock-run-1');
   const requiredFiles = ['plan.md', 'implementation-log.md', 'quality-report.md', 'staging-report.md', 'final-report.md', 'state.json'];
 
   for (const fileName of requiredFiles) {
@@ -303,10 +303,10 @@ test('agentic run stops safely with NEEDS_HUMAN when planning selects multiple r
   const workspacePath = await createTempRoot(t, 'agentic-cli-run-multi-repo-');
   const captured = createCapturedIO();
 
-  await mkdir(join(workspacePath, 'config'));
-  await writeFile(join(workspacePath, 'config', 'workspace.yml'), multiRepoWorkspaceConfigYaml(), 'utf8');
+  await mkdir(join(workspacePath, '.ewokbot'));
+  await writeFile(join(workspacePath, '.ewokbot', 'workspace.yml'), multiRepoWorkspaceConfigYaml(), 'utf8');
 
-  const exitCode = await createCliProgram({ cwd: workspacePath, configPath: 'config/workspace.yml', io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspacePath, configPath: '.ewokbot/workspace.yml', io: captured.io }).run([
     'node',
     'agentic',
     'run',
@@ -321,7 +321,7 @@ test('agentic run stops safely with NEEDS_HUMAN when planning selects multiple r
   assert.match(captured.stdout, /Multi-repo sub-runs are not implemented yet/u);
   assert.equal(captured.stderr, '');
 
-  const runRoot = join(workspacePath, 'runs', 'LK-101', 'multi-repo-run');
+  const runRoot = join(workspacePath, '.ewokbot', 'runs', 'LK-101', 'multi-repo-run');
   const state = JSON.parse(await readFile(join(workspacePath, getRunStateFilePath('LK-101', 'multi-repo-run')), 'utf8')) as DeliveryRunStateRecord;
   const planReport = await readFile(join(runRoot, 'plan.md'), 'utf8');
 
@@ -380,7 +380,7 @@ function createState(state: DeliveryRunStateRecord['state']): DeliveryRunStateRe
         baseBranch: branch.baseBranch,
         command: 'opencode',
         workingDirectory: repository.localPath,
-        implementationLogPath: 'runs/LK-101/run-1/implementation-log.md',
+        implementationLogPath: '.ewokbot/runs/LK-101/run-1/implementation-log.md',
         startedAt: '2026-06-03T10:00:00.000Z',
         finishedAt: '2026-06-03T10:00:01.000Z',
         durationMs: 1000,

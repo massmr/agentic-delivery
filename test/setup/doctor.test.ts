@@ -13,9 +13,9 @@ async function createWorkspace(prefix: string): Promise<string> {
 
 function writeGeneratedSetup(cwd: string, monitor: 'railway' | 'vercel' | 'both' = 'both'): void {
   const files = createOnboardingFiles({ deploymentMonitor: monitor, includeOhMyOpenAgent: false });
-  mkdirSync(join(cwd, 'config'), { recursive: true });
-  writeFileSync(join(cwd, 'config', 'workspace.yml'), files.workspaceYaml, 'utf8');
-  writeFileSync(join(cwd, '.env.example'), files.envExample, 'utf8');
+  mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
+  writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), files.workspaceYaml, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env.example'), files.envExample, 'utf8');
 }
 
 test('doctor reports generated setup with injected local probes and warn-only mock readiness', async () => {
@@ -32,8 +32,8 @@ test('doctor reports generated setup with injected local probes and warn-only mo
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Node.js'), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'pnpm'), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'OpenCode'), true);
-  assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === '.env'), true);
-  assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === 'Repository frontend'), true);
+  assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === '.ewokbot/.env'), true);
+  assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === 'Repository discovery'), true);
   assert.equal(report.checks.some((check) => check.status === 'fail'), false);
 });
 
@@ -41,7 +41,7 @@ test('doctor redacts env values while reporting provider readiness', async () =>
   const cwd = await createWorkspace('ewokbot-doctor-ab-redaction-');
   writeGeneratedSetup(cwd, 'railway');
   writeFileSync(
-    join(cwd, '.env'),
+    join(cwd, '.ewokbot', '.env'),
     [
       'GITHUB_ORG=secret-org',
       'GITHUB_TOKEN=ghp_secret_value',
@@ -69,7 +69,7 @@ test('doctor redacts env values while reporting provider readiness', async () =>
 test('doctor fails missing provider secrets when provider mode is non-mock', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ab-real-mode-');
   writeGeneratedSetup(cwd, 'railway');
-  const configPath = join(cwd, 'config', 'workspace.yml');
+  const configPath = join(cwd, '.ewokbot', 'workspace.yml');
   const source = createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false }).workspaceYaml
     .replace('github:\n  mode: mock', 'github:\n  mode: real');
   writeFileSync(configPath, source, 'utf8');
@@ -86,8 +86,8 @@ test('doctor fails missing provider secrets when provider mode is non-mock', asy
 
 test('doctor validates repository branch and quality readiness statically', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ab-repo-');
-  const repoPath = join(cwd, 'worktrees', 'frontend');
-  mkdirSync(repoPath, { recursive: true });
+  const repoPath = join(cwd, 'frontend');
+  mkdirSync(join(repoPath, '.git'), { recursive: true });
   writeGeneratedSetup(cwd, 'vercel');
   writeFileSync(join(repoPath, 'package.json'), JSON.stringify({ scripts: { test: 'node --test' } }), 'utf8');
 
@@ -112,14 +112,27 @@ test('doctor validates repository branch and quality readiness statically', asyn
 
 test('doctor fails unsafe branch settings and invalid quality config', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ab-unsafe-');
-  const repoPath = join(cwd, 'worktrees', 'frontend');
-  mkdirSync(repoPath, { recursive: true });
+  const repoPath = join(cwd, 'frontend');
+  mkdirSync(join(repoPath, '.git'), { recursive: true });
   const source = createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false }).workspaceYaml
     .replace('staging_branch: develop', 'staging_branch: main')
-    .replace('default_branch: develop', 'default_branch: main');
-  mkdirSync(join(cwd, 'config'), { recursive: true });
-  writeFileSync(join(cwd, 'config', 'workspace.yml'), source, 'utf8');
-  writeFileSync(join(cwd, '.env.example'), createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false }).envExample, 'utf8');
+    .replace(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`, `repos:
+  - name: frontend
+    url: git@github.com:agentic/frontend.git
+    local_path: ./frontend
+    default_branch: main
+    production_branch: main
+    quality_profile: node
+    hints:
+      - frontend
+    staging_smoke_urls: []
+`);
+  mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
+  writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), source, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env.example'), createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false }).envExample, 'utf8');
   writeFileSync(join(repoPath, '.agent-quality.yml'), 'commands: []\nrequired: test\n', 'utf8');
 
   const report = runLocalDoctor(cwd, {

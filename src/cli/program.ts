@@ -22,6 +22,7 @@ import { parseStatusCommandOptions, runStatusCommand } from './commands/status.j
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
 import type { DoctorProbeOptions } from '../setup/index.js';
+import { ewokbotWorkspaceConfigPath, getEwokbotWorkspaceControlFilePath } from '../workspace-layout.js';
 import type { InitPrompter } from './commands/init.js';
 
 const HELP_TEXT = [
@@ -50,7 +51,7 @@ const HELP_TEXT = [
   '  ewokbot quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
   'Commands:',
-  '  init        Create config/workspace.yml and .env.example for local onboarding.',
+  `  init        Create ${ewokbotWorkspaceConfigPath} and .ewokbot/.env.example for local onboarding.`,
   '  doctor      Validate local setup files without live provider calls.',
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local mock plan and run state for one ticket.',
@@ -58,7 +59,7 @@ const HELP_TEXT = [
   '  smoke       Execute one explicitly confirmed real-provider single-ticket smoke run.',
   '  runs        List persisted local runs without contacting providers.',
   '  inspect     Show detailed local run state, reports, control intent, and next action.',
-  '  pause       Pause workspace worker processing using runs/control.json.',
+  `  pause       Pause workspace worker processing using ${getEwokbotWorkspaceControlFilePath()}.`,
   '  resume      Record a local resume intent for a resumable run and clear workspace pause.',
   '  approve     Record local human approval for a production PR; does not merge or deploy.',
   '  reject      Record local human rejection for a production PR; does not merge or deploy.',
@@ -123,10 +124,10 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
 
       if (args.length === 0) {
         const cwd = options.cwd ?? process.cwd();
-        const configExists = existsSync(join(cwd, 'config', 'workspace.yml'));
+        const configExists = existsSync(join(cwd, ewokbotWorkspaceConfigPath));
         const hint = configExists
           ? 'No command provided. Run ewokbot doctor to validate setup, ewokbot worker to process work, or ewokbot status to inspect a run.'
-          : 'No command provided. Run ewokbot init to create config/workspace.yml and .env.example.';
+          : `No command provided. Run ewokbot init to create ${ewokbotWorkspaceConfigPath} and .ewokbot/.env.example.`;
 
         io.stdout(`${hint}\n\n`);
         printHelp();

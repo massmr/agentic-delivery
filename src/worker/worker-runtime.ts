@@ -6,6 +6,7 @@ import { JsonRunControlStore } from '../control/index.js';
 import type { AgentWorkerLoopSummary, AgentWorkerRetryPolicy, AgentWorkerRuntimeInfo } from '../delivery/index.js';
 import { runAgentWorkerLoop } from '../delivery/index.js';
 import type { TicketPort } from '../ports/index.js';
+import { getEwokbotWorkspaceControlFilePath } from '../workspace-layout.js';
 import { acquireWorkerLock, WorkerLockHeldError } from './worker-lock.js';
 import { createWorkerLogger } from './worker-logger.js';
 import { createStateAwareTicketPort } from './worker-state-reuse.js';
@@ -78,8 +79,8 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<W
 
   try {
     if (await controlStore.isWorkspacePaused()) {
-      logger.log('warn', 'worker_paused', { controlPath: 'runs/control.json' });
-      options.io.stdout('Worker paused by runs/control.json. No backlog tickets, provider adapters, OpenCode runs, git operations, pull requests, or deployments were started. Use ewokbot resume <run-id> to clear the workspace pause after choosing a resumable run.\n');
+      logger.log('warn', 'worker_paused', { controlPath: getEwokbotWorkspaceControlFilePath() });
+      options.io.stdout(`Worker paused by ${getEwokbotWorkspaceControlFilePath()}. No backlog tickets, provider adapters, OpenCode runs, git operations, pull requests, or deployments were started. Use ewokbot resume <run-id> to clear the workspace pause after choosing a resumable run.\n`);
       return { exitCode: 0 };
     }
 
@@ -147,7 +148,7 @@ export async function runWorkerRuntime(options: WorkerRuntimeOptions): Promise<W
 
 function readWorkspacePauseSynchronously(rootPath: string): boolean {
   try {
-    const source = readFileSync(join(rootPath, 'runs', 'control.json'), 'utf8');
+    const source = readFileSync(join(rootPath, getEwokbotWorkspaceControlFilePath()), 'utf8');
     const parsed = JSON.parse(source) as { readonly paused?: boolean };
     return parsed.paused === true;
   } catch (error) {

@@ -22,7 +22,7 @@ import {
   type TicketPort
 } from '../src/index.js';
 
-test('worker start --dry-run uses config/workspace.yml created by init', async () => {
+test('worker start --dry-run uses .ewokbot/workspace.yml created by init', async () => {
   const rootPath = createEmptyWorkspaceRoot();
   const captured = createCapturedIO();
   const program = createCliProgram({ cwd: rootPath, io: captured.io });
@@ -40,14 +40,14 @@ test('worker start --dry-run uses config/workspace.yml created by init', async (
   const workerExitCode = await program.run(['node', 'ewokbot', 'worker', 'start', '--dry-run']);
 
   assert.equal(workerExitCode, 0);
-  assert.match(captured.stdout, /Created .*config\/workspace\.yml/u);
+  assert.match(captured.stdout, /Created .*.ewokbot\/workspace\.yml/u);
   assert.match(captured.stdout, /worker_dry_run_backlog/u);
   assert.match(captured.stdout, /AD-101/u);
   assert.match(captured.stdout, /AD-102/u);
   assert.match(captured.stdout, /No run state, provider writes, git operations, PRs, or deployments were performed/u);
   assert.equal(captured.stderr, '');
-  assert.equal(existsSync(join(rootPath, 'runs', 'AD-101')), false);
-  assert.equal(existsSync(join(rootPath, 'runs', 'AD-102')), false);
+  assert.equal(existsSync(join(rootPath, '.ewokbot', 'runs', 'AD-101')), false);
+  assert.equal(existsSync(join(rootPath, '.ewokbot', 'runs', 'AD-102')), false);
   assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
 });
 
@@ -55,7 +55,7 @@ test('worker start --dry-run previews backlog without creating run state', async
   const rootPath = createWorkspaceRoot(workerConfigYaml);
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: rootPath, configPath: 'config/workspace.yml', io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: rootPath, configPath: '.ewokbot/workspace.yml', io: captured.io }).run([
     'node',
     'ewokbot',
     'worker',
@@ -69,8 +69,8 @@ test('worker start --dry-run previews backlog without creating run state', async
   assert.match(captured.stdout, /AD-101/u);
   assert.match(captured.stdout, /AD-102/u);
   assert.equal(captured.stderr, '');
-  assert.equal(existsSync(join(rootPath, 'runs', 'AD-101')), false);
-  assert.equal(existsSync(join(rootPath, 'runs', 'AD-102')), false);
+  assert.equal(existsSync(join(rootPath, '.ewokbot', 'runs', 'AD-101')), false);
+  assert.equal(existsSync(join(rootPath, '.ewokbot', 'runs', 'AD-102')), false);
   assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
 });
 
@@ -78,7 +78,7 @@ test('worker start --once processes one mock cycle through the foreground runtim
   const rootPath = createWorkspaceRoot(workerConfigYaml);
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: rootPath, configPath: 'config/workspace.yml', io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: rootPath, configPath: '.ewokbot/workspace.yml', io: captured.io }).run([
     'node',
     'ewokbot',
     'worker',
@@ -154,7 +154,7 @@ test('worker runtime exits paused workspace before opening ticket providers', as
   assert.equal(result.exitCode, 0);
   assert.equal(result.summary, undefined);
   assert.equal(createTicketPortCalls, 0);
-  assert.match(captured.stdout, /worker_paused controlPath=runs\/control.json/u);
+  assert.match(captured.stdout, /worker_paused controlPath=.ewokbot\/runs\/control.json/u);
   assert.match(captured.stdout, /No backlog tickets, provider adapters, OpenCode runs, git operations, pull requests, or deployments were started/u);
   assert.equal(existsSync(getWorkerLockPath(rootPath)), false);
 });
@@ -233,13 +233,13 @@ test('worker runtime preserves existing state and avoids duplicate restart side 
   assert.equal(result.summary?.started, 0);
   assert.match(captured.stdout, /worker_state_reused ticket=AD-888 runId=AD-888-existing state=PRODUCTION_PR_OPENED/u);
   assert.match(captured.stdout, /human production approval/u);
-  assert.deepEqual(readdirSync(join(rootPath, 'runs', 'AD-888')).sort(), ['AD-888-existing']);
+  assert.deepEqual(readdirSync(join(rootPath, '.ewokbot', 'runs', 'AD-888')).sort(), ['AD-888-existing']);
 });
 
 function createWorkspaceRoot(configYaml: string): string {
   const rootPath = mkdtempSync(join(tmpdir(), 'agentic-worker-runtime-'));
-  mkdirSync(join(rootPath, 'config'));
-  writeFileSync(join(rootPath, 'config', 'workspace.yml'), configYaml, 'utf8');
+  mkdirSync(join(rootPath, '.ewokbot'));
+  writeFileSync(join(rootPath, '.ewokbot', 'workspace.yml'), configYaml, 'utf8');
   return rootPath;
 }
 
@@ -346,7 +346,7 @@ quality:
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
+    local_path: ./frontend
     default_branch: develop
     production_branch: main
     quality_profile: node

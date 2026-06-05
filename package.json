@@ -12,8 +12,6 @@
   },
   "files": [
     "dist",
-    "config",
-    ".env.example",
     "assets"
   ],
   "engines": {

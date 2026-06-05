@@ -40,7 +40,7 @@ test('smoke command refuses missing confirmation before doctor, config, MCP, or 
   assert.deepEqual(clients.atlassian.listToolRequests, []);
   assert.deepEqual(clients.github.listToolRequests, []);
   assert.deepEqual(clients.railway.listToolRequests, []);
-  await assert.rejects(stat(join(rootPath, 'runs')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs')));
 });
 
 test('smoke command stops on doctor fail before MCP readiness or run state', async (t) => {
@@ -63,7 +63,7 @@ test('smoke command stops on doctor fail before MCP readiness or run state', asy
   assert.deepEqual(clients.atlassian.listToolRequests, []);
   assert.deepEqual(clients.github.listToolRequests, []);
   assert.deepEqual(clients.railway.listToolRequests, []);
-  await assert.rejects(stat(join(rootPath, 'runs')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs')));
 });
 
 test('smoke command runs one MCP-backed ticket through production PR preparation with fakes only', async (t) => {
@@ -72,7 +72,7 @@ test('smoke command runs one MCP-backed ticket through production PR preparation
   const clients = createSmokeMcpClients();
   const auditRecords: McpToolCallAuditRecord[] = [];
   const gitCalls: GitCommandInput[] = [];
-  const qualityReport = createPassedQualityReport(join(rootPath, 'worktrees', 'frontend'));
+  const qualityReport = createPassedQualityReport(join(rootPath, 'frontend'));
 
   const exitCode = await createCliProgram({
     cwd: rootPath,
@@ -90,7 +90,7 @@ test('smoke command runs one MCP-backed ticket through production PR preparation
       },
       qualityRunner: async ({ gates, logRootPath }) => {
         assert.deepEqual(gates.map((gate) => gate.name), ['test']);
-        assert.match(logRootPath, /runs\/AE-101\/smoke-run-1\/quality-logs/u);
+        assert.match(logRootPath, /.ewokbot\/runs\/AE-101\/smoke-run-1\/quality-logs/u);
         return qualityReport;
       },
       smokeVerifier: new MockSmokeUrlVerifier()
@@ -135,7 +135,7 @@ test('smoke command runs one MCP-backed ticket through production PR preparation
   assert.equal(state.targetRepositories.length, 1);
   assert.equal(state.pullRequests.length, 2);
   assert.equal(state.stagingDeployments[0]?.status, 'success');
-  assert.match(await readFile(join(rootPath, 'runs', 'AE-101', 'smoke-run-1', 'final-report.md'), 'utf8'), /Real-provider smoke run completed only through production PR preparation/u);
+  assert.match(await readFile(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'final-report.md'), 'utf8'), /Real-provider smoke run completed only through production PR preparation/u);
   assert.equal((await stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1')))).isFile(), true);
 });
 
@@ -165,7 +165,7 @@ test('smoke command refuses an existing state file before delivery side effects'
       },
       qualityRunner: async ({ gates: _gates, logRootPath: _logRootPath }) => {
         qualityCalls += 1;
-        return createPassedQualityReport(join(rootPath, 'worktrees', 'frontend'));
+        return createPassedQualityReport(join(rootPath, 'frontend'));
       },
       smokeVerifier: new MockSmokeUrlVerifier()
     }
@@ -206,7 +206,7 @@ test('smoke command refuses an existing run directory before delivery side effec
       },
       qualityRunner: async ({ gates: _gates, logRootPath: _logRootPath }) => {
         qualityCalls += 1;
-        return createPassedQualityReport(join(rootPath, 'worktrees', 'frontend'));
+        return createPassedQualityReport(join(rootPath, 'frontend'));
       },
       smokeVerifier: new MockSmokeUrlVerifier()
     }
@@ -238,7 +238,7 @@ test('smoke command requires explicit MCP modes before runtime adapters', async 
   assert.equal(exitCode, 1);
   assert.match(captured.stderr, /requires Jira, GitHub, and Railway provider modes to be explicit MCP mode/u);
   assert.deepEqual(clients.github.listToolRequests, []);
-  await assert.rejects(stat(join(rootPath, 'runs')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs')));
 });
 
 test('smoke command stops on MCP readiness failure before Jira read or run state', async (t) => {
@@ -259,7 +259,7 @@ test('smoke command stops on MCP readiness failure before Jira read or run state
   assert.deepEqual(clients.atlassian.toolCallRequests, []);
   assert.deepEqual(clients.github.toolCallRequests, []);
   assert.deepEqual(clients.railway.toolCallRequests, []);
-  await assert.rejects(stat(join(rootPath, 'runs')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs')));
 });
 
 async function createTempRoot(t: TestContext): Promise<string> {
@@ -274,13 +274,13 @@ async function createTempRoot(t: TestContext): Promise<string> {
 
 async function createSmokeWorkspace(t: TestContext, configYaml: string): Promise<string> {
   const rootPath = await createTempRoot(t);
-  const repoPath = join(rootPath, 'worktrees', 'frontend');
+  const repoPath = join(rootPath, 'frontend');
 
-  await mkdir(join(rootPath, 'config'), { recursive: true });
+  await mkdir(join(rootPath, '.ewokbot'), { recursive: true });
   await mkdir(repoPath, { recursive: true });
-  await writeFile(join(rootPath, 'config', 'workspace.yml'), configYaml, 'utf8');
-  await writeFile(join(rootPath, '.env.example'), ['GITHUB_ORG=', 'GITHUB_TOKEN=', 'JIRA_BASE_URL=', 'JIRA_EMAIL=', 'JIRA_API_TOKEN=', 'RAILWAY_TOKEN=', ''].join('\n'), 'utf8');
-  await writeFile(join(rootPath, '.env'), ['GITHUB_ORG=redacted', 'GITHUB_TOKEN=redacted', 'JIRA_BASE_URL=redacted', 'JIRA_EMAIL=redacted', 'JIRA_API_TOKEN=redacted', 'RAILWAY_TOKEN=redacted', ''].join('\n'), 'utf8');
+  await writeFile(join(rootPath, '.ewokbot', 'workspace.yml'), configYaml, 'utf8');
+  await writeFile(join(rootPath, '.ewokbot', '.env.example'), ['GITHUB_ORG=', 'GITHUB_TOKEN=', 'JIRA_BASE_URL=', 'JIRA_EMAIL=', 'JIRA_API_TOKEN=', 'RAILWAY_TOKEN=', ''].join('\n'), 'utf8');
+  await writeFile(join(rootPath, '.ewokbot', '.env'), ['GITHUB_ORG=redacted', 'GITHUB_TOKEN=redacted', 'JIRA_BASE_URL=redacted', 'JIRA_EMAIL=redacted', 'JIRA_API_TOKEN=redacted', 'RAILWAY_TOKEN=redacted', ''].join('\n'), 'utf8');
   await writeFile(join(repoPath, '.agent-quality.yml'), ['commands:', '  test: mock test', 'required:', '  - test', ''].join('\n'), 'utf8');
   return rootPath;
 }
@@ -390,8 +390,8 @@ function createPassedQualityReport(repositoryPath: string): QualityReport {
         finishedAt: '2026-06-05T00:00:01.000Z',
         durationMs: 1000,
         exitCode: 0,
-        stdoutLogPath: 'runs/AE-101/smoke-run-1/quality-logs/test.stdout.log',
-        stderrLogPath: 'runs/AE-101/smoke-run-1/quality-logs/test.stderr.log',
+        stdoutLogPath: '.ewokbot/runs/AE-101/smoke-run-1/quality-logs/test.stdout.log',
+        stderrLogPath: '.ewokbot/runs/AE-101/smoke-run-1/quality-logs/test.stderr.log',
         status: 'passed',
         summary: 'Mock quality gate passed.'
       }
@@ -410,11 +410,11 @@ function fixedClock(): () => Date {
 }
 
 async function assertNoSmokeSideEffectFiles(rootPath: string): Promise<void> {
-  await assert.rejects(stat(join(rootPath, 'runs', 'AE-101', 'smoke-run-1', 'plan.md')));
-  await assert.rejects(stat(join(rootPath, 'runs', 'AE-101', 'smoke-run-1', 'implementation-log.md')));
-  await assert.rejects(stat(join(rootPath, 'runs', 'AE-101', 'smoke-run-1', 'quality-report.md')));
-  await assert.rejects(stat(join(rootPath, 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md')));
-  await assert.rejects(stat(join(rootPath, 'runs', 'AE-101', 'smoke-run-1', 'final-report.md')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'plan.md')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'implementation-log.md')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'quality-report.md')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'final-report.md')));
   await assert.rejects(stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1'))));
 }
 
@@ -461,7 +461,7 @@ mcp_servers:
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
+    local_path: ./frontend
     default_branch: develop
     production_branch: main
     quality_profile: node

@@ -3,7 +3,9 @@ export {
   formatWorkspaceConfigIssues,
   loadWorkspaceConfig,
   parseWorkspaceConfig,
-  validateWorkspaceConfig
+  validateWorkspaceConfig,
+  createDiscoveredRepositoryConfig,
+  discoverSiblingGitDirectories
 } from './config/index.js';
 export type {
   DevRunnerProvider,
@@ -21,9 +23,13 @@ export type {
   RailwayWorkspaceConfig,
   WorkspaceConfig,
   WorkspaceConfigIssue,
+  WorkspaceConfigParseOptions,
   WorkspaceConfigValidationResult,
+  WorkspaceRepositoryDiscoveryConfig,
   WorkspaceRepositoryConfig,
-  WorkspaceSettings
+  WorkspaceSettings,
+  RepositoryDiscoveryMode,
+  RepositoryDiscoveryOptions
 } from './config/index.js';
 export {
   JsonRunControlStore,
@@ -57,6 +63,19 @@ export type {
 } from './agent/index.js';
 export { createCliProgram } from './cli/program.js';
 export { createPublicCliRuntimeMcp } from './cli/runtime-mcp.js';
+export {
+  ewokbotCacheDirectory,
+  ewokbotDirectory,
+  ewokbotEnvExamplePath,
+  ewokbotEnvPath,
+  ewokbotLogsDirectory,
+  ewokbotRunsDirectory,
+  ewokbotWorkspaceConfigPath,
+  getEwokbotRunDirectoryPath,
+  getEwokbotRunStateFilePath,
+  getEwokbotWorkerLockFilePath,
+  getEwokbotWorkspaceControlFilePath
+} from './workspace-layout.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions, CliRuntimeMcpOptions } from './cli/program.js';
 export type { CreatePublicCliRuntimeMcpOptions, PublicCliRuntimeMcp } from './cli/runtime-mcp.js';
 export {

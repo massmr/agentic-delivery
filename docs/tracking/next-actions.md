@@ -2,9 +2,9 @@
 
 ## Immediate
 
-1. Milestones AA, AB, AC, AD, AE, and AF from `docs/plans/approved-backlog.md` are complete.
+1. Milestones AA, AB, AC, AD, AE, AF, and AG from `docs/plans/approved-backlog.md` are complete.
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
-3. No post-AF implementation milestone is currently approved in `docs/plans/approved-backlog.md`.
+3. No later implementation milestone is approved yet; propose the next useful task here before coding.
 4. Do not implement later worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
@@ -17,19 +17,23 @@ Read AGENTS.md, then execute docs/prompts/opencode-next-step.md.
 
 ## After Milestone AF
 
-Completed through Milestone AF. Workspace config supports `mock`, `real`, and selected `mcp` provider modes, adapter factories keep mock connectors as the default, real Jira/GitHub/Railway factories fail fast before live adapters are implemented, shared MCP client infrastructure exists without live provider calls, Jira, GitHub, and Railway MCP operations now have typed ports with audit capture and configurable tool names where applicable, native fallback contracts explicitly define when MCP, native, subprocess, mock, and human-only surfaces are allowed, and the public CLI can construct supported stdio MCP clients from `config/workspace.yml` for scan, worker, and smoke.
+Completed through Milestone AG. Workspace config supports `mock`, `real`, and selected `mcp` provider modes, adapter factories keep mock connectors as the default, real Jira/GitHub/Railway factories fail fast before live adapters are implemented, shared MCP client infrastructure exists without live provider calls, Jira, GitHub, and Railway MCP operations now have typed ports with audit capture and configurable tool names where applicable, native fallback contracts explicitly define when MCP, native, subprocess, mock, and human-only surfaces are allowed, and the public CLI can construct supported stdio MCP clients from `.ewokbot/workspace.yml` for scan, worker, and smoke.
 
 Milestone AC added `ewokbot worker start`, `--once`, `--dry-run`, foreground continuous polling, workspace locking, graceful shutdown, operator-readable logs, and conservative restart state reuse that avoids duplicate side effects.
 
-Milestone AD added local CLI control commands: `ewokbot runs`, `ewokbot inspect <run-id>`, `ewokbot pause`, `ewokbot resume <run-id>`, `ewokbot approve <run-id>`, `ewokbot reject <run-id>`, and `ewokbot logs <run-id>`. These commands operate on persisted state and sidecar control files under `runs/`, and approval commands record local human decisions only without merging or deploying production.
+Milestone AD added local CLI control commands: `ewokbot runs`, `ewokbot inspect <run-id>`, `ewokbot pause`, `ewokbot resume <run-id>`, `ewokbot approve <run-id>`, `ewokbot reject <run-id>`, and `ewokbot logs <run-id>`. After AG, these commands operate on persisted state and sidecar control files under `.ewokbot/runs/`, and approval commands record local human decisions only without merging or deploying production.
 
-Milestone AE added `ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]` for one explicitly confirmed real-provider smoke path. The command loads `config/workspace.yml`, fails missing confirmation before any doctor/config/MCP/state/git/OpenCode/PR/deployment/ledger/provider side effects, runs local doctor before effects, requires Jira/GitHub/Railway `mcp` provider modes, validates runtime MCP readiness, reads exactly one Jira ticket through `TicketPort.getTicket`, refuses an existing `runs/<ticket-key>/<run-id>/` directory or `state.json` before delivery side effects, requires exactly one selected repository, then proceeds through local git, OpenCode, local quality gates, develop PR handoff with the existing operation ledger, staging verification, and production PR preparation only. It does not list the full backlog, implement multi-repo autonomy, merge production, or deploy production.
+Milestone AE added `ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]` for one explicitly confirmed real-provider smoke path. After AG, the command loads `.ewokbot/workspace.yml`, fails missing confirmation before any doctor/config/MCP/state/git/OpenCode/PR/deployment/ledger/provider side effects, runs local doctor before effects, requires Jira/GitHub/Railway `mcp` provider modes, validates runtime MCP readiness, reads exactly one Jira ticket through `TicketPort.getTicket`, refuses an existing `.ewokbot/runs/<ticket-key>/<run-id>/` directory or `state.json` before delivery side effects, requires exactly one selected repository, then proceeds through local git, OpenCode, local quality gates, develop PR handoff with the existing operation ledger, staging verification, and production PR preparation only. It does not list the full backlog, implement multi-repo autonomy, merge production, or deploy production.
 
-Milestone AF added public CLI stdio MCP client construction from `config/workspace.yml` for scan, worker, and smoke. Supported MCP server entries use `mcp_servers.<id>.command` plus optional `args`; HTTP MCP server entries currently fail fast as unsupported by the public runtime. Missing, unsupported, unavailable, unauthenticated, missing-tool, or disallowed MCP setup fails before Jira reads, worker locks, run-state writes, git, OpenCode, PRs, Railway checks, operation-ledger writes, or provider mutations where applicable. Tests remain fake-only and do not start live MCP servers or OAuth flows.
+Milestone AF added public CLI stdio MCP client construction, and AG moved the default config source to `.ewokbot/workspace.yml` for scan, worker, and smoke. Supported MCP server entries use `mcp_servers.<id>.command` plus optional `args`; HTTP MCP server entries currently fail fast as unsupported by the public runtime. Missing, unsupported, unavailable, unauthenticated, missing-tool, or disallowed MCP setup fails before Jira reads, worker locks, run-state writes, git, OpenCode, PRs, Railway checks, operation-ledger writes, or provider mutations where applicable. Tests remain fake-only and do not start live MCP servers or OAuth flows.
 
 Architecture direction changed after review and Milestone N is complete: external SaaS integrations are MCP-first, with native/subprocess/mock adapters kept as fallbacks behind typed business ports. Do not implement Jira REST as the next milestone.
 
-Next approved work: none yet after Milestone AF. Add a proposed post-AF milestone here before implementing any new product work.
+Milestone AG Workspace Layout Migration To `.ewokbot/` is complete.
+
+AG changed the product layout so Ewokbot is launched from the parent directory that already contains the target repositories. Fresh init now generates repository discovery mode (`repos.discovery: sibling-git-directories`) so all direct child directories containing `.git/` are watched by default, with `.ewokbot/`, hidden directories, `node_modules/`, non-Git directories, nested repos, and configured excludes ignored. Ewokbot-owned files move under `.ewokbot/`: `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/`.
+
+AG removed legacy fallback defaults. Root `config/workspace.yml`, root `.env`, root `.env.example`, and root `runs/` are not supported defaults; commands fail clearly if `.ewokbot/workspace.yml` is missing unless an explicit config path is supplied.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -59,6 +63,7 @@ The next milestones should move in this order:
 4. AD - CLI Control Plane. Completed.
 5. AE - First Real Provider Smoke Run. Completed.
 6. AF - Real MCP Client Runtime Wiring. Completed.
+7. AG - Workspace Layout Migration To `.ewokbot/`. Completed.
 
 Non-goals for the immediate next milestone:
 

@@ -45,8 +45,8 @@ const qualityReport = {
       finishedAt: '2026-06-04T11:00:01.000Z',
       durationMs: 1000,
       exitCode: 0,
-      stdoutLogPath: 'runs/AD-301/resume-run/quality-logs/typecheck.stdout.log',
-      stderrLogPath: 'runs/AD-301/resume-run/quality-logs/typecheck.stderr.log',
+      stdoutLogPath: '.ewokbot/runs/AD-301/resume-run/quality-logs/typecheck.stdout.log',
+      stderrLogPath: '.ewokbot/runs/AD-301/resume-run/quality-logs/typecheck.stderr.log',
       status: 'passed',
       summary: 'TypeScript passed.'
     }
@@ -70,7 +70,7 @@ test('ewokbot runs and inspect read persisted local state only', async () => {
   assert.equal(listCaptured.stderr, '');
   assert.equal(inspectExit, 0);
   assert.match(inspectCaptured.stdout, /Run ID: resume-run/u);
-  assert.match(inspectCaptured.stdout, /Run Directory: runs\/AD-301\/resume-run/u);
+  assert.match(inspectCaptured.stdout, /Run Directory: .ewokbot\/runs\/AD-301\/resume-run/u);
   assert.match(inspectCaptured.stdout, /Human-only Production Note/u);
 });
 
@@ -146,11 +146,11 @@ test('ewokbot logs prints known reports, missing markers, and quality stdout std
   const captured = createCapturedIO();
 
   await store.write(createState('LOCAL_CHECKS_PASSED', 'resume-run'));
-  writeFileSync(join(rootPath, 'runs', ticket.key, 'resume-run', 'plan.md'), 'Plan body\n', 'utf8');
-  writeFileSync(join(rootPath, 'runs', ticket.key, 'resume-run', 'quality-report.md'), 'Quality body\n', 'utf8');
-  mkdirSync(join(rootPath, 'runs', ticket.key, 'resume-run', 'quality-logs'), { recursive: true });
-  writeFileSync(join(rootPath, 'runs', ticket.key, 'resume-run', 'quality-logs', 'typecheck.stdout.log'), 'typecheck stdout\n', 'utf8');
-  writeFileSync(join(rootPath, 'runs', ticket.key, 'resume-run', 'quality-logs', 'typecheck.stderr.log'), 'typecheck stderr\n', 'utf8');
+  writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'plan.md'), 'Plan body\n', 'utf8');
+  writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-report.md'), 'Quality body\n', 'utf8');
+  mkdirSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-logs'), { recursive: true });
+  writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-logs', 'typecheck.stdout.log'), 'typecheck stdout\n', 'utf8');
+  writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-logs', 'typecheck.stderr.log'), 'typecheck stderr\n', 'utf8');
 
   const exitCode = await createCliProgram({ cwd: rootPath, io: captured.io }).run(['node', 'ewokbot', 'logs', 'resume-run']);
 

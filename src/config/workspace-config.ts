@@ -6,6 +6,11 @@ import type { McpServerConfig, McpServerTransport } from '../mcp/index.js';
 import { defaultMcpToolTimeoutMs } from '../mcp/index.js';
 import { validateJiraProjectKeys } from '../connectors/jira/jira-project-key-validation.js';
 import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
+import {
+  discoverSiblingGitDirectories,
+  type WorkspaceRepositoryDiscoveryConfig,
+  type RepositoryDiscoveryMode
+} from './repository-discovery.js';
 
 export type ProviderMode = 'mock' | 'real';
 export type JiraProviderMode = ProviderMode | 'mcp';
@@ -51,6 +56,11 @@ export interface WorkspaceConfig {
   readonly quality: QualityWorkspaceConfig;
   readonly mcpServers: readonly McpServerConfig[];
   readonly repos: readonly WorkspaceRepositoryConfig[];
+  readonly repositoryDiscovery?: WorkspaceRepositoryDiscoveryConfig | undefined;
+}
+
+export interface WorkspaceConfigParseOptions {
+  readonly workspaceRoot?: string | undefined;
 }
 
 export interface WorkspaceSettings {
@@ -138,12 +148,12 @@ const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
 const defaultDevRunnerTimeoutMs = 30 * 60 * 1000;
 const defaultDevRunnerEnvVarNames = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP'] as const;
 
-export async function loadWorkspaceConfig(filePath: string): Promise<WorkspaceConfig> {
+export async function loadWorkspaceConfig(filePath: string, options: WorkspaceConfigParseOptions = {}): Promise<WorkspaceConfig> {
   const source = await readFile(filePath, 'utf8');
-  return parseWorkspaceConfig(source);
+  return parseWorkspaceConfig(source, options);
 }
 
-export function parseWorkspaceConfig(source: string): WorkspaceConfig {
+export function parseWorkspaceConfig(source: string, options: WorkspaceConfigParseOptions = {}): WorkspaceConfig {
   const document = parseDocument(source, { prettyErrors: false });
   const syntaxIssues = document.errors.map((error) => ({
     path: 'yaml',
@@ -156,7 +166,7 @@ export function parseWorkspaceConfig(source: string): WorkspaceConfig {
   }
 
   const input: unknown = document.toJS({});
-  const validation = validateWorkspaceConfig(input);
+  const validation = validateWorkspaceConfig(input, options);
 
   if (!validation.valid) {
     throw new WorkspaceConfigError(validation.issues);
@@ -176,7 +186,7 @@ export type WorkspaceConfigValidationResult =
       readonly issues: readonly WorkspaceConfigIssue[];
     };
 
-export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidationResult {
+export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfigParseOptions = {}): WorkspaceConfigValidationResult {
   const issues: WorkspaceConfigIssue[] = [];
 
   if (!isRecord(input)) {
@@ -197,7 +207,7 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
       issues.push({
         path: section,
         message: `Missing required top-level section '${section}'.`,
-        action: `Add a '${section}' section matching config/workspace.example.yml.`
+        action: `Add a '${section}' section matching .ewokbot/workspace.yml.`
       });
     }
   }
@@ -218,7 +228,7 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
   const parsedDevRunner = devRunner === undefined ? undefined : parseDevRunnerConfig(devRunner, issues);
   const parsedQuality = quality === undefined ? undefined : parseQualityConfig(quality, issues);
   const parsedMcpServers = mcpServers === undefined ? [] : parseMcpServers(mcpServers, issues);
-  const parsedRepos = parseRepositoryList(reposValue, issues);
+  const parsedRepos = parseRepositories(reposValue, issues, options);
 
   if (parsedJira !== undefined && parsedMcpServers !== undefined) {
     validateJiraMcpServerReference(parsedJira, parsedMcpServers, issues);
@@ -257,7 +267,8 @@ export function validateWorkspaceConfig(input: unknown): WorkspaceConfigValidati
       devRunner: parsedDevRunner,
       quality: parsedQuality,
       mcpServers: parsedMcpServers,
-      repos: parsedRepos
+      repos: parsedRepos.repos,
+      repositoryDiscovery: parsedRepos.discovery
     }
   };
 }
@@ -485,21 +496,35 @@ function parseQualityConfig(section: WorkspaceConfigInput, issues: WorkspaceConf
   return { defaultProfile };
 }
 
-function parseRepositoryList(value: unknown, issues: WorkspaceConfigIssue[]): readonly WorkspaceRepositoryConfig[] | undefined {
-  if (!Array.isArray(value)) {
-    issues.push({
-      path: 'repos',
-      message: 'repos must be a non-empty array of repository entries.',
-      action: 'Add repository entries matching config/workspace.example.yml.'
-    });
-    return undefined;
+interface ParsedRepositories {
+  readonly repos: readonly WorkspaceRepositoryConfig[];
+  readonly discovery?: WorkspaceRepositoryDiscoveryConfig | undefined;
+}
+
+function parseRepositories(value: unknown, issues: WorkspaceConfigIssue[], options: WorkspaceConfigParseOptions): ParsedRepositories | undefined {
+  if (Array.isArray(value)) {
+    const repos = parseRepositoryList(value, issues);
+    return repos === undefined ? undefined : { repos };
   }
 
+  if (isRecord(value)) {
+    return parseRepositoryDiscovery(value, issues, options);
+  }
+
+  issues.push({
+    path: 'repos',
+    message: 'repos must be either a non-empty array of repository entries or a repository discovery mapping.',
+    action: 'Use explicit repository entries, or set repos.discovery to sibling-git-directories with repos.exclude as an array.'
+  });
+  return undefined;
+}
+
+function parseRepositoryList(value: readonly unknown[], issues: WorkspaceConfigIssue[]): readonly WorkspaceRepositoryConfig[] | undefined {
   if (value.length === 0) {
     issues.push({
       path: 'repos',
       message: 'repos must include at least one repository.',
-      action: 'Add at least one repository entry with name, url, local_path, branches, quality_profile, and hints.'
+      action: 'Add at least one repository entry with name, url, local_path, branches, quality_profile, and hints, or use repos.discovery.'
     });
     return undefined;
   }
@@ -530,6 +555,37 @@ function parseRepositoryList(value: unknown, issues: WorkspaceConfigIssue[]): re
   }
 
   return repositories;
+}
+
+function parseRepositoryDiscovery(value: WorkspaceConfigInput, issues: WorkspaceConfigIssue[], options: WorkspaceConfigParseOptions): ParsedRepositories | undefined {
+  const mode = readRepositoryDiscoveryMode(value.discovery, issues);
+  const exclude = value.exclude === undefined
+    ? []
+    : readStringArray(value.exclude, 'repos.exclude', 'Set repos.exclude to an array of direct child directory names to skip.', issues);
+
+  if (mode === undefined || exclude === undefined) {
+    return undefined;
+  }
+
+  const discovery = { discovery: mode, exclude };
+  const repos = options.workspaceRoot === undefined
+    ? []
+    : discoverSiblingGitDirectories(options.workspaceRoot, { exclude });
+
+  return { repos, discovery };
+}
+
+function readRepositoryDiscoveryMode(value: unknown, issues: WorkspaceConfigIssue[]): RepositoryDiscoveryMode | undefined {
+  if (value !== 'sibling-git-directories') {
+    issues.push({
+      path: 'repos.discovery',
+      message: 'repos.discovery must be sibling-git-directories.',
+      action: 'Set repos.discovery to sibling-git-directories, or replace repos with explicit repository entries.'
+    });
+    return undefined;
+  }
+
+  return value;
 }
 
 function parseRepositoryConfig(section: WorkspaceConfigInput, path: string, issues: WorkspaceConfigIssue[]): WorkspaceRepositoryConfig | undefined {
@@ -658,7 +714,7 @@ function readSection(input: WorkspaceConfigInput, key: string, issues: Workspace
     issues.push({
       path: key,
       message: `${key} must be a YAML mapping.`,
-      action: `Replace ${key} with a mapping matching config/workspace.example.yml.`
+      action: `Replace ${key} with a mapping matching .ewokbot/workspace.yml.`
     });
     return undefined;
   }

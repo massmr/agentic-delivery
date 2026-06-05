@@ -11,6 +11,7 @@ import {
   type SetupGeneratedConfigMetadata,
   type SetupSelections
 } from './provider-capability.js';
+import { ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotWorkspaceConfigPath } from '../workspace-layout.js';
 
 export type DoctorCheckStatus = 'pass' | 'warn' | 'fail';
 
@@ -58,21 +59,21 @@ const minimumNodeMajor = 20;
 
 export function runLocalDoctor(cwd: string, options: DoctorProbeOptions = {}): DoctorReport {
   const probes = createProbeSet(options);
-  const configPath = join(cwd, 'config', 'workspace.yml');
-  const envExamplePath = join(cwd, '.env.example');
-  const envPath = join(cwd, '.env');
+  const configPath = join(cwd, ewokbotWorkspaceConfigPath);
+  const envExamplePath = join(cwd, ewokbotEnvExamplePath);
+  const envPath = join(cwd, ewokbotEnvPath);
   const lines = [localOnlyLine];
   const checks: DoctorCheck[] = [];
 
   if (!probes.fileExists(configPath)) {
-    checks.push(failCheck('Workspace config', 'Missing config/workspace.yml. Run ewokbot init to create local setup files.', 'Run ewokbot init.'));
+    checks.push(failCheck('Workspace config', `Missing ${ewokbotWorkspaceConfigPath}. Run ewokbot init to create local setup files.`, 'Run ewokbot init.'));
     return buildReport(lines, checks);
   }
 
   const configYaml = probes.readFile(configPath);
 
   if (configYaml === undefined) {
-    checks.push(failCheck('Workspace config', 'Unable to read config/workspace.yml.', 'Check file permissions and rerun ewokbot doctor.'));
+    checks.push(failCheck('Workspace config', `Unable to read ${ewokbotWorkspaceConfigPath}.`, 'Check file permissions and rerun ewokbot doctor.'));
     return buildReport(lines, checks);
   }
 
@@ -81,20 +82,20 @@ export function runLocalDoctor(cwd: string, options: DoctorProbeOptions = {}): D
   let config: WorkspaceConfig;
 
   try {
-    config = parseWorkspaceConfig(configYaml);
-    lines.push('config/workspace.yml is valid.');
-    checks.push(passCheck('Workspace config', 'config/workspace.yml parses and matches the local schema.'));
+    config = parseWorkspaceConfig(configYaml, { workspaceRoot: cwd });
+    lines.push(`${ewokbotWorkspaceConfigPath} is valid.`);
+    checks.push(passCheck('Workspace config', `${ewokbotWorkspaceConfigPath} parses and matches the local schema.`));
 
     for (const capability of getSetupCapabilitiesForSelections(selections)) {
       const validation = capability.validateGeneratedConfig(config, metadata);
 
       for (const issue of validation.issues) {
-        checks.push(failCheck(capability.label, issue, 'Update config/workspace.yml or rerun ewokbot init.'));
+        checks.push(failCheck(capability.label, issue, `Update ${ewokbotWorkspaceConfigPath} or rerun ewokbot init.`));
       }
     }
   } catch (error) {
     const message = error instanceof WorkspaceConfigError ? error.message : String(error);
-    checks.push(failCheck('Workspace config', `Invalid config/workspace.yml: ${message}`, 'Fix config/workspace.yml before running worker commands.'));
+    checks.push(failCheck('Workspace config', `Invalid ${ewokbotWorkspaceConfigPath}: ${message}`, `Fix ${ewokbotWorkspaceConfigPath} before running worker commands.`));
     return buildReport(lines, checks);
   }
 
@@ -201,17 +202,17 @@ function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetad
 
 function checkEnvExample(envExamplePath: string, selections: SetupSelections, probes: DoctorProbeSet): readonly DoctorCheck[] {
   if (!probes.fileExists(envExamplePath)) {
-    return [failCheck('.env.example', 'Missing .env.example with required secret placeholders.', 'Run ewokbot init or restore .env.example.')];
+    return [failCheck(ewokbotEnvExamplePath, `Missing ${ewokbotEnvExamplePath} with required secret placeholders.`, `Run ewokbot init or restore ${ewokbotEnvExamplePath}.`)];
   }
 
   const envExample = probes.readFile(envExamplePath) ?? '';
   const missing = getRequiredEnvPlaceholders(selections).filter((placeholder) => !new RegExp(`^${escapeRegex(placeholder)}=`, 'mu').test(envExample));
 
   if (missing.length > 0) {
-    return missing.map((placeholder) => failCheck('.env.example', `Missing .env.example placeholder: ${placeholder}`, 'Add the empty placeholder without storing a real secret.'));
+    return missing.map((placeholder) => failCheck(ewokbotEnvExamplePath, `Missing ${ewokbotEnvExamplePath} placeholder: ${placeholder}`, 'Add the empty placeholder without storing a real secret.'));
   }
 
-  return [passCheck('.env.example', 'Required secret placeholders are present and values are not inspected.')];
+  return [passCheck(ewokbotEnvExamplePath, 'Required secret placeholders are present and values are not inspected.')];
 }
 
 function readEnvFile(envPath: string, probes: DoctorProbeSet): { readonly exists: boolean; readonly values: EnvValueMap } {
@@ -224,10 +225,10 @@ function readEnvFile(envPath: string, probes: DoctorProbeSet): { readonly exists
 
 function checkEnvFile(envFile: { readonly exists: boolean; readonly values: EnvValueMap }): DoctorCheck {
   if (!envFile.exists) {
-    return warnCheck('.env', 'No .env file found; mock mode can run, but real provider readiness needs local secret keys.', 'Create .env from .env.example when leaving mock mode.');
+    return warnCheck(ewokbotEnvPath, `No ${ewokbotEnvPath} file found; mock mode can run, but real provider readiness needs local secret keys.`, `Create ${ewokbotEnvPath} from ${ewokbotEnvExamplePath} when leaving mock mode.`);
   }
 
-  return passCheck('.env', `.env is present; values are treated as [redacted].`);
+  return passCheck(ewokbotEnvPath, `${ewokbotEnvPath} is present; values are treated as [redacted].`);
 }
 
 function checkProviderReadiness(config: WorkspaceConfig, selections: SetupSelections, envFileValues: EnvValueMap, processEnv: NodeJS.ProcessEnv): readonly DoctorCheck[] {
@@ -300,6 +301,16 @@ function checkBranchPolicy(config: WorkspaceConfig): readonly DoctorCheck[] {
 }
 
 function checkRepositoryReadiness(cwd: string, config: WorkspaceConfig, probes: DoctorProbeSet): readonly DoctorCheck[] {
+  if (config.repositoryDiscovery !== undefined && config.repos.length === 0) {
+    return [
+      warnCheck(
+        'Repository discovery',
+        'No direct sibling Git repositories were found next to .ewokbot/.',
+        'Create or clone repositories as direct children of the workspace root, or switch repos to explicit entries.'
+      )
+    ];
+  }
+
   return config.repos.flatMap((repo) => {
     const repoPath = resolveLocalPath(cwd, repo.localPath);
 

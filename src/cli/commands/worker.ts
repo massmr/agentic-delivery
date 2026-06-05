@@ -11,6 +11,7 @@ import {
 import { createRuntimeTicketPort, createRuntimeWorkspaceAdapters, createWorkspaceAdapters } from '../../providers/index.js';
 import type { TicketPort } from '../../ports/index.js';
 import { runWorkerRuntime, type WorkerRuntimeMode } from '../../worker/index.js';
+import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface WorkerCommandOptions {
@@ -43,7 +44,7 @@ export interface ParsedWorkerCommandOptions {
 
 export async function runWorkerCommand(options: WorkerCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
-  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.yml'));
+  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
   const retryPolicy = buildRetryPolicy(options);
   const runtimeInfo = createAgentWorkerRuntimeInfo(config);
 

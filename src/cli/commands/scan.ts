@@ -1,8 +1,8 @@
-import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/workspace-config.js';
 import { createRuntimeTicketPort } from '../../providers/index.js';
+import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface ScanCommandOptions {
@@ -15,7 +15,7 @@ export interface ScanCommandOptions {
 export async function runScanCommand(options: ScanCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const configPath = resolveScanConfigPath(cwd, options.configPath);
-  const config = await loadWorkspaceConfig(configPath);
+  const config = await loadWorkspaceConfig(configPath, { workspaceRoot: cwd });
   const jira = await createRuntimeTicketPort({ config, ...options.runtimeMcp });
   const tickets = await jira.listBacklog();
 
@@ -33,10 +33,5 @@ function resolveScanConfigPath(cwd: string, configPath: string | undefined): str
     return resolve(cwd, configPath);
   }
 
-  const workspaceConfigPath = resolve(cwd, 'config/workspace.yml');
-  if (existsSync(workspaceConfigPath)) {
-    return workspaceConfigPath;
-  }
-
-  return resolve(cwd, 'config/workspace.example.yml');
+  return resolve(cwd, ewokbotWorkspaceConfigPath);
 }

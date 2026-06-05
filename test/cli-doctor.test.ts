@@ -37,7 +37,7 @@ test('ewokbot doctor reports missing local setup without live calls', async () =
   assert.equal(exitCode, 1);
   assert.equal(captured.stderr, '');
   assert.match(captured.stdout, /Doctor checked local files only/u);
-  assert.match(captured.stdout, /Missing config\/workspace\.yml/u);
+  assert.match(captured.stdout, /Missing .ewokbot\/workspace\.yml/u);
   assert.match(captured.stdout, /Run ewokbot init/u);
 });
 
@@ -68,11 +68,11 @@ test('ewokbot doctor validates generated local setup without provider calls', as
   assert.equal(doctorExitCode, 0);
   assert.equal(capturedDoctor.stderr, '');
   assert.match(capturedDoctor.stdout, /Doctor checked local files only/u);
-  assert.match(capturedDoctor.stdout, /config\/workspace\.yml is valid/u);
+  assert.match(capturedDoctor.stdout, /.ewokbot\/workspace\.yml is valid/u);
   assert.match(capturedDoctor.stdout, /Deployment monitors: railway, vercel/u);
   assert.match(capturedDoctor.stdout, /PASS: Node\.js/u);
   assert.match(capturedDoctor.stdout, /PASS: pnpm/u);
-  assert.match(capturedDoctor.stdout, /WARN: \.env/u);
+  assert.match(capturedDoctor.stdout, /WARN: \.ewokbot\/\.env/u);
 });
 
 test('ewokbot doctor renders failures and never prints secret values', async () => {
@@ -88,7 +88,7 @@ test('ewokbot doctor renders failures and never prints secret values', async () 
   ]);
 
   assert.equal(initExitCode, 0);
-  writeFileSync(join(workspaceDir, '.env'), 'GITHUB_TOKEN=super-secret-token\n', 'utf8');
+  writeFileSync(join(workspaceDir, '.ewokbot', '.env'), 'GITHUB_TOKEN=super-secret-token\n', 'utf8');
 
   const captured = createCapturedIO();
   const exitCode = await createCliProgram({
@@ -122,11 +122,11 @@ test('ewokbot doctor reports missing env placeholders for generated config', asy
   ]);
 
   assert.equal(initExitCode, 0);
-  writeFileSync(join(workspaceDir, '.env.example'), 'GITHUB_TOKEN=\n', 'utf8');
+  writeFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'GITHUB_TOKEN=\n', 'utf8');
   const captured = createCapturedIO();
 
   const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run(['node', 'ewokbot', 'doctor']);
 
   assert.equal(exitCode, 1);
-  assert.match(captured.stdout, /Missing \.env\.example placeholder: VERCEL_TOKEN/u);
+  assert.match(captured.stdout, /Missing \.ewokbot\/\.env\.example placeholder: VERCEL_TOKEN/u);
 });

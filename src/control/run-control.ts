@@ -5,6 +5,7 @@ import { dirname, join, resolve, sep } from 'node:path';
 import type { DeliveryRunStateRecord } from '../domain/index.js';
 import { getRunDirectoryPath, getRunStateFilePath } from '../state/index.js';
 import { getNextActionForState, readRunState } from '../status/index.js';
+import { ewokbotRunsDirectory, getEwokbotWorkspaceControlFilePath } from '../workspace-layout.js';
 
 export type RunControlDecision = 'approved' | 'rejected';
 
@@ -80,7 +81,7 @@ export interface RunControlStore {
   readRunLogs(runId: string): Promise<RunLogsResult>;
 }
 
-const workspaceControlPath = join('runs', 'control.json');
+const workspaceControlPath = getEwokbotWorkspaceControlFilePath();
 const runControlFileName = 'control.json';
 const knownReportFiles: readonly RunLogFile[] = [
   { label: 'Plan', path: 'plan.md' },
@@ -190,7 +191,7 @@ export class JsonRunControlStore implements RunControlStore {
     const matches = (await this.scanRunStates()).filter((lookup) => lookup.runId === runId);
 
     if (matches.length === 0) {
-      throw new Error(`No run found for run id ${runId}. Expected runs/<ticket-key>/${runId}/state.json.`);
+      throw new Error(`No run found for run id ${runId}. Expected ${ewokbotRunsDirectory}/<ticket-key>/${runId}/state.json.`);
     }
 
     if (matches.length > 1) {
@@ -224,7 +225,7 @@ export class JsonRunControlStore implements RunControlStore {
   }
 
   private async scanRunStates(): Promise<readonly RunLookupResult[]> {
-    const runsDirectory = join(this.rootPath, 'runs');
+    const runsDirectory = join(this.rootPath, ewokbotRunsDirectory);
     const ticketEntries = await readDirectoryIfExists(runsDirectory);
     const lookups: RunLookupResult[] = [];
 
@@ -254,7 +255,7 @@ export class JsonRunControlStore implements RunControlStore {
 
 export function renderRunsList(runs: readonly ListedRun[]): string {
   if (runs.length === 0) {
-    return 'No runs found under runs/<ticket-key>/<run-id>/state.json. Start one with ewokbot run <ticket-key> or ewokbot worker start --once.';
+    return `No runs found under ${ewokbotRunsDirectory}/<ticket-key>/<run-id>/state.json. Start one with ewokbot run <ticket-key> or ewokbot worker start --once.`;
   }
 
   return [
@@ -390,8 +391,8 @@ function uniqueLogFiles(paths: readonly string[]): readonly string[] {
 }
 
 function resolveLogPath(rootPath: string, runDirectory: string, path: string): ResolvedLogPath {
-  const resolvedRunDirectory = resolve(runDirectory);
-  const candidatePath = path.startsWith('runs/') ? resolve(rootPath, path) : resolve(runDirectory, path);
+  const resolvedRunDirectory = resolve(rootPath, runDirectory);
+  const candidatePath = path.startsWith(`${ewokbotRunsDirectory}/`) ? resolve(rootPath, path) : resolve(resolvedRunDirectory, path);
   const safePrefix = `${resolvedRunDirectory}${sep}`;
 
   return { path: candidatePath, safe: candidatePath.startsWith(safePrefix) };

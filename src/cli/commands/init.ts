@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { createOnboardingFiles, defaultSetupSelections, type DeploymentMonitorSelection, type SetupSelections } from '../../setup/index.js';
+import { ewokbotCacheDirectory, ewokbotEnvExamplePath, ewokbotLogsDirectory, ewokbotRunsDirectory, ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO } from '../program.js';
 
 export interface InitCommandOptions {
@@ -24,8 +25,8 @@ class InitArgumentError extends Error {
 
 export async function runInitCommand(options: InitCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
-  const targetPath = join(cwd, 'config', 'workspace.yml');
-  const envExamplePath = join(cwd, '.env.example');
+  const targetPath = join(cwd, ewokbotWorkspaceConfigPath);
+  const envExamplePath = join(cwd, ewokbotEnvExamplePath);
   let selections: SetupSelections;
 
   try {
@@ -47,12 +48,18 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   const files = createOnboardingFiles(selections);
 
   mkdirSync(dirname(targetPath), { recursive: true });
+  mkdirSync(join(cwd, ewokbotRunsDirectory), { recursive: true });
+  mkdirSync(join(cwd, ewokbotLogsDirectory), { recursive: true });
+  mkdirSync(join(cwd, ewokbotCacheDirectory), { recursive: true });
   writeFileSync(targetPath, files.workspaceYaml, 'utf8');
   writeFileSync(envExamplePath, files.envExample, 'utf8');
 
   options.io.stdout(`Created ${targetPath}\n`);
   options.io.stdout(`Created ${envExamplePath}\n`);
-  options.io.stdout('Mock mode remains the default. Fill .env.example placeholders before enabling live providers.\n');
+  options.io.stdout(`Created ${join(cwd, ewokbotRunsDirectory)}\n`);
+  options.io.stdout(`Created ${join(cwd, ewokbotLogsDirectory)}\n`);
+  options.io.stdout(`Created ${join(cwd, ewokbotCacheDirectory)}\n`);
+  options.io.stdout(`Mock mode remains the default. Fill ${ewokbotEnvExamplePath} placeholders before enabling live providers.\n`);
   return 0;
 }
 

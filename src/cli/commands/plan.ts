@@ -5,6 +5,7 @@ import { MockJiraConnector } from '../../connectors/jira/mock-jira-connector.js'
 import { createTicketPlan } from '../../planning/repository-resolver.js';
 import { MarkdownReportWriter } from '../../reports/markdown-report-writer.js';
 import { JsonRunStateStore, createDeliveryRunStateRecord, transitionDeliveryRunState } from '../../state/run-state-store.js';
+import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO } from '../program.js';
 
 export interface PlanCommandOptions {
@@ -17,7 +18,7 @@ export interface PlanCommandOptions {
 export async function runPlanCommand(ticketKey: string, options: PlanCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const now = options.now ?? (() => new Date());
-  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.example.yml'));
+  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
   const ticket = await new MockJiraConnector(config).getTicket(ticketKey);
   const plan = createTicketPlan(ticket, config);
   const runId = createRunId(ticketKey, now());

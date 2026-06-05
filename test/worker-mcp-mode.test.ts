@@ -31,7 +31,7 @@ test('agentic worker runs explicit MCP mode with injected clients after provider
 
   const exitCode = await createCliProgram({
     cwd: rootPath,
-    configPath: 'config/workspace.yml',
+    configPath: '.ewokbot/workspace.yml',
     io: captured.io,
     runtimeMcp: {
       mcpClients: clients,
@@ -70,7 +70,7 @@ test('agentic worker refuses MCP mode before queue side effects when a runtime c
 
   await assert.rejects(
     () =>
-      createCliProgram({ cwd: rootPath, configPath: 'config/workspace.yml', io: captured.io }).run([
+      createCliProgram({ cwd: rootPath, configPath: '.ewokbot/workspace.yml', io: captured.io }).run([
         'node',
         'agentic',
         'worker',
@@ -98,7 +98,7 @@ test('agentic worker start rejects unsupported public MCP transport before lock 
     () =>
       createCliProgram({
         cwd: rootPath,
-        configPath: 'config/workspace.yml',
+        configPath: '.ewokbot/workspace.yml',
         io: captured.io,
         runtimeMcp: runtime.runtimeMcp
       }).run(['node', 'agentic', 'worker', 'start', '--once']),
@@ -123,7 +123,7 @@ test('agentic worker refuses MCP mode before tool calls when a required provider
     () =>
       createCliProgram({
         cwd: rootPath,
-        configPath: 'config/workspace.yml',
+        configPath: '.ewokbot/workspace.yml',
         io: captured.io,
         runtimeMcp: { mcpClients: clients }
       }).run(['node', 'agentic', 'worker', '--max-cycles', '1']),
@@ -150,8 +150,8 @@ test('agent worker runtime info rejects real provider modes for Milestone W', ()
 
 function createWorkspaceRoot(configYaml: string): string {
   const rootPath = mkdtempSync(join(tmpdir(), 'agentic-worker-mcp-'));
-  mkdirSync(join(rootPath, 'config'));
-  writeFileSync(join(rootPath, 'config', 'workspace.yml'), configYaml, 'utf8');
+  mkdirSync(join(rootPath, '.ewokbot'));
+  writeFileSync(join(rootPath, '.ewokbot', 'workspace.yml'), configYaml, 'utf8');
   return rootPath;
 }
 
@@ -265,7 +265,7 @@ mcp_servers:
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
+    local_path: ./frontend
     default_branch: develop
     production_branch: main
     quality_profile: node

@@ -42,8 +42,8 @@ async function createTempRunRoot(t: TestContext): Promise<string> {
 }
 
 test('getRunDirectoryPath and getRunStateFilePath derive the run layout', () => {
-  assert.equal(getRunDirectoryPath(ticket.key, 'run-1'), 'runs/AD-123/run-1');
-  assert.equal(getRunStateFilePath(ticket.key, 'run-1'), 'runs/AD-123/run-1/state.json');
+  assert.equal(getRunDirectoryPath(ticket.key, 'run-1'), '.ewokbot/runs/AD-123/run-1');
+  assert.equal(getRunStateFilePath(ticket.key, 'run-1'), '.ewokbot/runs/AD-123/run-1/state.json');
 });
 
 test('createDeliveryRunStateRecord creates the initial discoverable run state', () => {
@@ -173,7 +173,7 @@ test('recordDevRunResult turns failed implementation results into actionable fai
   assert.equal(state.state, 'FAILED');
   assert.equal(state.timestamps.completedAt, failedAt);
   assert.equal(state.failure?.state, 'IMPLEMENTING');
-  assert.match(state.failure?.reason ?? '', /runs\/AD-123\/run-1\/implementation-log\.md/u);
+  assert.match(state.failure?.reason ?? '', /.ewokbot\/runs\/AD-123\/run-1\/implementation-log\.md/u);
   assert.match(state.failure?.reason ?? '', /exit code: 2/u);
   assert.deepEqual(state.devRuns, [result]);
 });
@@ -190,7 +190,7 @@ function createDevRunResult(status: 'passed' | 'failed'): DevRunResult {
     baseBranch: 'develop',
     command: 'node mock-opencode.js',
     workingDirectory: '/repo',
-    implementationLogPath: 'runs/AD-123/run-1/implementation-log.md',
+    implementationLogPath: '.ewokbot/runs/AD-123/run-1/implementation-log.md',
     startedAt: '2026-06-03T10:01:00.000Z',
     finishedAt: '2026-06-03T10:02:00.000Z',
     durationMs: 60000,

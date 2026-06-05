@@ -30,7 +30,7 @@ Read these first:
 - `docs/specs/technical-architecture.md`
 - `docs/plans/mvp-plan.md`
 - `docs/specs/quality-gates.md`
-- `config/workspace.example.yml`
+- `.ewokbot/workspace.yml`
 
 ## Initial Implementation Target
 
@@ -46,6 +46,7 @@ Required outcomes:
 - Markdown report writer.
 - Mock Jira connector.
 - `ewokbot init`.
+- Repository discovery that watches direct sibling Git repositories from `.ewokbot/workspace.yml` by default.
 - `agentic scan`.
 - `agentic plan <ticket>`.
 - Unit tests for config/state/planning basics.

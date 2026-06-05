@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/index.js';
 import { runEndToEndMockDelivery } from '../../delivery/index.js';
+import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO } from '../program.js';
 
 export interface RunCommandOptions {
@@ -14,7 +15,7 @@ export interface RunCommandOptions {
 
 export async function runRunCommand(ticketKey: string, options: RunCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
-  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? 'config/workspace.example.yml'));
+  const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
   const result = await runEndToEndMockDelivery({
     ticketKey,
     config,

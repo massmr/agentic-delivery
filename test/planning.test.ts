@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test, type TestContext } from 'node:test';
@@ -64,6 +64,34 @@ test('createTicketPlan requests human input when no repository is confident', as
   assert.match(plan.humanReason ?? '', /No repository matched/u);
 });
 
+test('createTicketPlan selects discovered sibling repositories using folder hints', async (t) => {
+  const workspaceDir = await createTempRunRoot(t);
+  await mkdir(join(workspaceDir, '.ewokbot'), { recursive: true });
+  await mkdir(join(workspaceDir, 'api', '.git'), { recursive: true });
+  await writeFile(join(workspaceDir, '.ewokbot', 'workspace.yml'), discoveryWorkspaceConfig(), 'utf8');
+  const config = await loadWorkspaceConfig(join(workspaceDir, '.ewokbot', 'workspace.yml'), { workspaceRoot: workspaceDir });
+  const ticket = {
+    ref: {
+      provider: 'jira',
+      key: 'LK-200',
+      url: 'https://your-domain.atlassian.net/browse/LK-200'
+    },
+    summary: 'Update API endpoint validation',
+    description: 'The api service should validate the new endpoint payload.',
+    status: 'To Do',
+    priority: 'medium',
+    labels: ['api'],
+    createdAt: '2026-06-03T08:00:00.000Z',
+    updatedAt: '2026-06-03T08:00:00.000Z'
+  } satisfies DeliveryTicket;
+
+  const plan = createTicketPlan(ticket, config);
+
+  assert.equal(plan.needsHuman, false);
+  assert.equal(plan.selectedRepositories[0]?.name, 'api');
+  assert.equal(config.repos[0]?.localPath, './api');
+});
+
 test('renderTicketPlanMarkdown includes status, selected repository, and risk notes', async () => {
   const config = await loadWorkspaceConfig('config/workspace.example.yml');
   const ticket = await new MockJiraConnector(config).getTicket('LK-102');
@@ -87,9 +115,9 @@ test('agentic plan creates a run state and plan report in mock mode', async (t) 
 
   assert.equal(exitCode, 0);
   assert.match(captured.stdout, /Planned LK-101/u);
-  assert.match(captured.stdout, /Report: runs\/LK-101\/LK-101-/u);
+  assert.match(captured.stdout, /Report: .ewokbot\/runs\/LK-101\/LK-101-/u);
 
-  const reportMatch = /Report: (runs\/LK-101\/[^/]+\/plan\.md)/u.exec(captured.stdout);
+  const reportMatch = /Report: (.ewokbot\/runs\/LK-101\/[^/]+\/plan\.md)/u.exec(captured.stdout);
   assert.notEqual(reportMatch, null);
 
   const report = await readFile(join(workspaceDir, reportMatch?.[1] ?? ''), 'utf8');
@@ -117,4 +145,36 @@ function createCapturedIO() {
       return stderr;
     }
   };
+}
+
+function discoveryWorkspaceConfig(): string {
+  return `
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - LK
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+repos:
+  discovery: sibling-git-directories
+  exclude: []
+`;
 }

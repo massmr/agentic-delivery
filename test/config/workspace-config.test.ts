@@ -1,6 +1,8 @@
 import * as assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 import { defaultGitHubMcpToolNames, defaultRailwayMcpToolNames, loadWorkspaceConfig, parseWorkspaceConfig, WorkspaceConfigError } from '../../src/index.js';
@@ -89,6 +91,63 @@ repos:
 `);
 
   assert.deepEqual(config.repos[0]?.stagingSmokeUrls, []);
+});
+
+test('workspace config discovery mode normalizes sibling Git repositories', () => {
+  const rootPath = mkdtempSync(join(tmpdir(), 'ewokbot-config-discovery-'));
+
+  try {
+    mkdirSync(join(rootPath, 'service-b', '.git'), { recursive: true });
+    mkdirSync(join(rootPath, 'service-a', '.git'), { recursive: true });
+
+    const config = parseWorkspaceConfig(minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`), { workspaceRoot: rootPath });
+
+    assert.equal(config.repositoryDiscovery?.discovery, 'sibling-git-directories');
+    assert.deepEqual(config.repositoryDiscovery?.exclude, []);
+    assert.deepEqual(config.repos.map((repo) => repo.name), ['service-a', 'service-b']);
+    assert.equal(config.repos[0]?.localPath, './service-a');
+  } finally {
+    rmSync(rootPath, { recursive: true, force: true });
+  }
+});
+
+test('workspace config discovery mode honors excludes', () => {
+  const rootPath = mkdtempSync(join(tmpdir(), 'ewokbot-config-discovery-exclude-'));
+
+  try {
+    mkdirSync(join(rootPath, 'service-a', '.git'), { recursive: true });
+    mkdirSync(join(rootPath, 'service-b', '.git'), { recursive: true });
+
+    const config = parseWorkspaceConfig(minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude:
+    - service-b
+`), { workspaceRoot: rootPath });
+
+    assert.deepEqual(config.repos.map((repo) => repo.name), ['service-a']);
+  } finally {
+    rmSync(rootPath, { recursive: true, force: true });
+  }
+});
+
+test('workspace config rejects unknown repository discovery mode', () => {
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(minimalWorkspaceConfig(`repos:
+  discovery: recursive
+  exclude: []
+`)));
+
+  assert.ok(error.issues.some((issue) => issue.path === 'repos.discovery'));
+  assert.match(error.message, /repos\.discovery must be sibling-git-directories/u);
+});
+
+test('workspace config still rejects an explicit empty repository array', () => {
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(minimalWorkspaceConfig('repos: []\n')));
+
+  assert.ok(error.issues.some((issue) => issue.path === 'repos'));
+  assert.match(error.message, /repos must include at least one repository/u);
 });
 
 test('invalid YAML reports a clear syntax issue', () => {
@@ -460,4 +519,33 @@ repos:
       - api
     staging_smoke_urls: []
 `;
+}
+
+function minimalWorkspaceConfig(reposSection: string): string {
+  return `
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - LK
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+${reposSection}`;
 }

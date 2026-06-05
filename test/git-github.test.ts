@@ -80,8 +80,8 @@ const qualityReport = {
       finishedAt: '2026-06-03T10:10:01.000Z',
       durationMs: 1000,
       exitCode: 0,
-      stdoutLogPath: 'runs/AD-123/run-1/quality-logs/typecheck.stdout.log',
-      stderrLogPath: 'runs/AD-123/run-1/quality-logs/typecheck.stderr.log',
+      stdoutLogPath: '.ewokbot/runs/AD-123/run-1/quality-logs/typecheck.stdout.log',
+      stderrLogPath: '.ewokbot/runs/AD-123/run-1/quality-logs/typecheck.stderr.log',
       status: 'passed',
       summary: 'typecheck passed.'
     }
@@ -94,8 +94,8 @@ const qualityReport = {
       finishedAt: '2026-06-03T10:10:01.000Z',
       durationMs: 0,
       exitCode: null,
-      stdoutLogPath: 'runs/AD-123/run-1/quality-logs/coverage.stdout.log',
-      stderrLogPath: 'runs/AD-123/run-1/quality-logs/coverage.stderr.log',
+      stdoutLogPath: '.ewokbot/runs/AD-123/run-1/quality-logs/coverage.stdout.log',
+      stderrLogPath: '.ewokbot/runs/AD-123/run-1/quality-logs/coverage.stderr.log',
       status: 'skipped',
       summary: 'coverage skipped: optional gate has no command configured.'
     }
@@ -319,7 +319,7 @@ test('runDevelopPullRequestHandoff without a ledger root ignores stale cwd ledge
   assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'push'), [
     ['push', 'origin', 'agent/AD-123-github-pr-handoff']
   ]);
-  assert.equal(getOperationLedgerFilePath(ticket.ref.key, 'run-1'), 'runs/AD-123/run-1/operation-ledger.json');
+  assert.equal(getOperationLedgerFilePath(ticket.ref.key, 'run-1'), '.ewokbot/runs/AD-123/run-1/operation-ledger.json');
 });
 
 test('runDevelopPullRequestHandoff ledger prevents duplicate GitHub handoff side effects on rerun', async () => {

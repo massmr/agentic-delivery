@@ -153,7 +153,7 @@ test('MarkdownReportWriter writes deterministic quality reports to the run direc
   const report = createSampleQualityReport(rootPath);
   const relativePath = await new MarkdownReportWriter(rootPath).writeQuality('AD-123', 'run-1', report);
 
-  assert.equal(relativePath, 'runs/AD-123/run-1/quality-report.md');
+  assert.equal(relativePath, '.ewokbot/runs/AD-123/run-1/quality-report.md');
   assert.equal((await stat(join(rootPath, relativePath))).isFile(), true);
 
   const markdown = await readFile(join(rootPath, relativePath), 'utf8');

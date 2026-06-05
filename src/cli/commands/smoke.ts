@@ -9,6 +9,7 @@ import type { RuntimeProviderFactoryOptions, WorkspaceAdapters } from '../../pro
 import { createRuntimeWorkspaceAdapters } from '../../providers/index.js';
 import { runLocalDoctor } from '../../setup/index.js';
 import type { DoctorCheck, DoctorProbeOptions } from '../../setup/index.js';
+import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface SmokeCommandDeliveryOptions {
@@ -49,7 +50,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
     return 1;
   }
 
-  options.io.stdout('Phase 2/6: loading config/workspace.yml and validating explicit MCP provider modes.\n');
+  options.io.stdout(`Phase 2/6: loading ${ewokbotWorkspaceConfigPath} and validating explicit MCP provider modes.\n`);
   const config = await loadSmokeConfig(cwd, options.configPath, options.io);
 
   if (config === undefined) {
@@ -60,7 +61,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
 
   if (modeError !== undefined) {
     options.io.stderr(`${modeError}\n`);
-    options.io.stderr('Smoke preflight failed before runtime adapters or provider side effects. Set jira.mode, github.mode, and railway.mode to mcp in config/workspace.yml.\n');
+    options.io.stderr(`Smoke preflight failed before runtime adapters or provider side effects. Set jira.mode, github.mode, and railway.mode to mcp in ${ewokbotWorkspaceConfigPath}.\n`);
     return 1;
   }
 
@@ -135,9 +136,9 @@ function validateSmokeConfig(config: Awaited<ReturnType<typeof loadWorkspaceConf
 
 async function loadSmokeConfig(cwd: string, configPath: string | undefined, io: CliProgramIO): Promise<Awaited<ReturnType<typeof loadWorkspaceConfig>> | undefined> {
   try {
-    return await loadWorkspaceConfig(resolve(cwd, configPath ?? 'config/workspace.yml'));
+    return await loadWorkspaceConfig(resolve(cwd, configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
   } catch (error) {
-    io.stderr(`Smoke preflight failed while loading config/workspace.yml: ${formatError(error)}\n`);
+    io.stderr(`Smoke preflight failed while loading ${ewokbotWorkspaceConfigPath}: ${formatError(error)}\n`);
     io.stderr('No runtime adapters, run state, git, OpenCode, PR, deployment, ledger, or provider writes were started.\n');
     return undefined;
   }

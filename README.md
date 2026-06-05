@@ -31,10 +31,10 @@ Current capabilities:
 
 - CLI-first local runtime.
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
-- Interactive and non-interactive local onboarding that writes `config/workspace.yml` and `.env.example` placeholders.
+- Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml` and `.ewokbot/.env.example` placeholders.
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
-- Persistent run state and Markdown reports under `runs/`.
+- Persistent run state and Markdown reports under `.ewokbot/runs/`.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
@@ -168,13 +168,13 @@ Run one mock ticket end to end:
 node dist/src/cli/index.js run LK-101
 ```
 
-Run one explicitly confirmed real-provider smoke ticket after `config/workspace.yml` and local readiness are prepared:
+Run one explicitly confirmed real-provider smoke ticket after `.ewokbot/workspace.yml` and local readiness are prepared:
 
 ```bash
 node dist/src/cli/index.js smoke LK-101 --confirm-real-provider-smoke
 ```
 
-The smoke command uses `config/workspace.yml` by default, refuses to start without `--confirm-real-provider-smoke`, runs `ewokbot doctor` checks before side effects, requires Jira, GitHub, and Railway to be configured as `mcp`, reads exactly one Jira ticket through `TicketPort.getTicket`, and requires planning to select exactly one repository. After preflight passes it creates local run state, creates a local git branch, invokes the configured OpenCode runner, runs local quality gates, opens the develop PR through the typed code host port, verifies Railway staging, and prepares a production PR for human review. It does not list the full backlog, merge production, or deploy production.
+The smoke command uses `.ewokbot/workspace.yml` by default, refuses to start without `--confirm-real-provider-smoke`, runs `ewokbot doctor` checks before side effects, requires Jira, GitHub, and Railway to be configured as `mcp`, reads exactly one Jira ticket through `TicketPort.getTicket`, and requires planning to select exactly one repository. After preflight passes it creates local run state, creates a local git branch, invokes the configured OpenCode runner, runs local quality gates, opens the develop PR through the typed code host port, verifies Railway staging, and prepares a production PR for human review. It does not list the full backlog, merge production, or deploy production.
 
 Inspect persisted run state:
 
@@ -204,7 +204,7 @@ node dist/src/cli/index.js approve <run-id>
 node dist/src/cli/index.js reject <run-id>
 ```
 
-These control commands read and write only local files under `runs/`. `pause` writes `runs/control.json`; `resume`, `approve`, and `reject` write `runs/<ticket-key>/<run-id>/control.json`. Approval and rejection are local operator records only: they do not merge pull requests, deploy production, call providers, run OpenCode, or push git changes.
+These control commands read and write only local files under `.ewokbot/runs/`. `pause` writes `.ewokbot/runs/control.json`; `resume`, `approve`, and `reject` write `.ewokbot/runs/<ticket-key>/<run-id>/control.json`. Approval and rejection are local operator records only: they do not merge pull requests, deploy production, call providers, run OpenCode, or push git changes.
 
 Run local quality gates for a repository:
 
@@ -230,15 +230,25 @@ Run the worker as a foreground VPS process:
 node dist/src/cli/index.js worker start
 ```
 
-`worker start` acquires a workspace lock at `runs/worker.lock` before it processes work, so two workers cannot process the same workspace concurrently. In MCP mode, runtime MCP setup is validated before the lock is created, run state is written, Jira is read, git/OpenCode/PR/deployment work starts, or provider mutations occur. It logs startup mode, provider modes, lock lifecycle, cycle summaries, restart-safety decisions, and the human-only production boundary in operator-readable text.
+`worker start` acquires a workspace lock at `.ewokbot/runs/worker.lock` before it processes work, so two workers cannot process the same workspace concurrently. In MCP mode, runtime MCP setup is validated before the lock is created, run state is written, Jira is read, git/OpenCode/PR/deployment work starts, or provider mutations occur. It logs startup mode, provider modes, lock lifecycle, cycle summaries, restart-safety decisions, and the human-only production boundary in operator-readable text.
 
-Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects. If `runs/control.json` marks the workspace paused, the worker exits before opening ticket providers or starting delivery work.
+Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects. If `.ewokbot/runs/control.json` marks the workspace paused, the worker exits before opening ticket providers or starting delivery work.
 
 The legacy `worker` command remains available for compatibility with existing local and test workflows.
 
 ## Configuration
 
-`ewokbot init` creates a mock-safe `config/workspace.yml` and a root `.env.example` with empty secret placeholders. It supports Railway-only, Vercel-only, or both deployment/CI monitor choices while keeping runtime provider modes on `mock` by default.
+`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It supports Railway-only, Vercel-only, or both deployment/CI monitor choices while keeping runtime provider modes on `mock` by default.
+
+Generated configs discover repositories from the workspace root by default:
+
+```yaml
+repos:
+  discovery: sibling-git-directories
+  exclude: []
+```
+
+Discovery watches direct child directories that contain `.git/`, sorts them by folder name, ignores `.ewokbot/`, hidden directories, `node_modules/`, non-Git directories, nested repositories, and any names listed in `exclude`. Discovered repositories use the folder basename as the repo name and `./<folder>` as the local path. Explicit `repos: [...]` entries remain supported for workspaces that need manual repository metadata.
 
 Examples:
 
@@ -248,11 +258,11 @@ ewokbot init --non-interactive --deployment-monitor vercel
 ewokbot init --non-interactive --deployment-monitor both
 ```
 
-`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.env.example`, `.env`, GitHub, Jira, Railway, Vercel, repository paths, staging/production branch settings, and static quality gate presence.
+`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Jira, Railway, Vercel, discovered or explicit repository paths, staging/production branch settings, and static quality gate presence. Discovery mode warns clearly when no direct sibling Git repositories are found.
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. The public CLI constructs supported stdio MCP clients from `config/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and continues to load `config/workspace.example.yml` by default.
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
 
 Example Jira MCP configuration:
 
@@ -347,7 +357,7 @@ Requires a human:
 - exposing or rotating secrets,
 - destructive data operations.
 
-Never commit `.env` files or provider credentials. Use `.env.example` and local environment variables for private configuration.
+Never commit `.env` files or provider credentials. Use `.ewokbot/.env.example` and local environment variables for private configuration.
 
 ## Development
 

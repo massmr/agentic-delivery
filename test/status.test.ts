@@ -72,8 +72,8 @@ const qualityReport = {
       finishedAt: '2026-06-03T10:01:01.000Z',
       durationMs: 1000,
       exitCode: 0,
-      stdoutLogPath: 'runs/LK-101/run-1/quality-logs/test.stdout.log',
-      stderrLogPath: 'runs/LK-101/run-1/quality-logs/test.stderr.log',
+      stdoutLogPath: '.ewokbot/runs/LK-101/run-1/quality-logs/test.stdout.log',
+      stderrLogPath: '.ewokbot/runs/LK-101/run-1/quality-logs/test.stderr.log',
       status: 'passed',
       summary: 'Mock local quality gates passed.'
     }

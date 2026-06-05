@@ -130,7 +130,7 @@ test('buildOpenCodeImplementationPrompt renders deterministic ticket, repo, bran
 test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted env', async (t) => {
   const rootPath = await createTempRoot(t);
   const workingDirectory = join(rootPath, 'repo');
-  const logPath = join(rootPath, 'runs', 'AD-123', 'run-1', 'implementation-log.md');
+  const logPath = join(rootPath, '.ewokbot', 'runs', 'AD-123', 'run-1', 'implementation-log.md');
   const calls: OpenCodeSubprocessExecutorInput[] = [];
   const executor: OpenCodeSubprocessExecutor = async (input) => {
     calls.push(input);

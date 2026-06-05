@@ -48,13 +48,13 @@ test('agentic quality writes report, logs, and passed state for a local reposito
 
   assert.equal(exitCode, 0);
   assert.match(captured.stdout, /Quality passed for AD-123 as run-1/u);
-  assert.match(captured.stdout, /Report: runs\/AD-123\/run-1\/quality-report\.md/u);
+  assert.match(captured.stdout, /Report: .ewokbot\/runs\/AD-123\/run-1\/quality-report\.md/u);
   assert.equal(captured.stderr, '');
 
-  const reportPath = join(workspacePath, 'runs', 'AD-123', 'run-1', 'quality-report.md');
+  const reportPath = join(workspacePath, '.ewokbot', 'runs', 'AD-123', 'run-1', 'quality-report.md');
   const statePath = join(workspacePath, getRunStateFilePath('AD-123', 'run-1'));
-  const stdoutLogPath = join(workspacePath, 'runs', 'AD-123', 'run-1', 'quality-logs', 'test.stdout.log');
-  const optionalStderrLogPath = join(workspacePath, 'runs', 'AD-123', 'run-1', 'quality-logs', 'lint.stderr.log');
+  const stdoutLogPath = join(workspacePath, '.ewokbot', 'runs', 'AD-123', 'run-1', 'quality-logs', 'test.stdout.log');
+  const optionalStderrLogPath = join(workspacePath, '.ewokbot', 'runs', 'AD-123', 'run-1', 'quality-logs', 'lint.stderr.log');
 
   assert.equal((await stat(reportPath)).isFile(), true);
   assert.match(await readFile(reportPath, 'utf8'), /lint: SKIPPED/u);
@@ -101,9 +101,9 @@ test('agentic quality exits non-zero and stops on required failure', async (t) =
   assert.equal(exitCode, 1);
   assert.equal(captured.stdout, '');
   assert.match(captured.stderr, /Quality failed for AD-456 as run-2/u);
-  assert.match(captured.stderr, /Report: runs\/AD-456\/run-2\/quality-report\.md/u);
+  assert.match(captured.stderr, /Report: .ewokbot\/runs\/AD-456\/run-2\/quality-report\.md/u);
 
-  const buildStdoutPath = join(workspacePath, 'runs', 'AD-456', 'run-2', 'quality-logs', 'build.stdout.log');
+  const buildStdoutPath = join(workspacePath, '.ewokbot', 'runs', 'AD-456', 'run-2', 'quality-logs', 'build.stdout.log');
   const statePath = join(workspacePath, getRunStateFilePath('AD-456', 'run-2'));
   const state = JSON.parse(await readFile(statePath, 'utf8')) as DeliveryRunStateRecord;
 

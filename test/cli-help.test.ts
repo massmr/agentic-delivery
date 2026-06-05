@@ -54,7 +54,7 @@ test('ewokbot --help prints the mock planning help output', async () => {
   assert.match(captured.stdout, /ewokbot worker \[--concurrency <n>\].*\(legacy\)/u);
   assert.match(captured.stdout, /ewokbot status <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
-  assert.match(captured.stdout, /Create config\/workspace\.yml and \.env\.example/u);
+  assert.match(captured.stdout, /Create \.ewokbot\/workspace\.yml and \.ewokbot\/\.env\.example/u);
   assert.match(captured.stdout, /Mock mode remains the default/u);
   assert.equal(captured.stderr, '');
 });
@@ -77,8 +77,8 @@ test('no-command output points configured workspaces to operational commands', a
   const rootPath = mkdtempSync(join(tmpdir(), 'agentic-no-command-ready-'));
   const captured = createCapturedIO();
 
-  mkdirSync(join(rootPath, 'config'));
-  writeFileSync(join(rootPath, 'config', 'workspace.yml'), workerConfigYaml, 'utf8');
+  mkdirSync(join(rootPath, '.ewokbot'));
+  writeFileSync(join(rootPath, '.ewokbot', 'workspace.yml'), workerConfigYaml, 'utf8');
 
   const exitCode = await createCliProgram({ cwd: rootPath, io: captured.io }).run(['node', 'ewokbot']);
 
@@ -139,8 +139,12 @@ test('built ewok alias prints help when invoked through a package-manager symlin
 
 test('agentic worker processes the mock backlog without credentials', async () => {
   const rootPath = mkdtempSync(join(tmpdir(), 'agentic-worker-cli-'));
+  const repoPath = join(rootPath, 'frontend');
   const captured = createCapturedIO();
   const program = createCliProgram({ cwd: rootPath, io: captured.io });
+
+  mkdirSync(join(repoPath, '.git'), { recursive: true });
+  writeFileSync(join(repoPath, 'package.json'), JSON.stringify({ scripts: { test: 'node --test' } }), 'utf8');
 
   const initExitCode = await program.run([
     'node',
@@ -165,7 +169,7 @@ test('agentic worker processes the mock backlog without credentials', async () =
 
   assert.equal(initExitCode, 0);
   assert.equal(exitCode, 2);
-  assert.match(captured.stdout, /Created .*config\/workspace\.yml/u);
+  assert.match(captured.stdout, /Created .*.ewokbot\/workspace\.yml/u);
   assert.match(captured.stdout, /Worker Mode: mock/u);
   assert.match(captured.stdout, /Intake Mode: mock/u);
   assert.match(captured.stdout, /Provider Modes: Jira=mock, GitHub=mock, Railway=mock/u);
@@ -207,7 +211,7 @@ quality:
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
-    local_path: ./worktrees/frontend
+    local_path: ./frontend
     default_branch: develop
     production_branch: main
     quality_profile: node

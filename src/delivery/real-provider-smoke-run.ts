@@ -248,7 +248,7 @@ function requireWorkspaceRepository(config: WorkspaceConfig, repository: Reposit
   const workspaceRepository = config.repos.find((candidate) => candidate.name === repository.name);
 
   if (workspaceRepository === undefined) {
-    throw new RealProviderSmokePreflightError(`Selected repository ${repository.owner}/${repository.name} is not present in config/workspace.yml repos.`);
+    throw new RealProviderSmokePreflightError(`Selected repository ${repository.owner}/${repository.name} is not present in .ewokbot/workspace.yml repos.`);
   }
 
   return workspaceRepository;

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { open, mkdir, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
+import { ewokbotRunsDirectory, getEwokbotWorkerLockFilePath } from '../workspace-layout.js';
+
 export interface WorkerLockMetadata {
   readonly pid: number;
   readonly startedAt: string;
@@ -47,7 +49,7 @@ export async function acquireWorkerLock(options: AcquireWorkerLockOptions): Prom
   };
   const isProcessAlive = options.isProcessAlive ?? defaultIsProcessAlive;
 
-  await mkdir(join(options.rootPath, 'runs'), { recursive: true });
+  await mkdir(join(options.rootPath, ewokbotRunsDirectory), { recursive: true });
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
@@ -79,7 +81,7 @@ export async function acquireWorkerLock(options: AcquireWorkerLockOptions): Prom
 }
 
 export function getWorkerLockPath(rootPath: string): string {
-  return join(rootPath, 'runs', 'worker.lock');
+  return join(rootPath, getEwokbotWorkerLockFilePath());
 }
 
 async function releaseWorkerLock(lockPath: string, token: string): Promise<void> {

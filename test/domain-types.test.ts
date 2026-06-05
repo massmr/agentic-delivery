@@ -65,8 +65,8 @@ const qualityReport = {
       finishedAt: '2026-06-03T10:31:05.000Z',
       durationMs: 5000,
       exitCode: 0,
-      stdoutLogPath: 'runs/AD-123/run-1/typecheck.stdout.log',
-      stderrLogPath: 'runs/AD-123/run-1/typecheck.stderr.log',
+      stdoutLogPath: '.ewokbot/runs/AD-123/run-1/typecheck.stdout.log',
+      stderrLogPath: '.ewokbot/runs/AD-123/run-1/typecheck.stderr.log',
       status: 'passed',
       summary: 'TypeScript compiled successfully.'
     }
