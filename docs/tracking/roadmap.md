@@ -115,6 +115,10 @@ Status legend:
 - `[x]` Real workspace dry run for discovery, Jira MCP intake, and planning without delivery side effects
 - `[x]` Controlled single-repository dev execution
 - `[x]` Interactive init wizard and credential setup
+- `[ ]` User-level Ewokbot config/data/auth/cache layout
+- `[ ]` Dev tool detection adapters, starting with OpenCode
+- `[ ]` Inquirer TUI init
+- `[ ]` Ewokbot auth commands separated from OpenCode auth
 
 ## Future Control Surfaces
 

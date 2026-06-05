@@ -4,8 +4,10 @@
 
 1. Milestones AA, AB, AC, AD, AE, AF, AG, AH, and AI from `docs/plans/approved-backlog.md` are complete and accepted.
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
-3. Milestone AJ: Interactive Init Wizard And Credential Setup is implemented as a review candidate and is awaiting acceptance.
-4. No next implementation milestone is approved until AJ is reviewed and accepted. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
+3. Milestone AJ: Interactive Init Wizard And Credential Setup is accepted after the prompt UX hardening commit.
+4. The next approved implementation milestone is Milestone AK: User-Level Ewokbot Layout.
+5. Milestones AL, AM, and AN are approved in order as future work, but must not be implemented before AK is completed and reviewed.
+6. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
 
@@ -62,7 +64,7 @@ AI reuses the AH dry-run path for Jira MCP ticket intake and repository planning
 
 AI must stop after local development evidence. It must not open GitHub PRs, call Railway or Vercel, verify deployments, merge production, deploy production, or enable autonomous production automation.
 
-Milestone AJ - Interactive Init Wizard And Credential Setup is implemented as a review candidate.
+Milestone AJ - Interactive Init Wizard And Credential Setup is complete and accepted.
 
 AJ must make `ewokbot init` a real first-run wizard. At the end of the wizard, the operator should have `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` ready for:
 
@@ -85,7 +87,26 @@ AJ implementation status:
 - Runtime commands load `.ewokbot/.env` before provider, OpenCode, and public MCP construction.
 - Tests remain fake-only and no later PR, staging, production, Telegram, dashboard, daemonization, or deployment scope was added.
 
-Recommended next action: review and accept AJ. After acceptance, propose the next implementation milestone explicitly before coding it.
+Recommended next action: implement Milestone AK only.
+
+Milestone AK - User-Level Ewokbot Layout is the next approved implementation milestone.
+
+AK must add Ewokbot's user-level config/data/auth/cache paths while keeping workspace-local delivery state under `.ewokbot/`. Target paths:
+
+```text
+~/.config/ewokbot/config.json
+~/.local/share/ewokbot/auth.json
+~/.local/share/ewokbot/state/
+~/.cache/ewokbot/
+```
+
+AK must use XDG overrides in tests, avoid real home-directory mutation in tests, create strict auth-file permissions where supported, and update doctor/docs to distinguish global user state from workspace-local state.
+
+After AK is completed and reviewed, continue in this order:
+
+1. AL - Dev Tool Detection Adapters, starting with OpenCode `detect()`, `doctor()`, `launchSetup()`, and `getConfigSummary()`.
+2. AM - Inquirer TUI Init using `@inquirer/prompts`, backed by AK and AL.
+3. AN - Ewokbot Auth Commands, separate from OpenCode auth.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -118,7 +139,11 @@ The next milestones should move in this order:
 7. AG - Workspace Layout Migration To `.ewokbot/`. Completed.
 8. AH - Real Workspace Dry Run. Completed.
 9. AI - Controlled Single-Repository Dev Execution. Completed.
-10. AJ - Interactive Init Wizard And Credential Setup. Implemented review candidate.
+10. AJ - Interactive Init Wizard And Credential Setup. Completed.
+11. AK - User-Level Ewokbot Layout. Next approved.
+12. AL - Dev Tool Detection Adapters. Approved after AK.
+13. AM - Inquirer TUI Init. Approved after AL.
+14. AN - Ewokbot Auth Commands. Approved after AM.
 
 Non-goals for the immediate next milestone:
 
@@ -128,4 +153,5 @@ Non-goals for the immediate next milestone:
 - Live provider calls during tests.
 - Live MCP server startup or OAuth flows during tests.
 - Automatic global installs without explicit user confirmation.
+- Demanding OpenAI/Anthropic API keys during Ewokbot init when OpenCode owns the selected runner auth flow.
 - Autonomous production merge or production deployment.

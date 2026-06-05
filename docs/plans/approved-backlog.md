@@ -686,3 +686,163 @@ Acceptance:
 - Tests prove runtime commands can load `.ewokbot/.env` and pass selected environment variables to Jira MCP/OpenCode paths through fakes only.
 - Tests remain fake-only: no live MCP/OAuth/provider/network/OpenCode/package-manager/git side effects.
 - Production merge and production deployment remain human-only.
+
+### Milestone AK: User-Level Ewokbot Layout
+
+Goal:
+
+Add Ewokbot's user-level config, data, auth, state, and cache layout so workspace-local `.ewokbot/` files are no longer forced to carry machine-wide settings or credentials.
+
+Target user layout:
+
+```text
+~/.config/ewokbot/config.json
+~/.local/share/ewokbot/auth.json
+~/.local/share/ewokbot/state/
+~/.cache/ewokbot/
+```
+
+Workspace-local layout remains:
+
+```text
+<workspace-root>/
+  .ewokbot/
+    workspace.yml
+    .env
+    .env.example
+    runs/
+    logs/
+    cache/
+```
+
+Build:
+
+- Add cross-platform path helpers using `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, and `XDG_CACHE_HOME` when set, with macOS/Linux-safe defaults.
+- Add typed models for user config, auth file metadata, global state directory, and cache directory.
+- Add filesystem helpers that create Ewokbot user directories only when explicitly requested by init/auth/setup flows.
+- Ensure `auth.json` creation uses strict owner-only permissions where the platform supports it.
+- Add doctor/readiness output for user-level Ewokbot paths without printing secrets.
+- Keep `.ewokbot/workspace.yml` as the workspace contract and `.ewokbot/runs/` as the workspace run ledger.
+- Update docs to explain what lives globally versus what lives in a workspace.
+
+Acceptance:
+
+- Tests cover default and XDG-overridden paths without touching the real home directory.
+- Tests cover owner-only permissions for generated auth files where supported.
+- Doctor can report missing/present user-level directories and auth files without exposing values.
+- No existing workspace-local commands silently move run state or workspace config into global user paths.
+- No secrets are written to tracked files or printed in stdout/stderr.
+- Tests remain fake-only and do not require real OpenCode, provider auth, MCP servers, network, or home-directory mutation.
+
+Explicit safety constraints:
+
+- Do not migrate existing user secrets automatically.
+- Do not read or write real `~/.config`, `~/.local/share`, or `~/.cache` in tests.
+- Do not store OpenCode credentials in Ewokbot user auth.
+- Production merge and production deployment remain human-only.
+
+### Milestone AL: Dev Tool Detection Adapters
+
+Goal:
+
+Replace naive dev-runner setup assumptions with explicit detection and readiness adapters, starting with OpenCode.
+
+Build:
+
+- Define a `DevToolSetupAdapter` contract with:
+  - `detect()`
+  - `doctor()`
+  - `launchSetup()`
+  - `getConfigSummary()`
+- Implement `OpenCodeSetupAdapter`.
+- Detect OpenCode command path and version without mutating the machine.
+- Detect global OpenCode config at `~/.config/opencode/opencode.json`.
+- Detect OpenCode auth state at `~/.local/share/opencode/auth.json` and/or through `opencode auth list`, without printing or copying secrets.
+- Detect project OpenCode config at `<workspace-root>/opencode.json`.
+- Return normalized readiness states such as `not_installed`, `installed_not_authenticated`, `installed_authenticated_no_model`, `installed_ready`, `installed_unsupported`, and `command_failed`.
+- Preserve support for custom OpenCode command paths.
+- Add fake process/filesystem tests for every readiness branch.
+
+Acceptance:
+
+- Ewokbot can tell the operator when OpenCode is already installed and configured.
+- Ewokbot does not attempt to install OpenCode when a usable command is already detected.
+- Ewokbot does not ask for OpenAI/Anthropic API keys on behalf of OpenCode.
+- OpenCode credentials stay owned by OpenCode and are never copied into `.ewokbot/.env` or Ewokbot auth.
+- `launchSetup()` only returns or invokes approved setup actions when explicitly selected by the operator.
+- Tests remain fake-only and do not run real `opencode`, package managers, OAuth flows, or network calls.
+
+Explicit safety constraints:
+
+- Do not run install scripts, package managers, or `opencode auth login` without explicit user confirmation.
+- Do not parse or print raw OpenCode secret values.
+- Do not mutate `~/.config/opencode` or `~/.local/share/opencode` in tests.
+- Production merge and production deployment remain human-only.
+
+### Milestone AM: Inquirer TUI Init
+
+Goal:
+
+Replace the readline-style init wizard with an `@inquirer/prompts` TUI while preserving non-interactive automation and the existing safety model.
+
+Build:
+
+- Add `@inquirer/prompts` for interactive `ewokbot init`.
+- Use `select`, `confirm`, `input`, and `checkbox` prompts for guided choices.
+- Keep deterministic `--non-interactive` behavior for tests, CI, and scripted VPS setup.
+- Surface OpenCode detection/readiness from Milestone AL inside the TUI.
+- If OpenCode is absent, offer install instructions, custom command path, mock mode, or skip.
+- If OpenCode is installed but not authenticated, offer to launch the OpenCode setup/auth flow or continue without claiming readiness.
+- If OpenCode is ready, allow direct selection without asking for provider API keys.
+- Keep Jira/GitHub/Railway/Vercel provider choices guided by select prompts.
+- Write only Ewokbot-owned workspace files under `.ewokbot/`.
+- Update tests to use injected prompt adapters rather than a real terminal.
+
+Acceptance:
+
+- `ewokbot init` no longer requires users to type magic string values for closed questions.
+- Operator choices are visible as TUI selections.
+- Non-interactive init remains stable and mock-safe.
+- Existing `.ewokbot/` files are not overwritten accidentally.
+- The wizard does not install tools, launch auth flows, mutate external config, call MCP servers, call providers, run OpenCode, create branches, open PRs, deploy, or merge without explicit follow-up confirmation.
+- Tests remain fake-only.
+
+Explicit safety constraints:
+
+- Do not remove `--non-interactive`.
+- Do not require a real TTY in tests.
+- Do not demand model provider API keys for OpenCode during Ewokbot init.
+- Production merge and production deployment remain human-only.
+
+### Milestone AN: Ewokbot Auth Commands
+
+Goal:
+
+Give Ewokbot its own auth flow for credentials Ewokbot owns, separate from OpenCode's auth and separate from workspace-local `.ewokbot/.env`.
+
+Build:
+
+- Add `ewokbot auth login`.
+- Add `ewokbot auth list`.
+- Add `ewokbot auth logout`.
+- Store Ewokbot-owned credentials or credential metadata in `~/.local/share/ewokbot/auth.json`.
+- Keep OpenCode auth external and detected only through the OpenCode adapter.
+- Support initial Ewokbot model/provider auth choices without requiring them during `ewokbot init`.
+- Redact all credential values in output, logs, reports, tests, and errors.
+- Ensure auth file creation uses strict permissions where supported.
+- Update doctor to distinguish OpenCode auth readiness from Ewokbot auth readiness.
+
+Acceptance:
+
+- `ewokbot auth list` reports configured providers without secret values.
+- `ewokbot auth logout` removes only Ewokbot-owned auth entries.
+- `ewokbot init` may offer to launch `ewokbot auth login`, but does not directly collect model provider secrets as the default OpenCode path.
+- Ewokbot does not copy or mutate OpenCode auth.
+- Tests use fake home directories and fake prompt inputs only.
+- Tests remain fake-only with no live provider, OAuth, MCP, OpenCode, package-manager, or network calls.
+
+Explicit safety constraints:
+
+- Do not store secrets in `.ewokbot/workspace.yml`, tracked docs, test fixtures, or stdout/stderr.
+- Do not treat Ewokbot auth as a substitute for OpenCode auth when OpenCode is the selected runner.
+- Production merge and production deployment remain human-only.

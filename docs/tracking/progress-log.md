@@ -2,6 +2,15 @@
 
 ## 2026-06-05
 
+Accepted Milestone AJ and prepared Milestones AK-AN:
+
+- Committed AJ prompt UX hardening with guided numbered choices for closed init questions and the top-level-await CLI wrapper fix.
+- Marked AJ Interactive Init Wizard And Credential Setup as complete and accepted.
+- Added AK User-Level Ewokbot Layout as the next approved implementation milestone.
+- Added AL Dev Tool Detection Adapters, AM Inquirer TUI Init, and AN Ewokbot Auth Commands as the approved follow-up sequence after AK.
+- Clarified the product direction: Ewokbot should detect and qualify external dev tools such as OpenCode instead of blindly installing or asking for model provider API keys that belong to the selected runner's own auth flow.
+- Clarified the storage model: workspace-local `.ewokbot/` remains for workspace config and run evidence, while shared user-level Ewokbot config/data/auth/cache should live under XDG-style user paths.
+
 Implemented Milestone AJ Interactive Init Wizard And Credential Setup review candidate:
 
 - Expanded `ewokbot init` into a first-run wizard that can configure OpenCode, optional oh-my-openagent intent, model/provider environment variables, Jira MCP, GitHub MCP, Railway MCP, Vercel monitor intent, and direct sibling repository discovery while preserving deterministic mock-safe non-interactive init.
