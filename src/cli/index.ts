@@ -2,8 +2,9 @@
 
 import { createCliProgram } from './program.js';
 import { createPublicCliRuntimeMcp } from './runtime-mcp.js';
+import { loadWorkspaceEnvironment } from '../setup/index.js';
 
-const publicRuntimeMcp = createPublicCliRuntimeMcp();
+const publicRuntimeMcp = createPublicCliRuntimeMcp({ environmentProvider: () => loadWorkspaceEnvironment(process.cwd()) });
 
 try {
   process.exitCode = await createCliProgram({ runtimeMcp: publicRuntimeMcp.runtimeMcp }).run(process.argv);

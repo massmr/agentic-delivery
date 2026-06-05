@@ -146,7 +146,7 @@ const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
   commentOnPullRequest: 'commentOnGitHubPullRequest'
 };
 const defaultDevRunnerTimeoutMs = 30 * 60 * 1000;
-const defaultDevRunnerEnvVarNames = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP'] as const;
+export const defaultDevRunnerEnvVarNames = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP'] as const;
 
 export async function loadWorkspaceConfig(filePath: string, options: WorkspaceConfigParseOptions = {}): Promise<WorkspaceConfig> {
   const source = await readFile(filePath, 'utf8');

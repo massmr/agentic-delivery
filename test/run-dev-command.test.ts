@@ -52,6 +52,8 @@ test('run-dev command executes one selected repository through local checks only
   const devRunner = createFakeDevRunner();
   const qualityReport = createPassedQualityReport(join(rootPath, 'frontend'));
 
+  await writeFile(join(rootPath, '.ewokbot', '.env'), ['OPENCODE_COMMAND=opencode-from-env', 'ANTHROPIC_API_KEY=workspace-secret', ''].join('\n'), 'utf8');
+
   const exitCode = await createCliProgram({
     cwd: rootPath,
     io: captured.io,
@@ -84,6 +86,14 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(clients.atlassian.toolCallRequests.some((call) => call.toolName === defaultJiraMcpToolNames.listBacklog), false);
   assert.deepEqual(clients.github.toolCallRequests, []);
   assert.deepEqual(clients.railway.toolCallRequests, []);
+  assert.equal(devRunner.calls.length, 1);
+  const devRunInput = devRunner.calls[0];
+  assert.ok(devRunInput !== undefined);
+  assert.ok(devRunInput.environment !== undefined);
+  assert.equal(devRunInput.environment.OPENCODE_COMMAND, 'opencode-from-env');
+  assert.equal(devRunInput.environment.ANTHROPIC_API_KEY, 'workspace-secret');
+  assert.doesNotMatch(captured.stdout, /workspace-secret/u);
+  assert.doesNotMatch(captured.stderr, /workspace-secret/u);
   assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse']);
   assert.equal(gitCalls.some((call) => call.args[0] === 'push'), false);
 

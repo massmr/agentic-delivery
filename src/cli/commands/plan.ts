@@ -7,6 +7,7 @@ import { mapMcpError } from '../../mcp/index.js';
 import { createTicketPlan } from '../../planning/repository-resolver.js';
 import { createRuntimeTicketPort } from '../../providers/runtime-mcp-factory.js';
 import { MarkdownReportWriter } from '../../reports/markdown-report-writer.js';
+import { loadWorkspaceEnvironment } from '../../setup/index.js';
 import { JsonRunStateStore, createDeliveryRunStateRecord, transitionDeliveryRunState } from '../../state/run-state-store.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
@@ -24,13 +25,14 @@ export interface PlanCommandOptions {
 
 export async function runPlanCommand(ticketKey: string, options: PlanCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
+  const environment = loadWorkspaceEnvironment(cwd);
   const now = options.now ?? (() => new Date());
   let config: WorkspaceConfig;
   let ticket: DeliveryTicket;
 
   try {
     config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
-    const ticketPort = await createRuntimeTicketPort({ config, ...options.runtimeMcp, requiredJiraMcpActions: ['getTicket'] });
+    const ticketPort = await createRuntimeTicketPort({ config, environment, ...options.runtimeMcp, requiredJiraMcpActions: ['getTicket'] });
     ticket = await ticketPort.getTicket(ticketKey);
   } catch (error) {
     options.io.stderr(formatPlanPreflightFailure(ticketKey, error));

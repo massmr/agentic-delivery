@@ -7,6 +7,7 @@ import type { DevRunner } from '../../domain/index.js';
 import type { GitCommandRunner } from '../../git/index.js';
 import { mapMcpError } from '../../mcp/index.js';
 import { createDevRunner, createRuntimeTicketPort } from '../../providers/index.js';
+import { loadWorkspaceEnvironment } from '../../setup/index.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
@@ -34,6 +35,7 @@ export async function runRunDevCommand(ticketKey: string, options: RunDevCommand
   }
 
   const cwd = options.cwd ?? process.cwd();
+  const environment = loadWorkspaceEnvironment(cwd);
   options.io.stdout(`Development execution requested for ${ticketKey}.\n`);
   options.io.stdout('Scope: one Jira ticket, exactly one selected repository, local branch, OpenCode, local quality gates, and local evidence only.\n');
   options.io.stdout('Local-only boundary: Ewokbot will not push, open PRs, call Railway/Vercel, verify deployments, merge production, or deploy production.\n');
@@ -41,8 +43,8 @@ export async function runRunDevCommand(ticketKey: string, options: RunDevCommand
 
   try {
     const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
-    const ticketPort = await createRuntimeTicketPort({ config, ...options.runtimeMcp, requiredJiraMcpActions: ['getTicket'] });
-    const devRunner = options.delivery?.devRunner ?? createDevRunner({ config, environment: process.env });
+    const ticketPort = await createRuntimeTicketPort({ config, environment, ...options.runtimeMcp, requiredJiraMcpActions: ['getTicket'] });
+    const devRunner = options.delivery?.devRunner ?? createDevRunner({ config, environment });
 
     options.io.stdout('Phase 2/3: reading one Jira ticket and planning a single repository before side effects.\n');
     const result = await runDevelopmentExecution({
@@ -55,7 +57,7 @@ export async function runRunDevCommand(ticketKey: string, options: RunDevCommand
       now: options.delivery?.now,
       gitCommandRunner: options.delivery?.gitCommandRunner,
       qualityRunner: options.delivery?.qualityRunner,
-      environment: process.env,
+      environment,
       onBoundaryReady: (boundary) => renderBoundary(options.io, boundary)
     });
 

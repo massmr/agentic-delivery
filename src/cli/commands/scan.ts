@@ -2,6 +2,7 @@ import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/workspace-config.js';
 import { createRuntimeTicketPort } from '../../providers/index.js';
+import { loadWorkspaceEnvironment } from '../../setup/index.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
@@ -15,8 +16,9 @@ export interface ScanCommandOptions {
 export async function runScanCommand(options: ScanCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
   const configPath = resolveScanConfigPath(cwd, options.configPath);
+  const environment = loadWorkspaceEnvironment(cwd);
   const config = await loadWorkspaceConfig(configPath, { workspaceRoot: cwd });
-  const jira = await createRuntimeTicketPort({ config, ...options.runtimeMcp });
+  const jira = await createRuntimeTicketPort({ config, environment, ...options.runtimeMcp });
   const tickets = await jira.listBacklog();
 
   options.io.stdout(`Found ${tickets.length} Jira backlog tickets:\n`);

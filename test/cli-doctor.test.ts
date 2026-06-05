@@ -54,6 +54,7 @@ test('ewokbot doctor validates generated local setup without provider calls', as
   ]);
 
   assert.equal(initExitCode, 0);
+  writeFileSync(join(workspaceDir, '.ewokbot', '.env'), 'OPENCODE_COMMAND=opencode-from-env\n', 'utf8');
 
   const capturedDoctor = createCapturedIO();
   const doctorExitCode = await createCliProgram({
@@ -61,7 +62,7 @@ test('ewokbot doctor validates generated local setup without provider calls', as
     io: capturedDoctor.io,
     doctorOptions: {
       nodeVersion: 'v20.11.1',
-      commandExists: (command) => command === 'pnpm' || command === 'opencode'
+      commandExists: (command) => command === 'pnpm' || command === 'opencode-from-env'
     }
   }).run(['node', 'ewokbot', 'doctor']);
 
@@ -72,7 +73,8 @@ test('ewokbot doctor validates generated local setup without provider calls', as
   assert.match(capturedDoctor.stdout, /Deployment monitors: railway, vercel/u);
   assert.match(capturedDoctor.stdout, /PASS: Node\.js/u);
   assert.match(capturedDoctor.stdout, /PASS: pnpm/u);
-  assert.match(capturedDoctor.stdout, /WARN: \.ewokbot\/\.env/u);
+  assert.match(capturedDoctor.stdout, /PASS: OpenCode: opencode-from-env/u);
+  assert.match(capturedDoctor.stdout, /PASS: \.ewokbot\/\.env/u);
 });
 
 test('ewokbot doctor renders failures and never prints secret values', async () => {

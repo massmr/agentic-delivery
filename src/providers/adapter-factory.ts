@@ -171,7 +171,7 @@ export function createDevRunner(options: ProviderFactoryOptions): DevRunner {
     return new MockOpenCodeRunner();
   }
 
-  return new OpenCodeSubprocessRunner();
+  return new OpenCodeSubprocessRunner({ baseEnvironment: options.environment });
 }
 
 function requireCredential(environment: ProviderFactoryEnvironment | undefined, provider: string, variableName: string): void {

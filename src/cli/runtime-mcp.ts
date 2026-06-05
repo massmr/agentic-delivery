@@ -3,7 +3,9 @@ import { createSdkRuntimeMcpClient, type CreateSdkRuntimeMcpClientOptions } from
 import type { RuntimeMcpClientFactory } from '../providers/index.js';
 import type { CliRuntimeMcpOptions } from './program.js';
 
-export interface CreatePublicCliRuntimeMcpOptions extends CreateSdkRuntimeMcpClientOptions {}
+export interface CreatePublicCliRuntimeMcpOptions extends CreateSdkRuntimeMcpClientOptions {
+  readonly environmentProvider?: (() => Readonly<Record<string, string | undefined>>) | undefined;
+}
 
 export interface PublicCliRuntimeMcp {
   readonly runtimeMcp: CliRuntimeMcpOptions;
@@ -13,7 +15,7 @@ export interface PublicCliRuntimeMcp {
 export function createPublicCliRuntimeMcp(options: CreatePublicCliRuntimeMcpOptions = {}): PublicCliRuntimeMcp {
   const clients: McpClient[] = [];
   const createMcpClient: RuntimeMcpClientFactory = async (server) => {
-    const client = await createSdkRuntimeMcpClient(server, options);
+    const client = await createSdkRuntimeMcpClient(server, { ...options, environment: options.environmentProvider?.() ?? options.environment });
     clients.push(client);
     return client;
   };

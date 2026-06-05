@@ -113,7 +113,8 @@ Status legend:
 - `[x]` Explicit first real-provider smoke run command
 - `[x]` Public CLI real MCP client wiring for smoke/scan/worker
 - `[x]` Real workspace dry run for discovery, Jira MCP intake, and planning without delivery side effects
-- `[~]` Controlled single-repository dev execution implemented; awaiting review/acceptance
+- `[x]` Controlled single-repository dev execution
+- `[x]` Interactive init wizard and credential setup
 
 ## Future Control Surfaces
 

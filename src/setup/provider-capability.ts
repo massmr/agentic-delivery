@@ -1,10 +1,36 @@
 import type { WorkspaceConfig } from '../config/index.js';
 
-export type DeploymentMonitorSelection = 'railway' | 'vercel' | 'both';
+export type DeploymentMonitorSelection = 'none' | 'railway' | 'vercel' | 'both';
+export type TicketProviderSelection = 'mock' | 'jira-mcp';
+export type CodeHostSelection = 'mock' | 'github-mcp';
+export type RailwayProviderSelection = 'mock' | 'railway-mcp';
+export type DevRunnerModeSelection = 'mock' | 'opencode';
+
+export interface McpServerSelection {
+  readonly id: string;
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly envVarNames: readonly string[];
+}
 
 export interface SetupSelections {
   readonly deploymentMonitor: DeploymentMonitorSelection;
   readonly includeOhMyOpenAgent: boolean;
+  readonly devRunnerMode?: DevRunnerModeSelection | undefined;
+  readonly opencodeCommand?: string | undefined;
+  readonly opencodeArgs?: readonly string[] | undefined;
+  readonly opencodeEnvVarNames?: readonly string[] | undefined;
+  readonly modelProviderEnvVarNames?: readonly string[] | undefined;
+  readonly ticketProvider?: TicketProviderSelection | undefined;
+  readonly jiraBaseUrl?: string | undefined;
+  readonly jiraProjectKeys?: readonly string[] | undefined;
+  readonly jiraMcpServer?: McpServerSelection | undefined;
+  readonly codeHostProvider?: CodeHostSelection | undefined;
+  readonly githubOrganization?: string | undefined;
+  readonly githubMcpServer?: McpServerSelection | undefined;
+  readonly railwayProvider?: RailwayProviderSelection | undefined;
+  readonly railwayMcpServer?: McpServerSelection | undefined;
+  readonly envValues?: Readonly<Record<string, string | undefined>> | undefined;
 }
 
 export interface SetupDetectionInput {
@@ -45,7 +71,19 @@ export interface SetupProviderCapability {
 
 export const defaultSetupSelections: SetupSelections = {
   deploymentMonitor: 'railway',
-  includeOhMyOpenAgent: false
+  includeOhMyOpenAgent: false,
+  devRunnerMode: 'mock',
+  opencodeCommand: 'opencode',
+  opencodeArgs: [],
+  opencodeEnvVarNames: [],
+  modelProviderEnvVarNames: [],
+  ticketProvider: 'mock',
+  jiraBaseUrl: 'https://jira.example.test',
+  jiraProjectKeys: ['AD'],
+  codeHostProvider: 'mock',
+  githubOrganization: 'agentic',
+  railwayProvider: 'mock',
+  envValues: {}
 };
 
 function createCapability(input: Omit<SetupProviderCapability, 'summarize'>): SetupProviderCapability {
@@ -249,6 +287,10 @@ export function getSetupCapabilities(selections: SetupSelections = defaultSetupS
 }
 
 export function getDeploymentMonitors(selection: DeploymentMonitorSelection): readonly string[] {
+  if (selection === 'none') {
+    return [];
+  }
+
   if (selection === 'both') {
     return ['railway', 'vercel'];
   }

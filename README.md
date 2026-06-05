@@ -31,7 +31,7 @@ Current capabilities:
 
 - CLI-first local runtime.
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
-- Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml` and `.ewokbot/.env.example` placeholders.
+- Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml`, `.ewokbot/.env`, and placeholder-only `.ewokbot/.env.example` setup files.
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
@@ -250,7 +250,9 @@ The legacy `worker` command remains available for compatibility with existing lo
 
 ## Configuration
 
-`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It supports Railway-only, Vercel-only, or both deployment/CI monitor choices while keeping runtime provider modes on `mock` by default.
+`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It supports interactive wizard choices for OpenCode, optional oh-my-openagent intent, model/provider environment variable names, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default.
+
+The generated `.ewokbot/.env.example` file is placeholder-only. Secret values belong only in `.ewokbot/.env`, and `init` refuses to overwrite existing `.ewokbot/workspace.yml`, `.ewokbot/.env`, or `.ewokbot/.env.example` by default.
 
 Generated configs discover repositories from the workspace root by default:
 
@@ -274,7 +276,7 @@ ewokbot init --non-interactive --deployment-monitor both
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
 
 Example Jira MCP configuration:
 
@@ -370,7 +372,7 @@ Requires a human:
 - exposing or rotating secrets,
 - destructive data operations.
 
-Never commit `.env` files or provider credentials. Use `.ewokbot/.env.example` and local environment variables for private configuration.
+Never commit `.env` files or provider credentials. Use generated `.ewokbot/.env` for local workspace secrets, keep `.ewokbot/.env.example` placeholder-only, and use the wizard or Ewokbot-owned files when intentionally changing workspace-local runtime environment values.
 
 ## Development
 

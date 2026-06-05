@@ -639,3 +639,50 @@ Acceptance:
 - No GitHub PR is opened, no Railway/Vercel deployment is checked, and no production merge/deploy action is possible in this milestone.
 - Mock mode remains the default and all tests remain fake-only with no live MCP/OAuth/provider/network/OpenCode subprocess/remote git side effects unless explicitly injected fakes are used.
 - Production merge and production deployment remain human-only.
+
+### Milestone AJ: Interactive Init Wizard And Credential Setup
+
+Goal:
+
+Make `ewokbot init` a real first-run wizard that can configure a usable local workspace end to end. At the end of the wizard, an operator should have `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, owned directories, repository discovery settings, provider choices, MCP server commands, and local credential placeholders/values ready for `ewokbot doctor`, `ewokbot scan`, `ewokbot plan <ticket-key>`, and `ewokbot run-dev <ticket-key> --confirm-dev-execution`.
+
+Operator flow:
+
+```bash
+cd <workspace-root>
+ewokbot init
+ewokbot doctor
+ewokbot scan
+ewokbot plan <ticket-key>
+ewokbot run-dev <ticket-key> --confirm-dev-execution
+```
+
+Build:
+
+- Extend `ewokbot init` with an interactive wizard while preserving a deterministic non-interactive mode for tests and automation.
+- Detect an existing `.ewokbot/workspace.yml`, `.ewokbot/.env`, and `.ewokbot/.env.example`; refuse destructive overwrite by default and offer explicit safe update behavior only if implemented with tests.
+- Ask which dev runner to use, with OpenCode as the only supported implementation for now.
+- Detect whether OpenCode is installed; if missing, print the exact install command and stop or continue in mock mode based on explicit operator choice. Do not auto-install without explicit confirmation.
+- Ask whether to use oh-my-openagent; detect existing local config when possible and write only Ewokbot-owned config or documented instructions unless explicit mutation is approved.
+- Ask for model/provider environment variables needed by the selected OpenCode setup and write them to `.ewokbot/.env`; never print secret values back to stdout/stderr.
+- Ask for ticket provider, with Jira MCP as the only supported real provider for now and mock mode as an explicit option.
+- Configure Jira MCP server settings, including server id, command, args, base URL, and project keys.
+- Ask for code host provider, with GitHub MCP as the first real target and mock mode as an explicit option.
+- Configure GitHub MCP server settings when selected, but do not require GitHub for `run-dev`.
+- Ask for deployment/CI monitor, supporting Railway MCP, Vercel placeholder/mock, both, or none where appropriate. Railway remains the first real staging target; Vercel may be captured as config intent if real support is not implemented yet.
+- Keep repository discovery as the default: watch all direct sibling Git repositories from the launch directory unless the operator chooses explicit repos.
+- Generate `.ewokbot/.env.example` from the chosen providers and `.ewokbot/.env` from entered values or blank placeholders when the operator skips a secret.
+- Load `.ewokbot/.env` in runtime commands that need environment variables, before constructing providers or OpenCode runners.
+- Update `ewokbot doctor` so it validates wizard-generated provider choices and reports missing secrets by variable name only.
+- Update README, technical architecture, next actions, roadmap, and tests.
+
+Acceptance:
+
+- Tests cover the interactive wizard with injected prompts, without reading stdin directly or requiring a real terminal.
+- Tests cover non-interactive init staying deterministic and mock-safe.
+- Tests prove generated `.ewokbot/workspace.yml`, `.ewokbot/.env.example`, and `.ewokbot/.env` match selected providers.
+- Tests prove secret values written to `.ewokbot/.env` are never printed in init or doctor output.
+- Tests prove existing `.ewokbot/` files are not overwritten accidentally.
+- Tests prove runtime commands can load `.ewokbot/.env` and pass selected environment variables to Jira MCP/OpenCode paths through fakes only.
+- Tests remain fake-only: no live MCP/OAuth/provider/network/OpenCode/package-manager/git side effects.
+- Production merge and production deployment remain human-only.

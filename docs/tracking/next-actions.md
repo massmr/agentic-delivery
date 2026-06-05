@@ -2,10 +2,10 @@
 
 ## Immediate
 
-1. Milestones AA, AB, AC, AD, AE, AF, AG, and AH from `docs/plans/approved-backlog.md` are complete and accepted.
+1. Milestones AA, AB, AC, AD, AE, AF, AG, AH, and AI from `docs/plans/approved-backlog.md` are complete and accepted.
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
-3. Milestone AI: Controlled Single-Repository Dev Execution has been implemented and is awaiting human review/acceptance.
-4. Do not implement later worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
+3. Milestone AJ: Interactive Init Wizard And Credential Setup is implemented as a review candidate and is awaiting acceptance.
+4. No next implementation milestone is approved until AJ is reviewed and accepted. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
 
@@ -49,7 +49,7 @@ ewokbot plan <ticket-key>
 
 AH connects `.ewokbot/` setup, direct sibling Git repository discovery, Jira MCP intake, and ticket-to-repository planning. Doctor reports discovered sibling Git repository count and names, scan can read Jira backlog through the configured Jira MCP, and plan reads one ticket through `TicketPort.getTicket`, selects from discovered or explicit repositories, and persists only local planning evidence under `.ewokbot/runs/`. It does not create git branches, run OpenCode, run package scripts, write operation ledgers, call GitHub, call Railway/Vercel, open PRs, verify deployments, merge production, or deploy production.
 
-Milestone AI - Controlled Single-Repository Dev Execution is implemented and awaiting review/acceptance.
+Milestone AI - Controlled Single-Repository Dev Execution is complete and accepted.
 
 AI adds an explicitly confirmed development-only command:
 
@@ -61,6 +61,31 @@ ewokbot run-dev <ticket-key> --confirm-dev-execution
 AI reuses the AH dry-run path for Jira MCP ticket intake and repository planning, refuses execution unless exactly one repository is selected, prints the selected ticket/repository/branch/quality boundary before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and writes local implementation/quality evidence under `.ewokbot/runs/`.
 
 AI must stop after local development evidence. It must not open GitHub PRs, call Railway or Vercel, verify deployments, merge production, deploy production, or enable autonomous production automation.
+
+Milestone AJ - Interactive Init Wizard And Credential Setup is implemented as a review candidate.
+
+AJ must make `ewokbot init` a real first-run wizard. At the end of the wizard, the operator should have `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` ready for:
+
+```bash
+ewokbot doctor
+ewokbot scan
+ewokbot plan <ticket-key>
+ewokbot run-dev <ticket-key> --confirm-dev-execution
+```
+
+AJ should configure OpenCode, optional oh-my-openagent intent/detection, model/provider env vars, Jira MCP, GitHub MCP intent, Railway MCP intent, Vercel placeholder/mock intent, and direct sibling repository discovery. It must write secrets only to `.ewokbot/.env`, keep `.ewokbot/.env.example` placeholder-only, never print secret values, and add runtime `.ewokbot/.env` loading before provider/OpenCode construction.
+
+AJ must preserve non-interactive deterministic init for tests and automation. It must not auto-install tools, mutate non-Ewokbot config, start live MCP/OAuth flows, call providers, run OpenCode, run package managers, create branches, open PRs, deploy, merge production, or enable autonomous production automation.
+
+AJ implementation status:
+
+- `ewokbot init` now generates `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/`.
+- Interactive and injected wizard selections can configure OpenCode, optional oh-my-openagent, model/provider env vars, Jira MCP, GitHub MCP, Railway MCP, Vercel monitor intent, and direct sibling repository discovery.
+- `.ewokbot/.env.example` remains placeholder-only, `.ewokbot/.env` is the only generated secrets file, and init/doctor output remains secret-safe.
+- Runtime commands load `.ewokbot/.env` before provider, OpenCode, and public MCP construction.
+- Tests remain fake-only and no later PR, staging, production, Telegram, dashboard, daemonization, or deployment scope was added.
+
+Recommended next action: review and accept AJ. After acceptance, propose the next implementation milestone explicitly before coding it.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -92,7 +117,8 @@ The next milestones should move in this order:
 6. AF - Real MCP Client Runtime Wiring. Completed.
 7. AG - Workspace Layout Migration To `.ewokbot/`. Completed.
 8. AH - Real Workspace Dry Run. Completed.
-9. AI - Controlled Single-Repository Dev Execution. Implemented; awaiting review/acceptance.
+9. AI - Controlled Single-Repository Dev Execution. Completed.
+10. AJ - Interactive Init Wizard And Credential Setup. Implemented review candidate.
 
 Non-goals for the immediate next milestone:
 

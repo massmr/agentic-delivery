@@ -2,6 +2,30 @@
 
 ## 2026-06-05
 
+Implemented Milestone AJ Interactive Init Wizard And Credential Setup review candidate:
+
+- Expanded `ewokbot init` into a first-run wizard that can configure OpenCode, optional oh-my-openagent intent, model/provider environment variables, Jira MCP, GitHub MCP, Railway MCP, Vercel monitor intent, and direct sibling repository discovery while preserving deterministic mock-safe non-interactive init.
+- Added init-time OpenCode command detection for real OpenCode selections; missing OpenCode prints the official install script and stops so the operator can choose mock mode or install OpenCode explicitly.
+- Generated `.ewokbot/workspace.yml`, `.ewokbot/.env`, placeholder-only `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/`, and made init refuse to overwrite any existing onboarding file by default.
+- Added workspace `.env` loading before doctor, scan, plan, run-dev, worker, smoke, provider adapter construction, OpenCode runner construction, and public MCP subprocess environment resolution without mutating global `process.env`.
+- Kept secret values out of init and doctor output, with tests proving injected wizard secrets remain only in `.ewokbot/.env` and MCP/OpenCode fake paths receive loaded values without leaking unlisted or secret values.
+- Preserved AJ scope only: no auto-installs, non-Ewokbot config mutation, live MCP/OAuth/provider calls, OpenCode/package-manager execution during init, branch creation, PR handoff, staging verification, production merge, production deploy, Telegram, dashboard, daemonization, or autonomous production automation.
+
+Verification commands run for AJ:
+
+- `pnpm run typecheck`
+- `pnpm run build && node --test dist/test/cli-init.test.js dist/test/runtime-mcp-client.test.js dist/test/run-dev-command.test.js`
+- `pnpm run build && node --test dist/test/cli-doctor.test.js dist/test/setup/doctor.test.js dist/test/setup/provider-capabilities.test.js`
+- `pnpm run build && pnpm test && git diff --check`
+
+Accepted Milestone AI and prepared Milestone AJ:
+
+- Marked AI Controlled Single-Repository Dev Execution as complete and accepted after review.
+- Set AJ Interactive Init Wizard And Credential Setup as the next approved implementation milestone.
+- Defined AJ around making `ewokbot init` produce a usable `.ewokbot/` setup for `doctor`, `scan`, `plan`, and `run-dev` without manual config surgery.
+- Required wizard coverage for OpenCode, optional oh-my-openagent intent/detection, model/provider env vars, Jira MCP, GitHub MCP intent, Railway MCP intent, Vercel placeholder/mock intent, and direct sibling repository discovery.
+- Required `.ewokbot/.env` loading for runtime commands while preserving secret redaction, fake-only tests, no auto-installs without explicit confirmation, no live MCP/OAuth/provider/network/OpenCode/package-manager/git side effects, and human-only production.
+
 Implemented Milestone AI Controlled Single-Repository Dev Execution review candidate:
 
 - Added `ewokbot run-dev <ticket-key> --confirm-dev-execution [--run-id <run-id>]` for one explicitly confirmed development-only ticket from the parent workspace.

@@ -15,6 +15,7 @@ function writeGeneratedSetup(cwd: string, monitor: 'railway' | 'vercel' | 'both'
   const files = createOnboardingFiles({ deploymentMonitor: monitor, includeOhMyOpenAgent: false });
   mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
   writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), files.workspaceYaml, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env'), files.env, 'utf8');
   writeFileSync(join(cwd, '.ewokbot', '.env.example'), files.envExample, 'utf8');
 }
 
@@ -32,7 +33,7 @@ test('doctor reports generated setup with injected local probes and warn-only mo
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Node.js'), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'pnpm'), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'OpenCode'), true);
-  assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === '.ewokbot/.env'), true);
+  assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === '.ewokbot/.env'), true);
   assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === 'Repository discovery'), true);
   assert.equal(report.checks.some((check) => check.status === 'fail'), false);
 });

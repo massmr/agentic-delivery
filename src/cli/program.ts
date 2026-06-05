@@ -54,7 +54,7 @@ const HELP_TEXT = [
   '  ewokbot quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
   '',
   'Commands:',
-  `  init        Create ${ewokbotWorkspaceConfigPath} and .ewokbot/.env.example for local onboarding.`,
+  `  init        Create ${ewokbotWorkspaceConfigPath}, .ewokbot/.env, and .ewokbot/.env.example for local onboarding.`,
   '  doctor      Validate local setup files without live provider calls.',
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local dry-run plan through the configured typed TicketPort; no delivery side effects.',
@@ -91,6 +91,7 @@ export interface CliProgramOptions {
   readonly io?: CliProgramIO;
   readonly initTemplatePath?: string;
   readonly initPrompter?: InitPrompter;
+  readonly initCommandExists?: ((command: string) => boolean) | undefined;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
   readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
@@ -132,7 +133,7 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         const configExists = existsSync(join(cwd, ewokbotWorkspaceConfigPath));
         const hint = configExists
           ? 'No command provided. Run ewokbot doctor to validate setup, ewokbot worker to process work, or ewokbot status to inspect a run.'
-          : `No command provided. Run ewokbot init to create ${ewokbotWorkspaceConfigPath} and .ewokbot/.env.example.`;
+          : `No command provided. Run ewokbot init to create ${ewokbotWorkspaceConfigPath}, .ewokbot/.env, and .ewokbot/.env.example.`;
 
         io.stdout(`${hint}\n\n`);
         printHelp();
@@ -145,7 +146,7 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
       }
 
       if (args[0] === 'init') {
-        return runInitCommand({ cwd: options.cwd, io, args: args.slice(1), prompter: options.initPrompter });
+        return runInitCommand({ cwd: options.cwd, io, args: args.slice(1), prompter: options.initPrompter, commandExists: options.initCommandExists });
       }
 
       if (args[0] === 'doctor') {

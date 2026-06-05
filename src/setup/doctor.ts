@@ -100,12 +100,14 @@ export function runLocalDoctor(cwd: string, options: DoctorProbeOptions = {}): D
   }
 
   lines.push(`Deployment monitors: ${selectedDeploymentMonitors(selections.deploymentMonitor).join(', ')}`);
-  checks.push(...checkTools(config, metadata, cwd, probes));
-  checks.push(...checkEnvExample(envExamplePath, selections, probes));
-
   const envFile = readEnvFile(envPath, probes);
+  const mergedEnv = { ...probes.env, ...Object.fromEntries(envFile.values) };
+  const envProbes: DoctorProbeSet = { ...probes, env: mergedEnv };
+
+  checks.push(...checkTools(config, metadata, cwd, envProbes));
+  checks.push(...checkEnvExample(envExamplePath, selections, probes));
   checks.push(checkEnvFile(envFile));
-  checks.push(...checkProviderReadiness(config, selections, envFile.values, probes.env));
+  checks.push(...checkProviderReadiness(config, selections, envFile.values, mergedEnv));
   checks.push(...checkBranchPolicy(config));
   checks.push(...checkRepositoryReadiness(cwd, config, probes));
 
@@ -412,6 +414,10 @@ function parseDeploymentMonitorSelection(monitors: readonly string[]): Deploymen
   const hasRailway = monitors.includes('railway');
   const hasVercel = monitors.includes('vercel');
 
+  if (!hasRailway && !hasVercel) {
+    return 'none';
+  }
+
   if (hasRailway && hasVercel) {
     return 'both';
   }
@@ -424,6 +430,10 @@ function parseDeploymentMonitorSelection(monitors: readonly string[]): Deploymen
 }
 
 function selectedDeploymentMonitors(selection: DeploymentMonitorSelection): readonly string[] {
+  if (selection === 'none') {
+    return ['none'];
+  }
+
   if (selection === 'both') {
     return ['railway', 'vercel'];
   }

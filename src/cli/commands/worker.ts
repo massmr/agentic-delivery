@@ -10,6 +10,7 @@ import {
 } from '../../delivery/index.js';
 import { createRuntimeTicketPort, createRuntimeWorkspaceAdapters, createWorkspaceAdapters } from '../../providers/index.js';
 import type { TicketPort } from '../../ports/index.js';
+import { loadWorkspaceEnvironment } from '../../setup/index.js';
 import { runWorkerRuntime, type WorkerRuntimeMode } from '../../worker/index.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
@@ -44,12 +45,13 @@ export interface ParsedWorkerCommandOptions {
 
 export async function runWorkerCommand(options: WorkerCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
+  const environment = loadWorkspaceEnvironment(cwd);
   const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
   const retryPolicy = buildRetryPolicy(options);
   const runtimeInfo = createAgentWorkerRuntimeInfo(config);
 
   if (options.workerMode === 'start') {
-    const preflightTicketPort = runtimeInfo.mode === 'mcp' ? await createWorkerStartTicketPort({ config, runtimeMcp: options.runtimeMcp, dryRun: options.dryRun }) : undefined;
+    const preflightTicketPort = runtimeInfo.mode === 'mcp' ? await createWorkerStartTicketPort({ config, environment, runtimeMcp: options.runtimeMcp, dryRun: options.dryRun }) : undefined;
     const abortController = new AbortController();
     const signalHandlers = createWorkerSignalHandlers(abortController);
 
@@ -74,13 +76,13 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
 
           if (runtimeInfo.mode === 'mcp') {
             if (options.dryRun === true) {
-              return createRuntimeTicketPort({ config, ...options.runtimeMcp });
+              return createRuntimeTicketPort({ config, environment, ...options.runtimeMcp });
             }
 
-            return (await createRuntimeWorkspaceAdapters({ config, ...options.runtimeMcp })).jira;
+            return (await createRuntimeWorkspaceAdapters({ config, environment, ...options.runtimeMcp })).jira;
           }
 
-          return createWorkspaceAdapters({ config }).jira;
+          return createWorkspaceAdapters({ config, environment }).jira;
         }
       });
 
@@ -97,8 +99,8 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
 
   const adapters =
     runtimeInfo.mode === 'mcp'
-      ? await createRuntimeWorkspaceAdapters({ config, ...options.runtimeMcp })
-      : createWorkspaceAdapters({ config });
+      ? await createRuntimeWorkspaceAdapters({ config, environment, ...options.runtimeMcp })
+      : createWorkspaceAdapters({ config, environment });
   const summary = await runAgentWorkerLoop({
     config,
     rootPath: cwd,
@@ -117,14 +119,15 @@ export async function runWorkerCommand(options: WorkerCommandOptions): Promise<n
 
 async function createWorkerStartTicketPort(options: {
   readonly config: Awaited<ReturnType<typeof loadWorkspaceConfig>>;
+  readonly environment: Readonly<Record<string, string | undefined>>;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
   readonly dryRun?: boolean | undefined;
 }): Promise<TicketPort> {
   if (options.dryRun === true) {
-    return createRuntimeTicketPort({ config: options.config, ...options.runtimeMcp });
+    return createRuntimeTicketPort({ config: options.config, environment: options.environment, ...options.runtimeMcp });
   }
 
-  return (await createRuntimeWorkspaceAdapters({ config: options.config, ...options.runtimeMcp })).jira;
+  return (await createRuntimeWorkspaceAdapters({ config: options.config, environment: options.environment, ...options.runtimeMcp })).jira;
 }
 
 export function parseWorkerCommandOptions(args: readonly string[]): ParsedWorkerCommandOptions {

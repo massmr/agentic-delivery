@@ -4,6 +4,7 @@ import { test } from 'node:test';
 import {
   RuntimeMcpClientStartupError,
   RuntimeMcpUnsupportedTransportError,
+  createPublicCliRuntimeMcp,
   createSdkRuntimeMcpClient,
   type McpServerConfig,
   type RuntimeMcpRequestOptions,
@@ -38,6 +39,31 @@ test('SDK runtime MCP client constructs stdio transport with a restricted enviro
     PATH: '/usr/bin',
     HOME: '/home/operator',
     ATLASSIAN_TOKEN: 'token-value'
+  });
+});
+
+test('public CLI runtime MCP resolves stdio environment from environmentProvider', async () => {
+  const transports: RuntimeMcpStdioTransportParameters[] = [];
+  const client = new FakeSdkClient();
+  const runtime = createPublicCliRuntimeMcp({
+    environment: { PATH: '/base/bin', ATLASSIAN_TOKEN: 'base-token' },
+    environmentProvider: () => ({ PATH: '/workspace/bin', HOME: '/workspace/home', ATLASSIAN_TOKEN: 'workspace-token', UNLISTED_SECRET: 'must-not-leak' }),
+    clientFactory: () => client,
+    transportFactory: (parameters) => {
+      transports.push(parameters);
+      return new FakeTransport();
+    }
+  });
+
+  const mcpClient = await runtime.runtimeMcp.createMcpClient?.(stdioServer({ envVarNames: ['ATLASSIAN_TOKEN'] }));
+  await runtime.close();
+
+  assert.ok(mcpClient !== undefined);
+  assert.equal(transports.length, 1);
+  assert.deepEqual(transports[0]?.env, {
+    PATH: '/workspace/bin',
+    HOME: '/workspace/home',
+    ATLASSIAN_TOKEN: 'workspace-token'
   });
 });
 

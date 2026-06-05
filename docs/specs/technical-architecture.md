@@ -86,7 +86,9 @@ src/
 
 The global config describes providers, branches, repositories, and autonomy.
 
-Default workspace configuration lives at `.ewokbot/workspace.yml`; `ewokbot init` generates it under the workspace-local `.ewokbot/` directory.
+Default workspace configuration lives at `.ewokbot/workspace.yml`; `ewokbot init` generates it under the workspace-local `.ewokbot/` directory alongside `.ewokbot/.env`, placeholder-only `.ewokbot/.env.example`, and the owned `runs/`, `logs/`, and `cache/` directories. The init command refuses to overwrite any existing onboarding file by default so credentials and local setup are not replaced accidentally.
+
+Runtime commands load `.ewokbot/.env` before constructing provider adapters, OpenCode runners, or public MCP clients. The loaded workspace environment is merged for that command invocation without mutating global `process.env`, and command output must continue to redact or omit secret values.
 
 Repository configuration supports two input shapes. Fresh init uses `repos.discovery: sibling-git-directories` plus `exclude: []`, which scans only direct child directories of the workspace root that contain `.git/`, ignores `.ewokbot/`, hidden directories, `node_modules/`, non-Git directories, and nested repos, then normalizes the result into `WorkspaceConfig.repos`. Explicit `repos: [...]` arrays remain supported and use the same normalized runtime model.
 
@@ -172,7 +174,7 @@ Responsibilities:
 - Capture result.
 - Enforce retry policy.
 
-OpenCode execution is subprocess-first. The subprocess runner must use an executable plus argument array, validate the working directory against the configured workspace root, pass only allowlisted environment variables, enforce timeout and cancellation, capture stdout/stderr into implementation logs, redact secret-like output before persistence, and stop retrying after timeout or cancellation.
+OpenCode execution is subprocess-first. The subprocess runner must use an executable plus argument array, validate the working directory against the configured workspace root, pass only allowlisted environment variables resolved from the command environment including `.ewokbot/.env`, enforce timeout and cancellation, capture stdout/stderr into implementation logs, redact secret-like output before persistence, and stop retrying after timeout or cancellation.
 
 Required methods:
 

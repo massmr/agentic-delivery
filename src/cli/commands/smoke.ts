@@ -7,7 +7,7 @@ import type { RealProviderSmokeRunResult, SmokeQualityRunner } from '../../deliv
 import type { GitCommandRunner } from '../../git/index.js';
 import type { RuntimeProviderFactoryOptions, WorkspaceAdapters } from '../../providers/index.js';
 import { createRuntimeWorkspaceAdapters } from '../../providers/index.js';
-import { runLocalDoctor } from '../../setup/index.js';
+import { loadWorkspaceEnvironment, runLocalDoctor } from '../../setup/index.js';
 import type { DoctorCheck, DoctorProbeOptions } from '../../setup/index.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
@@ -37,6 +37,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
   }
 
   const cwd = options.cwd ?? process.cwd();
+  const environment = loadWorkspaceEnvironment(cwd);
   options.io.stdout(`Real-provider smoke run requested for ${ticketKey}.\n`);
   options.io.stdout('Scope: one Jira ticket, exactly one selected repository, develop PR, staging verification, production PR preparation only.\n');
   options.io.stdout('Production boundary: Ewokbot will not merge production or deploy production. Human approval remains required.\n');
@@ -67,7 +68,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
 
   options.io.stdout(`Provider Modes: Jira=${config.jira.mode}, GitHub=${config.github.mode}, Railway=${config.railway.mode}.\n`);
   options.io.stdout('Phase 3/6: validating MCP client/tool readiness through typed runtime adapters.\n');
-  const adapters = await createSmokeAdapters(config, options.runtimeMcp, options.io);
+  const adapters = await createSmokeAdapters(config, environment, options.runtimeMcp, options.io);
 
   if (adapters === undefined) {
     return 1;
@@ -86,7 +87,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
       gitCommandRunner: options.delivery?.gitCommandRunner,
       smokeVerifier: options.delivery?.smokeVerifier,
       qualityRunner: options.delivery?.qualityRunner,
-      environment: process.env
+      environment
     });
 
     renderSmokeResult(options.io, ticketKey, result);
@@ -146,13 +147,14 @@ async function loadSmokeConfig(cwd: string, configPath: string | undefined, io: 
 
 async function createSmokeAdapters(
   config: Awaited<ReturnType<typeof loadWorkspaceConfig>>,
+  environment: Readonly<Record<string, string | undefined>>,
   runtimeMcp: CliRuntimeMcpOptions | undefined,
   io: CliProgramIO
 ): Promise<WorkspaceAdapters | undefined> {
   try {
     return await createRuntimeWorkspaceAdapters({
       config,
-      environment: process.env,
+      environment,
       ...(runtimeMcp ?? {})
     } satisfies RuntimeProviderFactoryOptions);
   } catch (error) {

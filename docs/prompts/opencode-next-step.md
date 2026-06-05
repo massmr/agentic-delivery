@@ -12,13 +12,15 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestone AH: Real Workspace Dry Run is complete and accepted. Milestone AI: Controlled Single-Repository Dev Execution has been implemented and is awaiting human review/acceptance.
+At the time this prompt was prepared, Milestone AH: Real Workspace Dry Run and Milestone AI: Controlled Single-Repository Dev Execution are complete and accepted. The approved next milestone is AJ: Interactive Init Wizard And Credential Setup.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
-AI must not open GitHub PRs, call Railway or Vercel, verify deployments, merge production, deploy production, or enable autonomous production automation.
+AJ must make `ewokbot init` a real first-run wizard. At the end of the wizard, the operator should have `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` ready for `ewokbot doctor`, `ewokbot scan`, `ewokbot plan <ticket-key>`, and `ewokbot run-dev <ticket-key> --confirm-dev-execution`.
 
-Do not start a later milestone until AI is reviewed and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step.
+AJ should configure OpenCode, optional oh-my-openagent intent/detection, model/provider env vars, Jira MCP, GitHub MCP intent, Railway MCP intent, Vercel placeholder/mock intent, and direct sibling repository discovery. It must write secrets only to `.ewokbot/.env`, keep `.ewokbot/.env.example` placeholder-only, never print secret values, and add runtime `.ewokbot/.env` loading before provider/OpenCode construction.
+
+Do not start a later milestone until AJ is implemented, reviewed, and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step.
 
 ## Required Reading
 
