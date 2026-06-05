@@ -35,6 +35,7 @@ Current capabilities:
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
+- Direct sibling Git repository discovery for parent workspace dry runs.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
@@ -150,17 +151,19 @@ Inspect available commands:
 node dist/src/cli/index.js --help
 ```
 
-Scan the mock Jira backlog:
+Scan the configured Jira backlog from `.ewokbot/workspace.yml`. Mock mode remains the default; when Jira is configured as MCP, scan uses the typed `TicketPort` without writing run evidence:
 
 ```bash
 node dist/src/cli/index.js scan
 ```
 
-Plan a mock ticket:
+Plan one ticket against the discovered or explicitly configured repositories:
 
 ```bash
 node dist/src/cli/index.js plan LK-101
 ```
+
+The planning command is a dry-run boundary. It reads exactly one ticket through the configured typed `TicketPort.getTicket`, can use Jira MCP when `.ewokbot/workspace.yml` selects `jira.mode: mcp`, selects candidate repositories from direct sibling Git discovery or explicit `repos: [...]`, and writes only local planning evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`. It does not create branches, run OpenCode, run package scripts, write an operation ledger, call GitHub, call Railway or Vercel, open pull requests, verify deployments, merge production, or deploy production.
 
 Run one mock ticket end to end:
 

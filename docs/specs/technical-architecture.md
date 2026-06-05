@@ -106,7 +106,7 @@ Responsibilities:
 - Transition ticket status where configured.
 - Attach run summaries.
 
-Current runtime intake can route `agentic scan` and worker backlog intake through `createRuntimeTicketPort(...)`. Mock Jira remains the default, while explicit `jira.mode: mcp` runtime wiring uses injected MCP clients, discovery, allowlist validation, and audit capture. No Jira REST adapter or live MCP session startup is part of the runtime path.
+Current runtime intake can route `agentic scan`, `ewokbot plan <ticket-key>`, and worker backlog intake through `createRuntimeTicketPort(...)`. Mock Jira remains the default, while explicit `jira.mode: mcp` runtime wiring uses injected MCP clients, discovery, allowlist validation, and audit capture. The planning command reads exactly one ticket through `TicketPort.getTicket`, writes only local dry-run evidence under `.ewokbot/runs/`, and does not create branches, run OpenCode, run package scripts, write operation ledgers, call GitHub, call Railway or Vercel, open PRs, verify deployments, merge production, or deploy production. No Jira REST adapter or live MCP session startup is part of the runtime path.
 
 Required methods:
 

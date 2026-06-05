@@ -54,7 +54,7 @@ const HELP_TEXT = [
   `  init        Create ${ewokbotWorkspaceConfigPath} and .ewokbot/.env.example for local onboarding.`,
   '  doctor      Validate local setup files without live provider calls.',
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
-  '  plan        Create a local mock plan and run state for one ticket.',
+  '  plan        Create a local dry-run plan through the configured typed TicketPort; no delivery side effects.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
   '  smoke       Execute one explicitly confirmed real-provider single-ticket smoke run.',
   '  runs        List persisted local runs without contacting providers.',
@@ -160,7 +160,7 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
           return 1;
         }
 
-        return runPlanCommand(ticketKey, { cwd: options.cwd, configPath: options.configPath, io });
+        return runPlanCommand(ticketKey, { cwd: options.cwd, configPath: options.configPath, io, runtimeMcp: options.runtimeMcp });
       }
 
       if (args[0] === 'run') {

@@ -12,6 +12,8 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
+At the time this prompt was prepared, the approved next milestone is AH: Real Workspace Dry Run. Milestone AI is defined as the follow-up, but must not be started until AH has been implemented, reviewed, and accepted.
+
 ## Required Reading
 
 Read these files before editing:

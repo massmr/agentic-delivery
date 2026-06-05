@@ -105,9 +105,34 @@ test('doctor validates repository branch and quality readiness statically', asyn
   });
 
   assert.equal(report.ok, true);
+  assert.equal(
+    report.checks.some(
+      (check) => check.status === 'pass' && check.label === 'Repository discovery' && /Found 1 direct sibling Git repository: frontend/u.test(check.message)
+    ),
+    true
+  );
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Repository frontend'), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Quality frontend'), true);
   assert.equal(report.checks.some((check) => check.label === 'Branch policy' && check.status === 'fail'), false);
+});
+
+test('doctor reports discovered sibling repository count and names', async () => {
+  const cwd = await createWorkspace('ewokbot-doctor-ah-discovery-');
+  mkdirSync(join(cwd, 'api', '.git'), { recursive: true });
+  mkdirSync(join(cwd, 'frontend', '.git'), { recursive: true });
+  writeGeneratedSetup(cwd, 'both');
+
+  const report = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+  });
+
+  const discoveryCheck = report.checks.find((check) => check.label === 'Repository discovery');
+  assert.equal(discoveryCheck?.status, 'pass');
+  assert.match(discoveryCheck?.message ?? '', /Found 2 direct sibling Git repositories: api, frontend/u);
+  assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Repository api'), true);
+  assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Repository frontend'), true);
 });
 
 test('doctor fails unsafe branch settings and invalid quality config', async () => {

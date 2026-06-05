@@ -2,6 +2,25 @@
 
 ## 2026-06-05
 
+Implemented Milestone AH Real Workspace Dry Run review candidate:
+
+- Added fake-only coverage for a parent workspace containing multiple direct sibling Git repositories, proving `ewokbot doctor`, `ewokbot scan`, and `ewokbot plan <ticket-key>` operate from `.ewokbot/workspace.yml` without delivery side effects.
+- Updated doctor repository discovery output so discovery mode reports the discovered sibling Git repository count and names while preserving the readable no-repository warning.
+- Routed planning ticket intake through the runtime typed `TicketPort.getTicket` boundary so mock mode remains default and Jira MCP planning uses the configured fake/runtime MCP client instead of a direct mock connector.
+- Hardened planning as an explicit dry run: output and `plan.md` state that no branches, OpenCode execution, package scripts, operation ledgers, GitHub, Railway/Vercel, PRs, deployment checks, production merge, or production deployment are performed.
+- Verified planning evidence stays local under `.ewokbot/runs/<ticket-key>/<run-id>/` as only `plan.md` plus `state.json`, with branch, pull request, deployment, quality, and dev-run arrays empty.
+- Added fail-before-write coverage for missing Jira MCP `getTicket` readiness, Jira MCP ticket-read failures, and scan coverage showing Jira MCP backlog intake does not create `.ewokbot/runs/` evidence.
+- Hardened `ewokbot plan` preflight failures so config/MCP/ticket-read readiness errors return actionable stderr with exit code `1`, no stdout, and no run state or delivery side effects.
+- Scoped AH planning MCP readiness to Jira `TicketPort.getTicket` only while preserving full Jira MCP requirements for scan, worker, smoke, and other runtime flows.
+
+Prepared Milestones AH and AI:
+
+- Added AH Real Workspace Dry Run to the approved backlog as the next milestone after AG.
+- Defined AH around the real operator flow `ewokbot init`, `ewokbot doctor`, `ewokbot scan`, and `ewokbot plan <ticket-key>` from a parent multi-repository workspace, using `.ewokbot/`, sibling Git repository discovery, Jira MCP intake, and planning without delivery side effects.
+- Added explicit AH non-side-effect boundaries: no git branches, OpenCode, package scripts, operation ledgers, GitHub, Railway/Vercel, PRs, deployment checks, production merge, or production deployment.
+- Added AI Controlled Single-Repository Dev Execution as the planned follow-up after AH is reviewed and accepted.
+- Defined AI around exactly one selected repository, explicit confirmation before side effects, OpenCode execution, local branch creation, local quality evidence, and no PR/deployment handoff until a later approved milestone.
+
 Completed Milestone AG Workspace Layout Migration To `.ewokbot/`:
 
 - Added shared workspace layout constants in `src/workspace-layout.ts` and exported them through `src/index.ts` so Ewokbot-owned paths resolve consistently to `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/`.

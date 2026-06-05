@@ -76,6 +76,7 @@ export function renderTicketPlanMarkdown(runId: string, plan: TicketPlan): strin
   const requirements = plan.analysis.requirements.map((requirement) => `- ${requirement}`).join('\n');
   const constraints = plan.analysis.constraints.map((constraint) => `- ${constraint}`).join('\n');
   const risks = plan.analysis.risks.length === 0 ? '- None identified in mock planning.' : plan.analysis.risks.map((risk) => `- ${risk}`).join('\n');
+  const humanInputStatus = plan.needsHuman ? plan.humanReason ?? 'Human input required before delivery.' : 'Not required for this dry-run plan.';
 
   return [
     `# Plan ${plan.ticket.ref.key}`,
@@ -98,7 +99,15 @@ export function renderTicketPlanMarkdown(runId: string, plan: TicketPlan): strin
     '',
     '## Repository Matches',
     '',
-    matches,
+    matches.length === 0 ? '- None' : matches,
+    '',
+    '## Human Input Status',
+    '',
+    humanInputStatus,
+    '',
+    '## Dry Run Boundary',
+    '',
+    'No branch creation, OpenCode execution, package scripts, operation ledger, GitHub, Railway/Vercel, pull request, deployment, production merge, or production deploy is performed by this planning command.',
     '',
     '## Constraints',
     '',

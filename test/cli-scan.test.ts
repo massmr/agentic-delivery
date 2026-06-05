@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -55,6 +55,28 @@ test('agentic scan lists Jira MCP backlog tickets when runtime clients are injec
     'TicketPort.listBacklog:started',
     'TicketPort.listBacklog:succeeded'
   ]);
+});
+
+test('agentic scan reads Jira MCP from discovered parent workspace without run evidence', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithJiraMcpDiscovery());
+  mkdirSync(join(rootPath, 'api', '.git'), { recursive: true });
+  mkdirSync(join(rootPath, 'frontend', '.git'), { recursive: true });
+  const captured = createCapturedIO();
+  const client = createJiraMcpClient([{ key: 'AD-705', summary: 'Scan discovered workspace through Jira MCP' }]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: captured.io,
+    runtimeMcp: { mcpClients: { atlassian: client } }
+  }).run(['node', 'agentic', 'scan']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /Found 1 Jira backlog tickets/u);
+  assert.match(captured.stdout, /AD-705/u);
+  assert.equal(captured.stderr, '');
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultJiraMcpToolNames.listBacklog]);
+  assert.equal(existsSync(join(rootPath, '.ewokbot', 'runs')), false);
 });
 
 test('agentic scan constructs public runtime MCP clients from workspace config', async () => {
@@ -303,5 +325,47 @@ repos:
       - frontend
     staging_smoke_urls:
       - /health
+`;
+}
+
+function workspaceWithJiraMcpDiscovery(): string {
+  return `
+workspace:
+  name: scan-discovery-test
+  autonomy: supervised
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mcp
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+  mcp_server: atlassian
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  mode: mock
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  atlassian:
+    display_name: Atlassian MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.example.test/atlassian
+repos:
+  discovery: sibling-git-directories
+  exclude: []
 `;
 }

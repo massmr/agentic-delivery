@@ -11,6 +11,7 @@ import type { ProviderFactoryEnvironment, WorkspaceAdapters } from './adapter-fa
 
 export type RuntimeMcpClientFactory = (server: McpServerConfig) => McpClient | Promise<McpClient>;
 export type RuntimeMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
+export type RuntimeJiraMcpAction = 'listBacklog' | 'getTicket' | 'comment';
 
 export interface RuntimeProviderFactoryOptions {
   readonly config: WorkspaceConfig;
@@ -20,6 +21,7 @@ export interface RuntimeProviderFactoryOptions {
   readonly createMcpClient?: RuntimeMcpClientFactory | undefined;
   readonly mcpAllowlist?: readonly McpToolAllowlistRule[] | undefined;
   readonly mcpAuditSink?: RuntimeMcpAuditSink | undefined;
+  readonly requiredJiraMcpActions?: readonly RuntimeJiraMcpAction[] | undefined;
 }
 
 export class RuntimeMcpClientResolutionError extends Error {
@@ -85,8 +87,9 @@ export async function createRuntimeTicketPort(options: RuntimeProviderFactoryOpt
     });
   }
 
-  const mcpClients = await resolveRuntimeMcpClients(options, [binding]);
-  await validateRuntimeMcpReadiness(mcpClients, [binding], options.mcpAllowlist ?? binding.requirements);
+  const scopedBinding = scopeJiraMcpBinding(binding, options.requiredJiraMcpActions);
+  const mcpClients = await resolveRuntimeMcpClients(options, [scopedBinding]);
+  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements);
 
   return createJiraConnector({
     config: options.config,
@@ -95,6 +98,19 @@ export async function createRuntimeTicketPort(options: RuntimeProviderFactoryOpt
     mcpClients,
     jiraMcpAuditSink: options.mcpAuditSink
   });
+}
+
+function scopeJiraMcpBinding(binding: RuntimeMcpBinding, actions: readonly RuntimeJiraMcpAction[] | undefined): RuntimeMcpBinding {
+  if (actions === undefined) {
+    return binding;
+  }
+
+  const actionSet = new Set<string>(actions);
+
+  return {
+    ...binding,
+    requirements: binding.requirements.filter((requirement) => actionSet.has(requirement.action))
+  };
 }
 
 export function collectRuntimeMcpRequirements(config: WorkspaceConfig): readonly McpToolAllowlistRule[] {

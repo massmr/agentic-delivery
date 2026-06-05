@@ -567,3 +567,75 @@ Acceptance:
 - No command silently falls back to `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/`.
 - Existing mock mode and fake-only MCP tests continue to pass after path migration.
 - Production merge and production deployment remain human-only.
+
+### Milestone AH: Real Workspace Dry Run
+
+Goal:
+
+Let an operator validate a real multi-repository workspace from the parent directory without starting code generation or delivery side effects. This milestone should prove that `.ewokbot/` setup, sibling Git repository discovery, local readiness checks, Jira MCP intake, and ticket-to-repository planning all work together on a real workspace.
+
+Operator flow:
+
+```bash
+cd <workspace-root>
+ewokbot init
+ewokbot doctor
+ewokbot scan
+ewokbot plan <ticket-key>
+```
+
+Build:
+
+- Add an explicit dry-run path, command output, or command option that makes the supported no-delivery operator flow obvious for a real workspace.
+- Ensure `ewokbot doctor` reports discovered sibling repositories clearly, including the discovered count and names when available.
+- Ensure `ewokbot scan` can use Jira MCP from `.ewokbot/workspace.yml` while keeping mock mode safe by default.
+- Ensure `ewokbot plan <ticket-key>` can read one ticket and select from discovered sibling repositories without creating branches, running OpenCode, running quality gates, opening pull requests, verifying deployments, or writing operation ledgers.
+- If `plan` still uses the mock Jira connector, introduce a safe MCP-backed planning intake path so the operator can plan a real Jira ticket without starting delivery.
+- Persist only local planning evidence under `.ewokbot/runs/`, with clear output showing selected repository candidates and whether human input is needed.
+- Keep all repository discovery bounded to direct sibling Git directories.
+- Keep explicit `repos: [...]` configs supported for advanced/manual workspaces.
+- Update README, technical architecture, next actions, roadmap, and tests for the real workspace dry-run workflow.
+
+Acceptance:
+
+- From a temporary parent workspace with multiple sibling fake Git repositories, tests prove discovery, doctor, scan, and plan work deterministically.
+- Real-provider planning can read a single Jira ticket through the typed MCP `TicketPort.getTicket` path when configured, using fake MCP clients in tests.
+- The dry-run/planning path does not create git branches, run OpenCode, run package scripts, write operation ledgers, call GitHub, call Railway, open PRs, verify deployments, merge production, or deploy production.
+- Missing MCP readiness, missing Jira tools, missing repositories, or no confident repository match fail with operator-readable next steps.
+- Mock mode remains the default and all tests remain fake-only with no live MCP/OAuth/provider/network/OpenCode/git side effects.
+- Production merge and production deployment remain human-only.
+
+### Milestone AI: Controlled Single-Repository Dev Execution
+
+Goal:
+
+Enable the first controlled development execution on one discovered repository after AH proves the real workspace dry-run path. This milestone should let Ewokbot invoke OpenCode on exactly one selected repository, run local quality gates, and produce local evidence, while keeping provider writes and production actions gated.
+
+Operator flow:
+
+```bash
+cd <workspace-root>
+ewokbot run-dev <ticket-key> --confirm-dev-execution
+```
+
+Build:
+
+- Add an explicit command or option for single-ticket, single-repository dev execution that cannot be confused with production delivery.
+- Reuse the AH real Jira/MCP ticket intake and repository planning path.
+- Refuse execution unless planning selects exactly one discovered or explicit repository.
+- Require an explicit confirmation flag before any OpenCode subprocess, git branch, quality command, provider write, PR, or deployment side effect.
+- Before running OpenCode, print the selected ticket, repository, branch target, quality profile, and human-only production boundary.
+- Create a local working branch only in the selected repository, invoke the configured OpenCode runner with the existing execution contract, and write implementation logs under `.ewokbot/runs/`.
+- Run local quality gates only for the selected repository and write quality reports/logs under `.ewokbot/runs/`.
+- Stop after local implementation and local quality evidence unless a later approved milestone explicitly enables PR/deployment handoff.
+- Keep all failures resumable/inspectable through existing status, logs, and control commands.
+- Update README, technical architecture, next actions, roadmap, and tests.
+
+Acceptance:
+
+- Tests prove missing `--confirm-dev-execution` stops before run state writes, git, OpenCode, quality, provider calls, PRs, deployments, and ledgers.
+- Tests prove multi-repository or zero-repository planning refuses execution with human-readable guidance.
+- Tests prove a fake OpenCode runner and fake local git path can complete one selected repository through implementation and local quality evidence.
+- No GitHub PR is opened, no Railway/Vercel deployment is checked, and no production merge/deploy action is possible in this milestone.
+- Mock mode remains the default and all tests remain fake-only with no live MCP/OAuth/provider/network/OpenCode subprocess/remote git side effects unless explicitly injected fakes are used.
+- Production merge and production deployment remain human-only.

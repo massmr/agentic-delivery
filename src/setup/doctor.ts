@@ -311,7 +311,8 @@ function checkRepositoryReadiness(cwd: string, config: WorkspaceConfig, probes: 
     ];
   }
 
-  return config.repos.flatMap((repo) => {
+  const discoveryChecks = config.repositoryDiscovery === undefined ? [] : [passCheck('Repository discovery', formatDiscoveredRepositories(config.repos))];
+  const repositoryChecks = config.repos.flatMap((repo) => {
     const repoPath = resolveLocalPath(cwd, repo.localPath);
 
     if (!probes.fileExists(repoPath) && !probes.directoryExists(repoPath)) {
@@ -327,6 +328,15 @@ function checkRepositoryReadiness(cwd: string, config: WorkspaceConfig, probes: 
       checkQualityReadiness(repo, repoPath, probes)
     ];
   });
+
+  return [...discoveryChecks, ...repositoryChecks];
+}
+
+function formatDiscoveredRepositories(repos: readonly WorkspaceRepositoryConfig[]): string {
+  const noun = repos.length === 1 ? 'repository' : 'repositories';
+  const names = repos.map((repo) => repo.name).join(', ');
+
+  return `Found ${repos.length} direct sibling Git ${noun}: ${names}.`;
 }
 
 function checkQualityReadiness(repo: WorkspaceRepositoryConfig, repoPath: string, probes: DoctorProbeSet): DoctorCheck {
