@@ -32,6 +32,7 @@ Current capabilities:
 - CLI-first local runtime.
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
 - Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml`, `.ewokbot/.env`, and placeholder-only `.ewokbot/.env.example` setup files.
+- User-level Ewokbot config/data/auth/cache layout under XDG-style paths, with workspace delivery evidence still kept under `.ewokbot/`.
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
@@ -250,7 +251,18 @@ The legacy `worker` command remains available for compatibility with existing lo
 
 ## Configuration
 
-`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It supports interactive wizard choices for OpenCode, optional oh-my-openagent intent, model/provider environment variable names, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default.
+`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. It supports interactive wizard choices for OpenCode, optional oh-my-openagent intent, model/provider environment variable names, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default.
+
+User-level paths follow XDG overrides when present and otherwise default to:
+
+```text
+~/.config/ewokbot/config.json
+~/.local/share/ewokbot/auth.json
+~/.local/share/ewokbot/state/
+~/.cache/ewokbot/
+```
+
+The generated user `auth.json` is Ewokbot auth metadata only; OpenCode credentials remain owned by OpenCode and provider secrets remain in `.ewokbot/.env`. Where supported, `auth.json` is created with owner-only permissions. `ewokbot doctor` reports whether these user-level paths are present without reading or printing auth contents.
 
 The generated `.ewokbot/.env.example` file is placeholder-only. Secret values belong only in `.ewokbot/.env`, and `init` refuses to overwrite existing `.ewokbot/workspace.yml`, `.ewokbot/.env`, or `.ewokbot/.env.example` by default.
 

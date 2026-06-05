@@ -1,12 +1,23 @@
 import * as assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 import { createCliProgram, parseWorkspaceConfig } from '../src/index.js';
 import { promptForSelectionsWithQuestioner } from '../src/cli/commands/init.js';
+
+function createTestUserLayoutOptions(workspaceDir: string) {
+  return {
+    homeDirectory: join(workspaceDir, 'home'),
+    env: {
+      XDG_CONFIG_HOME: join(workspaceDir, 'xdg-config'),
+      XDG_DATA_HOME: join(workspaceDir, 'xdg-data'),
+      XDG_CACHE_HOME: join(workspaceDir, 'xdg-cache')
+    }
+  };
+}
 
 function createCapturedIO() {
   let stdout = '';
@@ -35,6 +46,12 @@ test('agentic init creates non-interactive onboarding files in the current direc
   const cliPath = resolve('dist/src/cli/index.js');
   const result = spawnSync(process.execPath, [cliPath, 'init', '--non-interactive'], {
     cwd: workspaceDir,
+    env: {
+      ...process.env,
+      XDG_CONFIG_HOME: join(workspaceDir, 'xdg-config'),
+      XDG_DATA_HOME: join(workspaceDir, 'xdg-data'),
+      XDG_CACHE_HOME: join(workspaceDir, 'xdg-cache')
+    },
     encoding: 'utf8'
   });
 
@@ -59,12 +76,16 @@ test('agentic init creates non-interactive onboarding files in the current direc
   assert.equal(config.repositoryDiscovery?.discovery, 'sibling-git-directories');
   assert.match(readFileSync(envPath, 'utf8'), /OPENCODE_COMMAND=opencode\n/u);
   assert.match(readFileSync(envExamplePath, 'utf8'), /RAILWAY_TOKEN=\n/u);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-config', 'ewokbot')), true);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'auth.json')), true);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'state')), true);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-cache', 'ewokbot')), true);
 });
 
 test('agentic init creates .ewokbot directory and owned subdirectories when needed', async () => {
   const workspaceDir = mkdtempSync(join(tmpdir(), 'agentic-init-dir-test-'));
   const captured = createCapturedIO();
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run(['node', 'agentic', 'init', '--non-interactive']);
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run(['node', 'agentic', 'init', '--non-interactive']);
 
   assert.equal(exitCode, 0);
   assert.equal(captured.stderr, '');
@@ -78,6 +99,13 @@ test('agentic init creates .ewokbot directory and owned subdirectories when need
   assert.equal(existsSync(join(workspaceDir, '.env.example')), false);
   assert.equal(existsSync(join(workspaceDir, '.env')), false);
   assert.equal(existsSync(join(workspaceDir, 'runs')), false);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-config', 'ewokbot')), true);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'auth.json')), true);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'state')), true);
+  assert.equal(existsSync(join(workspaceDir, 'xdg-cache', 'ewokbot')), true);
+  if (process.platform !== 'win32') {
+    assert.equal(statSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'auth.json')).mode & 0o777, 0o600);
+  }
 });
 
 test('agentic init refuses to overwrite an existing workspace config', async () => {
@@ -89,7 +117,7 @@ test('agentic init refuses to overwrite an existing workspace config', async () 
   mkdirSync(configDir);
   writeFileSync(targetPath, 'workspace: existing\n');
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run(['node', 'agentic', 'init']);
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run(['node', 'agentic', 'init']);
 
   assert.equal(exitCode, 1);
   assert.equal(captured.stdout, '');
@@ -107,7 +135,7 @@ for (const existingFileName of ['.env', '.env.example']) {
     mkdirSync(configDir);
     writeFileSync(existingPath, 'KEEP_EXISTING=1\n');
 
-    const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run(['node', 'agentic', 'init', '--non-interactive']);
+    const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run(['node', 'agentic', 'init', '--non-interactive']);
 
     assert.equal(exitCode, 1);
     assert.equal(captured.stdout, '');
@@ -121,7 +149,7 @@ test('ewokbot init generates Railway-only onboarding config and placeholders', a
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-railway-'));
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run([
     'node',
     'ewokbot',
     'init',
@@ -143,7 +171,7 @@ test('ewokbot init generated config uses dev runner env_var_names allowlist', as
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-env-vars-'));
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run([
     'node',
     'ewokbot',
     'init',
@@ -164,7 +192,7 @@ test('ewokbot init generates Vercel-only onboarding config and placeholders', as
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-vercel-'));
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run([
     'node',
     'ewokbot',
     'init',
@@ -189,6 +217,7 @@ test('ewokbot init generates both Railway and Vercel onboarding config', async (
   const exitCode = await createCliProgram({
     cwd: workspaceDir,
     io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
     initPrompter: async () => ({ deploymentMonitor: 'both', includeOhMyOpenAgent: true })
   }).run(['node', 'ewokbot', 'init']);
 
@@ -210,6 +239,7 @@ test('ewokbot init injected wizard answers generate MCP workspace and secret-saf
   const exitCode = await createCliProgram({
     cwd: workspaceDir,
     io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
     initCommandExists: (command) => command === 'opencode',
     initPrompter: async () => ({
       deploymentMonitor: 'both',
@@ -307,6 +337,7 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   const exitCode = await createCliProgram({
     cwd: workspaceDir,
     io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
     initCommandExists: (command) => command === 'opencode',
     initPrompter: async (defaults) => promptForSelectionsWithQuestioner(defaults, async (question) => {
       asked.push(question);
@@ -395,6 +426,7 @@ test('ewokbot init stops real OpenCode setup when the command is missing', async
   const exitCode = await createCliProgram({
     cwd: workspaceDir,
     io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
     initCommandExists: () => false
   }).run([
     'node',
@@ -419,7 +451,7 @@ test('ewokbot init rejects invalid deployment monitor values', async () => {
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-invalid-monitor-'));
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run([
     'node',
     'ewokbot',
     'init',
@@ -438,7 +470,7 @@ test('ewokbot init rejects missing deployment monitor values', async () => {
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-missing-monitor-'));
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run([
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir) }).run([
     'node',
     'ewokbot',
     'init',

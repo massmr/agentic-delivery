@@ -2,6 +2,23 @@
 
 ## 2026-06-05
 
+Implemented Milestone AK User-Level Ewokbot Layout review candidate:
+
+- Added typed user-level Ewokbot layout helpers for XDG-aware config, data/auth, state, and cache paths, with defaults under `~/.config/ewokbot/config.json`, `~/.local/share/ewokbot/auth.json`, `~/.local/share/ewokbot/state/`, and `~/.cache/ewokbot/`.
+- Added explicit user layout creation through `ewokbot init`, including owner-only `auth.json` permissions where supported and non-overwrite behavior for existing auth metadata.
+- Kept workspace-local `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` unchanged for workspace setup and delivery evidence.
+- Extended `ewokbot doctor` to report user config, user auth, user state, and user cache readiness without reading or printing auth file contents.
+- Added fake-only tests with injected home/XDG paths so no test mutates the real home directory, starts providers, starts MCP/OAuth flows, runs OpenCode, or performs network calls.
+- Preserved AK scope only: no automatic secret migration, no OpenCode credential storage in Ewokbot auth, no AL dev-tool detection adapters, no AM Inquirer TUI, no AN auth commands, and no production automation.
+
+Verification commands run for AK:
+
+- `pnpm run typecheck`
+- `pnpm run build`
+- `node --test dist/test/user-layout.test.js dist/test/setup/doctor.test.js dist/test/cli-doctor.test.js dist/test/cli-init.test.js`
+- `pnpm test`
+- `git diff --check`
+
 Accepted Milestone AJ and prepared Milestones AK-AN:
 
 - Committed AJ prompt UX hardening with guided numbered choices for closed init questions and the top-level-await CLI wrapper fix.

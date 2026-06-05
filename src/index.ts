@@ -76,6 +76,10 @@ export {
   getEwokbotWorkerLockFilePath,
   getEwokbotWorkspaceControlFilePath
 } from './workspace-layout.js';
+export {
+  createEwokbotUserLayout,
+  resolveEwokbotUserLayout
+} from './user-layout.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions, CliRuntimeMcpOptions } from './cli/program.js';
 export type { CreatePublicCliRuntimeMcpOptions, PublicCliRuntimeMcp } from './cli/runtime-mcp.js';
 export {
@@ -371,3 +375,10 @@ export type { MockOpenCodeRunnerOptions, OpenCodePromptBranchInput, OpenCodeProm
 export type { BuildDevelopPullRequestBodyInput, BuildProductionPullRequestBodyInput } from './connectors/github/index.js';
 export type { CreateDeliveryRunStateRecordInput, RunStateStore } from './state/index.js';
 export type { RunStatusLookupOptions, RunStatusLookupResult } from './status/index.js';
+export type {
+  EwokbotUserLayout,
+  EwokbotUserLayoutEnv,
+  EwokbotUserLayoutFileGroup,
+  EwokbotUserLayoutPathGroup,
+  ResolveEwokbotUserLayoutOptions
+} from './user-layout.js';

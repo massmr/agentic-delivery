@@ -6,6 +6,17 @@ import { test } from 'node:test';
 
 import { createCliProgram } from '../src/index.js';
 
+function createTestUserLayoutOptions(workspaceDir: string) {
+  return {
+    homeDirectory: join(workspaceDir, 'home'),
+    env: {
+      XDG_CONFIG_HOME: join(workspaceDir, 'xdg-config'),
+      XDG_DATA_HOME: join(workspaceDir, 'xdg-data'),
+      XDG_CACHE_HOME: join(workspaceDir, 'xdg-cache')
+    }
+  };
+}
+
 function createCapturedIO() {
   let stdout = '';
   let stderr = '';
@@ -32,7 +43,7 @@ test('ewokbot doctor reports missing local setup without live calls', async () =
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-doctor-missing-'));
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run(['node', 'ewokbot', 'doctor']);
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, doctorOptions: { userLayoutOptions: createTestUserLayoutOptions(workspaceDir) } }).run(['node', 'ewokbot', 'doctor']);
 
   assert.equal(exitCode, 1);
   assert.equal(captured.stderr, '');
@@ -44,7 +55,8 @@ test('ewokbot doctor reports missing local setup without live calls', async () =
 test('ewokbot doctor validates generated local setup without provider calls', async () => {
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-doctor-generated-'));
   const capturedInit = createCapturedIO();
-  const initExitCode = await createCliProgram({ cwd: workspaceDir, io: capturedInit.io }).run([
+  const userLayoutOptions = createTestUserLayoutOptions(workspaceDir);
+  const initExitCode = await createCliProgram({ cwd: workspaceDir, io: capturedInit.io, initUserLayoutOptions: userLayoutOptions }).run([
     'node',
     'ewokbot',
     'init',
@@ -62,7 +74,8 @@ test('ewokbot doctor validates generated local setup without provider calls', as
     io: capturedDoctor.io,
     doctorOptions: {
       nodeVersion: 'v20.11.1',
-      commandExists: (command) => command === 'pnpm' || command === 'opencode-from-env'
+      commandExists: (command) => command === 'pnpm' || command === 'opencode-from-env',
+      userLayoutOptions
     }
   }).run(['node', 'ewokbot', 'doctor']);
 
@@ -75,12 +88,17 @@ test('ewokbot doctor validates generated local setup without provider calls', as
   assert.match(capturedDoctor.stdout, /PASS: pnpm/u);
   assert.match(capturedDoctor.stdout, /PASS: OpenCode: opencode-from-env/u);
   assert.match(capturedDoctor.stdout, /PASS: \.ewokbot\/\.env/u);
+  assert.match(capturedDoctor.stdout, /PASS: User config:/u);
+  assert.match(capturedDoctor.stdout, /PASS: User auth:/u);
+  assert.match(capturedDoctor.stdout, /PASS: User state:/u);
+  assert.match(capturedDoctor.stdout, /PASS: User cache:/u);
 });
 
 test('ewokbot doctor renders failures and never prints secret values', async () => {
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-doctor-cli-redaction-'));
   const capturedInit = createCapturedIO();
-  const initExitCode = await createCliProgram({ cwd: workspaceDir, io: capturedInit.io }).run([
+  const userLayoutOptions = createTestUserLayoutOptions(workspaceDir);
+  const initExitCode = await createCliProgram({ cwd: workspaceDir, io: capturedInit.io, initUserLayoutOptions: userLayoutOptions }).run([
     'node',
     'ewokbot',
     'init',
@@ -99,7 +117,8 @@ test('ewokbot doctor renders failures and never prints secret values', async () 
     doctorOptions: {
       env: { GITHUB_TOKEN: 'super-secret-process-token' },
       nodeVersion: 'v18.19.0',
-      commandExists: () => false
+      commandExists: () => false,
+      userLayoutOptions
     }
   }).run(['node', 'ewokbot', 'doctor']);
 
@@ -114,7 +133,8 @@ test('ewokbot doctor renders failures and never prints secret values', async () 
 test('ewokbot doctor reports missing env placeholders for generated config', async () => {
   const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-doctor-env-'));
   const capturedInit = createCapturedIO();
-  const initExitCode = await createCliProgram({ cwd: workspaceDir, io: capturedInit.io }).run([
+  const userLayoutOptions = createTestUserLayoutOptions(workspaceDir);
+  const initExitCode = await createCliProgram({ cwd: workspaceDir, io: capturedInit.io, initUserLayoutOptions: userLayoutOptions }).run([
     'node',
     'ewokbot',
     'init',
@@ -127,7 +147,7 @@ test('ewokbot doctor reports missing env placeholders for generated config', asy
   writeFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'GITHUB_TOKEN=\n', 'utf8');
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io }).run(['node', 'ewokbot', 'doctor']);
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, doctorOptions: { userLayoutOptions } }).run(['node', 'ewokbot', 'doctor']);
 
   assert.equal(exitCode, 1);
   assert.match(captured.stdout, /Missing \.ewokbot\/\.env\.example placeholder: VERCEL_TOKEN/u);

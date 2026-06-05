@@ -1,9 +1,15 @@
 import { existsSync, readFileSync, statSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { delimiter, isAbsolute, join, resolve } from 'node:path';
 import { parseDocument } from 'yaml';
 
 import { WorkspaceConfigError, parseWorkspaceConfig, type ProviderMode, type WorkspaceConfig, type WorkspaceRepositoryConfig } from '../config/index.js';
 import { parseRepositoryQualityConfig } from '../quality/index.js';
+import {
+  resolveEwokbotUserLayout,
+  type EwokbotUserLayout,
+  type ResolveEwokbotUserLayoutOptions
+} from '../user-layout.js';
 import {
   getRequiredEnvPlaceholders,
   getSetupCapabilitiesForSelections,
@@ -41,6 +47,8 @@ export interface DoctorProbeOptions {
   readonly directoryExists?: (path: string) => boolean;
   readonly readFile?: (path: string) => string | undefined;
   readonly commandExists?: (command: string) => boolean;
+  readonly fileMode?: (path: string) => number | undefined;
+  readonly userLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
 }
 
 interface DoctorProbeSet {
@@ -50,6 +58,7 @@ interface DoctorProbeSet {
   readonly directoryExists: (path: string) => boolean;
   readonly readFile: (path: string) => string | undefined;
   readonly commandExists: (command: string) => boolean;
+  readonly fileMode: (path: string) => number | undefined;
 }
 
 type EnvValueMap = ReadonlyMap<string, string>;
@@ -64,6 +73,9 @@ export function runLocalDoctor(cwd: string, options: DoctorProbeOptions = {}): D
   const envPath = join(cwd, ewokbotEnvPath);
   const lines = [localOnlyLine];
   const checks: DoctorCheck[] = [];
+  const userLayout = resolveDoctorUserLayout(options);
+
+  checks.push(...checkUserLayoutReadiness(userLayout, probes));
 
   if (!probes.fileExists(configPath)) {
     checks.push(failCheck('Workspace config', `Missing ${ewokbotWorkspaceConfigPath}. Run ewokbot init to create local setup files.`, 'Run ewokbot init.'));
@@ -121,7 +133,8 @@ function createProbeSet(options: DoctorProbeOptions): DoctorProbeSet {
     fileExists: options.fileExists ?? defaultFileExists,
     directoryExists: options.directoryExists ?? defaultDirectoryExists,
     readFile: options.readFile ?? defaultReadFile,
-    commandExists: options.commandExists ?? defaultCommandExists
+    commandExists: options.commandExists ?? defaultCommandExists,
+    fileMode: options.fileMode ?? defaultFileMode
   };
 }
 
@@ -149,6 +162,14 @@ function defaultReadFile(path: string): string | undefined {
   }
 }
 
+function defaultFileMode(path: string): number | undefined {
+  try {
+    return statSync(path).mode & 0o777;
+  } catch {
+    return undefined;
+  }
+}
+
 function defaultCommandExists(command: string): boolean {
   if (command.includes('/') || command.includes('\\')) {
     return existsSync(command);
@@ -163,6 +184,43 @@ function buildReport(lines: readonly string[], checks: readonly DoctorCheck[]): 
     .flatMap((check): readonly DoctorIssue[] => check.status === 'pass' ? [] : [{ severity: check.status, message: `${check.label}: ${check.message}` }]);
 
   return { ok: checks.every((check) => check.status !== 'fail'), lines, checks, issues };
+}
+
+function resolveDoctorUserLayout(options: DoctorProbeOptions): EwokbotUserLayout {
+  return resolveEwokbotUserLayout(options.userLayoutOptions ?? { homeDirectory: homedir(), env: options.env ?? process.env });
+}
+
+function checkUserLayoutReadiness(layout: EwokbotUserLayout, probes: DoctorProbeSet): readonly DoctorCheck[] {
+  const checks: DoctorCheck[] = [];
+
+  checks.push(checkUserDirectory('User config', layout.config.directory, probes));
+  checks.push(checkUserAuth(layout.auth.file, probes));
+  checks.push(checkUserDirectory('User state', layout.state.directory, probes));
+  checks.push(checkUserDirectory('User cache', layout.cache.directory, probes));
+
+  return checks;
+}
+
+function checkUserDirectory(label: string, directory: string, probes: DoctorProbeSet): DoctorCheck {
+  if (probes.directoryExists(directory)) {
+    return passCheck(label, `${directory} is present.`);
+  }
+
+  return warnCheck(label, `${directory} is missing.`, 'Run ewokbot init to prepare user-level Ewokbot paths.');
+}
+
+function checkUserAuth(authFile: string, probes: DoctorProbeSet): DoctorCheck {
+  if (!probes.fileExists(authFile)) {
+    return warnCheck('User auth', `${authFile} is missing.`, 'Run ewokbot init to create an empty Ewokbot auth metadata file.');
+  }
+
+  const mode = probes.fileMode(authFile);
+
+  if (process.platform !== 'win32' && mode !== undefined && (mode & 0o077) !== 0) {
+    return warnCheck('User auth', `${authFile} is present but is readable by group or others. Contents were not inspected.`, `Restrict ${authFile} to owner-only permissions.`);
+  }
+
+  return passCheck('User auth', `${authFile} is present with owner-only permissions where supported. Contents were not inspected.`);
 }
 
 function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetadata, cwd: string, probes: DoctorProbeSet): readonly DoctorCheck[] {

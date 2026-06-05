@@ -1,9 +1,11 @@
 import { accessSync, constants, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { createOnboardingFiles, defaultSetupSelections, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
+import { createEwokbotUserLayout, type ResolveEwokbotUserLayoutOptions } from '../../user-layout.js';
 import { ewokbotCacheDirectory, ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotLogsDirectory, ewokbotRunsDirectory, ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO } from '../program.js';
 
@@ -13,6 +15,7 @@ export interface InitCommandOptions {
   readonly args?: readonly string[];
   readonly prompter?: InitPrompter;
   readonly commandExists?: ((command: string) => boolean) | undefined;
+  readonly userLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
 }
 
 export type InitPrompter = (defaults: SetupSelections) => Promise<SetupSelections>;
@@ -67,6 +70,7 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   }
 
   const files = createOnboardingFiles(selections);
+  const userLayout = await createEwokbotUserLayout(options.userLayoutOptions ?? { homeDirectory: homedir(), env: process.env });
 
   mkdirSync(dirname(targetPath), { recursive: true });
   mkdirSync(join(cwd, ewokbotRunsDirectory), { recursive: true });
@@ -82,6 +86,10 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   options.io.stdout(`Created ${join(cwd, ewokbotRunsDirectory)}\n`);
   options.io.stdout(`Created ${join(cwd, ewokbotLogsDirectory)}\n`);
   options.io.stdout(`Created ${join(cwd, ewokbotCacheDirectory)}\n`);
+  options.io.stdout(`Prepared ${userLayout.config.directory}\n`);
+  options.io.stdout(`Prepared ${userLayout.auth.file}\n`);
+  options.io.stdout(`Prepared ${userLayout.state.directory}\n`);
+  options.io.stdout(`Prepared ${userLayout.cache.directory}\n`);
   options.io.stdout(`Secrets stay in ${ewokbotEnvPath}; generated output never prints secret values.\n`);
   return 0;
 }

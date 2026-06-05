@@ -5,9 +5,10 @@
 1. Milestones AA, AB, AC, AD, AE, AF, AG, AH, and AI from `docs/plans/approved-backlog.md` are complete and accepted.
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
 3. Milestone AJ: Interactive Init Wizard And Credential Setup is accepted after the prompt UX hardening commit.
-4. The next approved implementation milestone is Milestone AK: User-Level Ewokbot Layout.
-5. Milestones AL, AM, and AN are approved in order as future work, but must not be implemented before AK is completed and reviewed.
-6. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
+4. Milestone AK: User-Level Ewokbot Layout is complete and accepted.
+5. The next approved implementation milestone is Milestone AL: Dev Tool Detection Adapters.
+6. Milestones AM and AN are approved in order as future work, but must not be implemented before AL is completed and reviewed.
+7. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
 
@@ -87,11 +88,9 @@ AJ implementation status:
 - Runtime commands load `.ewokbot/.env` before provider, OpenCode, and public MCP construction.
 - Tests remain fake-only and no later PR, staging, production, Telegram, dashboard, daemonization, or deployment scope was added.
 
-Recommended next action: implement Milestone AK only.
+Milestone AK - User-Level Ewokbot Layout is complete and accepted.
 
-Milestone AK - User-Level Ewokbot Layout is the next approved implementation milestone.
-
-AK must add Ewokbot's user-level config/data/auth/cache paths while keeping workspace-local delivery state under `.ewokbot/`. Target paths:
+AK added Ewokbot's user-level config/data/auth/cache paths while keeping workspace-local delivery state under `.ewokbot/`. Target paths:
 
 ```text
 ~/.config/ewokbot/config.json
@@ -100,9 +99,13 @@ AK must add Ewokbot's user-level config/data/auth/cache paths while keeping work
 ~/.cache/ewokbot/
 ```
 
-AK must use XDG overrides in tests, avoid real home-directory mutation in tests, create strict auth-file permissions where supported, and update doctor/docs to distinguish global user state from workspace-local state.
+AK uses XDG-aware path helpers, creates user-level directories only through explicit setup flows such as `ewokbot init`, creates `auth.json` with owner-only permissions where supported, preserves existing auth metadata, and keeps `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` workspace-local.
 
-After AK is completed and reviewed, continue in this order:
+AK doctor/readiness output reports user config, auth, state, and cache presence without reading or printing auth file contents. Tests use injected home/XDG paths and avoid real home-directory mutation, live providers, MCP/OAuth flows, OpenCode execution, network calls, automatic secret migration, and OpenCode credential storage in Ewokbot auth.
+
+Recommended next action: implement Milestone AL only.
+
+Continue in this order:
 
 1. AL - Dev Tool Detection Adapters, starting with OpenCode `detect()`, `doctor()`, `launchSetup()`, and `getConfigSummary()`.
 2. AM - Inquirer TUI Init using `@inquirer/prompts`, backed by AK and AL.
@@ -140,8 +143,8 @@ The next milestones should move in this order:
 8. AH - Real Workspace Dry Run. Completed.
 9. AI - Controlled Single-Repository Dev Execution. Completed.
 10. AJ - Interactive Init Wizard And Credential Setup. Completed.
-11. AK - User-Level Ewokbot Layout. Next approved.
-12. AL - Dev Tool Detection Adapters. Approved after AK.
+11. AK - User-Level Ewokbot Layout. Completed.
+12. AL - Dev Tool Detection Adapters. Next approved.
 13. AM - Inquirer TUI Init. Approved after AL.
 14. AN - Ewokbot Auth Commands. Approved after AM.
 

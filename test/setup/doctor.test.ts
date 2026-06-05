@@ -1,11 +1,11 @@
 import * as assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 
-import { createOnboardingFiles, runLocalDoctor } from '../../src/index.js';
+import { createEwokbotUserLayout, createOnboardingFiles, runLocalDoctor } from '../../src/index.js';
 
 async function createWorkspace(prefix: string): Promise<string> {
   return mkdtemp(join(tmpdir(), prefix));
@@ -19,6 +19,17 @@ function writeGeneratedSetup(cwd: string, monitor: 'railway' | 'vercel' | 'both'
   writeFileSync(join(cwd, '.ewokbot', '.env.example'), files.envExample, 'utf8');
 }
 
+function createTestUserLayoutOptions(cwd: string) {
+  return {
+    homeDirectory: join(cwd, 'home'),
+    env: {
+      XDG_CONFIG_HOME: join(cwd, 'xdg-config'),
+      XDG_DATA_HOME: join(cwd, 'xdg-data'),
+      XDG_CACHE_HOME: join(cwd, 'xdg-cache')
+    }
+  };
+}
+
 test('doctor reports generated setup with injected local probes and warn-only mock readiness', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ab-generated-');
   writeGeneratedSetup(cwd, 'both');
@@ -26,7 +37,8 @@ test('doctor reports generated setup with injected local probes and warn-only mo
   const report = runLocalDoctor(cwd, {
     env: {},
     nodeVersion: 'v20.11.1',
-    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
   assert.equal(report.ok, true);
@@ -56,7 +68,8 @@ test('doctor redacts env values while reporting provider readiness', async () =>
 
   const report = runLocalDoctor(cwd, {
     nodeVersion: 'v20.11.1',
-    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
   const rendered = JSON.stringify(report);
 
@@ -78,7 +91,8 @@ test('doctor fails missing provider secrets when provider mode is non-mock', asy
   const report = runLocalDoctor(cwd, {
     env: {},
     nodeVersion: 'v20.11.1',
-    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
   assert.equal(report.ok, false);
@@ -102,7 +116,8 @@ test('doctor validates repository branch and quality readiness statically', asyn
       VERCEL_TOKEN: 'present'
     },
     nodeVersion: 'v20.11.1',
-    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
   assert.equal(report.ok, true);
@@ -126,7 +141,8 @@ test('doctor reports discovered sibling repository count and names', async () =>
   const report = runLocalDoctor(cwd, {
     env: {},
     nodeVersion: 'v20.11.1',
-    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
   const discoveryCheck = report.checks.find((check) => check.label === 'Repository discovery');
@@ -163,10 +179,49 @@ test('doctor fails unsafe branch settings and invalid quality config', async () 
 
   const report = runLocalDoctor(cwd, {
     nodeVersion: 'v20.11.1',
-    commandExists: (command) => command === 'pnpm' || command === 'opencode'
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
   assert.equal(report.ok, false);
   assert.equal(report.checks.some((check) => check.label === 'Branch policy' && check.status === 'fail'), true);
   assert.equal(report.checks.some((check) => check.label === 'Quality frontend' && check.status === 'fail'), true);
+});
+
+test('doctor reports user-level paths missing and present without reading auth contents', async () => {
+  const cwd = await createWorkspace('ewokbot-doctor-ak-user-layout-');
+  writeGeneratedSetup(cwd, 'railway');
+  const userLayoutOptions = createTestUserLayoutOptions(cwd);
+
+  const missingReport = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions
+  });
+
+  assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User config'), true);
+  assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User auth'), true);
+  assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User state'), true);
+  assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User cache'), true);
+
+  const layout = await createEwokbotUserLayout(userLayoutOptions);
+  writeFileSync(layout.auth.file, '{"token":"secret-user-auth-value"}\n', 'utf8');
+  if (process.platform !== 'win32') {
+    chmodSync(layout.auth.file, 0o600);
+  }
+
+  const presentReport = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    userLayoutOptions
+  });
+  const rendered = JSON.stringify(presentReport);
+
+  assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User config'), true);
+  assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User auth'), true);
+  assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User state'), true);
+  assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User cache'), true);
+  assert.doesNotMatch(rendered, /secret-user-auth-value/u);
 });

@@ -24,6 +24,7 @@ import { parseStatusCommandOptions, runStatusCommand } from './commands/status.j
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
 import type { DoctorProbeOptions } from '../setup/index.js';
+import type { ResolveEwokbotUserLayoutOptions } from '../user-layout.js';
 import { ewokbotWorkspaceConfigPath, getEwokbotWorkspaceControlFilePath } from '../workspace-layout.js';
 import type { InitPrompter } from './commands/init.js';
 
@@ -92,6 +93,7 @@ export interface CliProgramOptions {
   readonly initTemplatePath?: string;
   readonly initPrompter?: InitPrompter;
   readonly initCommandExists?: ((command: string) => boolean) | undefined;
+  readonly initUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
   readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
@@ -146,7 +148,14 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
       }
 
       if (args[0] === 'init') {
-        return runInitCommand({ cwd: options.cwd, io, args: args.slice(1), prompter: options.initPrompter, commandExists: options.initCommandExists });
+        return runInitCommand({
+          cwd: options.cwd,
+          io,
+          args: args.slice(1),
+          prompter: options.initPrompter,
+          commandExists: options.initCommandExists,
+          userLayoutOptions: options.initUserLayoutOptions
+        });
       }
 
       if (args[0] === 'doctor') {
