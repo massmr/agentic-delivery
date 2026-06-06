@@ -1,6 +1,35 @@
 # Progress Log
 
+## 2026-06-06
+
+Fixed AL OpenCode readiness detection review issue:
+
+- Updated the no-`runCommand` OpenCode detection path to still inspect global and project OpenCode config files for model/provider configuration before resolving readiness.
+- Added fake-only regression tests proving command-present/no-runner detection reports `installed_ready` when auth and model config are present, reports `installed_authenticated_no_model` when auth is present without model config, and does not expose auth or model values in returned details.
+- Preserved AL scope only: no live OpenCode execution in tests and no AM Inquirer TUI work.
+
 ## 2026-06-05
+
+Implemented Milestone AL Dev Tool Detection Adapters review candidate:
+
+- Added a typed `DevToolSetupAdapter` contract with `detect()`, `doctor()`, `launchSetup()`, and `getConfigSummary()` plus normalized readiness states for missing tools, command failures, unsupported versions, missing auth, missing model config, and ready setups.
+- Added `OpenCodeSetupAdapter` for command/custom-command detection, safe version probing, global OpenCode config presence at `~/.config/opencode/opencode.json`, OpenCode auth presence at `~/.local/share/opencode/auth.json` or an injected read-only `opencode auth list` probe, and project config presence at `<workspace-root>/opencode.json`.
+- Integrated OpenCode readiness into `ewokbot doctor`, init preflight, and setup capability detection while preserving mock-safe defaults and avoiding installers, auth login, package managers, OAuth, network, MCP, provider calls, and production automation.
+- Stopped `ewokbot init` from asking for or writing OpenCode-owned model/provider credential variables such as OpenCode API keys or Anthropic/OpenAI keys into `.ewokbot/.env`; OpenCode credentials remain owned by OpenCode.
+- Added fake-only adapter and integration tests for every AL readiness branch, custom command paths, fake OpenCode home paths, no secret output, doctor WARN/FAIL behavior, init missing-command safety, provider capability alignment, and smoke preflight isolation.
+- Preserved AL scope only: no AM Inquirer TUI, no AN Ewokbot auth commands, no automatic installs, no OpenCode auth flow execution, and no production merge or deployment automation.
+
+Focused verification run for AL:
+
+- `pnpm run build`
+- `node --test dist/test/setup/opencode-setup-adapter.test.js dist/test/setup/doctor.test.js dist/test/cli-doctor.test.js dist/test/cli-init.test.js dist/test/setup/provider-capabilities.test.js dist/test/smoke-command.test.js`
+
+Full verification run for AL:
+
+- `pnpm run typecheck`
+- `pnpm run build`
+- `pnpm test`
+- `git diff --check`
 
 Implemented Milestone AK User-Level Ewokbot Layout review candidate:
 

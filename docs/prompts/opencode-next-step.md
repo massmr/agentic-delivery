@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, and AK are complete and accepted. The approved next milestone is AL: Dev Tool Detection Adapters.
+At the time this prompt was prepared, Milestones AH, AI, AJ, and AK are complete and accepted. Milestone AL: Dev Tool Detection Adapters is implemented as a review candidate and must be reviewed and accepted before AM begins.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -29,16 +29,16 @@ AK added Ewokbot's user-level config/data/auth/cache paths while keeping workspa
 
 AK uses XDG-aware path helpers, avoids real home-directory mutation in tests, creates strict auth-file permissions where supported, reports user-level path readiness in doctor without exposing auth contents, and preserves existing `.ewokbot/` workspace behavior.
 
-AL must replace naive dev-runner setup assumptions with explicit detection and readiness adapters, starting with OpenCode. Implement a `DevToolSetupAdapter` contract with:
+AL replaced naive dev-runner setup assumptions with explicit detection and readiness adapters, starting with OpenCode. The `DevToolSetupAdapter` contract includes:
 
 - `detect()`
 - `doctor()`
 - `launchSetup()`
 - `getConfigSummary()`
 
-AL must implement `OpenCodeSetupAdapter` for OpenCode command/version detection, global OpenCode config detection at `~/.config/opencode/opencode.json`, OpenCode auth readiness detection at `~/.local/share/opencode/auth.json` and/or through `opencode auth list`, project config detection at `<workspace-root>/opencode.json`, normalized readiness states, custom command paths, and fake process/filesystem tests for every readiness branch.
+AL implemented `OpenCodeSetupAdapter` for OpenCode command/version detection, global OpenCode config detection at `~/.config/opencode/opencode.json`, OpenCode auth readiness detection at `~/.local/share/opencode/auth.json` and/or through injected read-only `opencode auth list` probes, project config detection at `<workspace-root>/opencode.json`, normalized readiness states, custom command paths, and fake process/filesystem tests for every readiness branch.
 
-AL safety constraints:
+AL safety constraints that must be preserved during review and follow-up work:
 
 - Do not add live OpenCode execution to tests.
 - Do not run install scripts, package managers, `opencode auth login`, auth flows, or setup actions without explicit operator confirmation.
@@ -47,7 +47,7 @@ AL safety constraints:
 - Keep tests fake-only with no real OpenCode, package-manager, OAuth, network, MCP, provider, or home-directory mutation side effects.
 - Production merge and production deployment remain human-only.
 
-Do not start AM, AN, or any later milestone until AL is implemented, reviewed, and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step.
+Do not start AM, AN, or any later milestone until AL is reviewed and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step.
 
 ## Required Reading
 

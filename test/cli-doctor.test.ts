@@ -75,6 +75,7 @@ test('ewokbot doctor validates generated local setup without provider calls', as
     doctorOptions: {
       nodeVersion: 'v20.11.1',
       commandExists: (command) => command === 'pnpm' || command === 'opencode-from-env',
+      opencodeHomeDirectory: join(workspaceDir, 'opencode-home'),
       userLayoutOptions
     }
   }).run(['node', 'ewokbot', 'doctor']);
@@ -86,7 +87,7 @@ test('ewokbot doctor validates generated local setup without provider calls', as
   assert.match(capturedDoctor.stdout, /Deployment monitors: railway, vercel/u);
   assert.match(capturedDoctor.stdout, /PASS: Node\.js/u);
   assert.match(capturedDoctor.stdout, /PASS: pnpm/u);
-  assert.match(capturedDoctor.stdout, /PASS: OpenCode: opencode-from-env/u);
+  assert.match(capturedDoctor.stdout, /WARN: OpenCode: opencode-from-env is installed but OpenCode authentication was not detected/u);
   assert.match(capturedDoctor.stdout, /PASS: \.ewokbot\/\.env/u);
   assert.match(capturedDoctor.stdout, /PASS: User config:/u);
   assert.match(capturedDoctor.stdout, /PASS: User auth:/u);
@@ -118,6 +119,7 @@ test('ewokbot doctor renders failures and never prints secret values', async () 
       env: { GITHUB_TOKEN: 'super-secret-process-token' },
       nodeVersion: 'v18.19.0',
       commandExists: () => false,
+      opencodeHomeDirectory: join(workspaceDir, 'opencode-home'),
       userLayoutOptions
     }
   }).run(['node', 'ewokbot', 'doctor']);
@@ -147,7 +149,7 @@ test('ewokbot doctor reports missing env placeholders for generated config', asy
   writeFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'GITHUB_TOKEN=\n', 'utf8');
   const captured = createCapturedIO();
 
-  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, doctorOptions: { userLayoutOptions } }).run(['node', 'ewokbot', 'doctor']);
+  const exitCode = await createCliProgram({ cwd: workspaceDir, io: captured.io, doctorOptions: { opencodeHomeDirectory: join(workspaceDir, 'opencode-home'), userLayoutOptions } }).run(['node', 'ewokbot', 'doctor']);
 
   assert.equal(exitCode, 1);
   assert.match(captured.stdout, /Missing \.ewokbot\/\.env\.example placeholder: VERCEL_TOKEN/u);

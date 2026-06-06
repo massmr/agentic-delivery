@@ -271,7 +271,7 @@ test('ewokbot init injected wizard answers generate MCP workspace and secret-saf
   assert.equal(config.jira.mode, 'mcp');
   assert.equal(config.github.mode, 'mcp');
   assert.equal(config.railway.mode, 'mcp');
-  assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'OPENCODE_API_KEY', 'ANTHROPIC_API_KEY']);
+  assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP']);
   assert.deepEqual(config.mcpServers.map((server) => server.id), ['atlassian', 'github', 'railway']);
   assert.match(configYaml, /project_keys:\n    - AJ\n    - OPS/u);
   assert.match(configYaml, /optional_tools:\n    - oh-my-openagent/u);
@@ -280,9 +280,11 @@ test('ewokbot init injected wizard answers generate MCP workspace and secret-saf
   const envExample = readFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'utf8');
   assert.match(env, new RegExp(`^JIRA_API_TOKEN=${secretValue}$`, 'mu'));
   assert.match(env, /^OPENCODE_COMMAND=opencode$/mu);
-  assert.match(env, /^ANTHROPIC_API_KEY=$/mu);
+  assert.doesNotMatch(env, /^OPENCODE_API_KEY=/mu);
+  assert.doesNotMatch(env, /^ANTHROPIC_API_KEY=/mu);
   assert.match(envExample, /^JIRA_API_TOKEN=$/mu);
-  assert.match(envExample, /^ANTHROPIC_API_KEY=$/mu);
+  assert.doesNotMatch(envExample, /^OPENCODE_API_KEY=/mu);
+  assert.doesNotMatch(envExample, /^ANTHROPIC_API_KEY=/mu);
   assert.doesNotMatch(envExample, new RegExp(secretValue, 'u'));
   assert.doesNotMatch(envExample, /secret|example-token|changeme/iu);
 });
@@ -292,8 +294,6 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   const captured = createCapturedIO();
   const asked: string[] = [];
   const secrets = {
-    opencode: 'opencode-secret-value',
-    anthropic: 'anthropic-secret-value',
     jiraEmail: 'agent@example.test',
     jiraToken: 'jira-secret-value',
     github: 'github-secret-value',
@@ -304,10 +304,6 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     'opencode',
     'yes',
     'opencode',
-    'OPENCODE_API_KEY',
-    'ANTHROPIC_API_KEY',
-    secrets.opencode,
-    secrets.anthropic,
     'jira-mcp',
     'https://jira.company.test',
     'AJ,OPS',
@@ -355,7 +351,8 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   }
   assert.deepEqual(answers, []);
   assert.equal(asked.some((question) => question.includes('Development runner:\n  1. Mock\n  2. OpenCode\nChoose [1]:')), true);
-  assert.equal(asked.some((question) => question.includes('OpenCode-specific env vars:\n  1. None\n  2. OPENCODE_API_KEY\n  3. Custom comma-separated list\nChoose [1]:')), true);
+  assert.equal(asked.some((question) => question.includes('OpenCode-specific env vars')), false);
+  assert.equal(asked.some((question) => question.includes('Model/provider API key env vars')), false);
   assert.equal(asked.some((question) => question.includes('Ticket provider:\n  1. Mock\n  2. Jira MCP\nChoose [1]:')), true);
   assert.equal(asked.some((question) => question.includes('Deployment/CI monitor:\n  1. None\n  2. Railway\n  3. Vercel\n  4. Railway and Vercel')), true);
   assert.equal(asked.some((question) => question.includes('JIRA_EMAIL value')), true);
@@ -375,12 +372,12 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     { id: 'company-github', command: 'github-mcp', args: ['--stdio'], envVarNames: ['GITHUB_TOKEN'] },
     { id: 'company-railway', command: 'railway-mcp', args: ['--stdio'], envVarNames: ['RAILWAY_TOKEN'] }
   ]);
-  assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'OPENCODE_API_KEY', 'ANTHROPIC_API_KEY']);
+  assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP']);
 
   const env = readFileSync(join(workspaceDir, '.ewokbot', '.env'), 'utf8');
   const envExample = readFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'utf8');
-  assert.match(env, /^OPENCODE_API_KEY=opencode-secret-value$/mu);
-  assert.match(env, /^ANTHROPIC_API_KEY=anthropic-secret-value$/mu);
+  assert.doesNotMatch(env, /^OPENCODE_API_KEY=/mu);
+  assert.doesNotMatch(env, /^ANTHROPIC_API_KEY=/mu);
   assert.match(env, /^JIRA_EMAIL=agent@example\.test$/mu);
   assert.match(env, /^JIRA_API_TOKEN=jira-secret-value$/mu);
   assert.match(env, /^GITHUB_TOKEN=github-secret-value$/mu);
@@ -389,8 +386,8 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   for (const secret of Object.values(secrets)) {
     assert.doesNotMatch(envExample, new RegExp(secret, 'u'));
   }
-  assert.match(envExample, /^OPENCODE_API_KEY=$/mu);
-  assert.match(envExample, /^ANTHROPIC_API_KEY=$/mu);
+  assert.doesNotMatch(envExample, /^OPENCODE_API_KEY=/mu);
+  assert.doesNotMatch(envExample, /^ANTHROPIC_API_KEY=/mu);
   assert.match(envExample, /^JIRA_EMAIL=$/mu);
   assert.match(envExample, /^JIRA_API_TOKEN=$/mu);
   assert.match(envExample, /^GITHUB_TOKEN=$/mu);
@@ -439,8 +436,8 @@ test('ewokbot init stops real OpenCode setup when the command is missing', async
 
   assert.equal(exitCode, 1);
   assert.equal(captured.stdout, '');
-  assert.match(captured.stderr, /OpenCode command "opencode" was not found/u);
-  assert.match(captured.stderr, /curl -fsSL https:\/\/opencode\.ai\/install \| bash/u);
+  assert.match(captured.stderr, /OpenCode command "opencode" is not ready \(not_installed\)/u);
+  assert.doesNotMatch(captured.stderr, /curl -fsSL/u);
   assert.match(captured.stderr, /Choose the mock dev runner to continue without OpenCode/u);
   assert.equal(existsSync(join(workspaceDir, '.ewokbot', 'workspace.yml')), false);
   assert.equal(existsSync(join(workspaceDir, '.ewokbot', '.env')), false);

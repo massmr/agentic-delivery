@@ -38,13 +38,14 @@ test('doctor reports generated setup with injected local probes and warn-only mo
     env: {},
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
   assert.equal(report.ok, true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'Node.js'), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'pnpm'), true);
-  assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === 'OpenCode'), true);
+  assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === 'OpenCode' && /authentication was not detected/u.test(check.message)), true);
   assert.equal(report.checks.some((check) => check.status === 'pass' && check.label === '.ewokbot/.env'), true);
   assert.equal(report.checks.some((check) => check.status === 'warn' && check.label === 'Repository discovery'), true);
   assert.equal(report.checks.some((check) => check.status === 'fail'), false);
@@ -69,6 +70,7 @@ test('doctor redacts env values while reporting provider readiness', async () =>
   const report = runLocalDoctor(cwd, {
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
   const rendered = JSON.stringify(report);
@@ -92,6 +94,7 @@ test('doctor fails missing provider secrets when provider mode is non-mock', asy
     env: {},
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
@@ -117,6 +120,7 @@ test('doctor validates repository branch and quality readiness statically', asyn
     },
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
@@ -142,6 +146,7 @@ test('doctor reports discovered sibling repository count and names', async () =>
     env: {},
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
@@ -180,6 +185,7 @@ test('doctor fails unsafe branch settings and invalid quality config', async () 
   const report = runLocalDoctor(cwd, {
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions: createTestUserLayoutOptions(cwd)
   });
 
@@ -197,6 +203,7 @@ test('doctor reports user-level paths missing and present without reading auth c
     env: {},
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions
   });
 
@@ -215,6 +222,7 @@ test('doctor reports user-level paths missing and present without reading auth c
     env: {},
     nodeVersion: 'v20.11.1',
     commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
     userLayoutOptions
   });
   const rendered = JSON.stringify(presentReport);

@@ -33,7 +33,7 @@ export function renderOnboardingWorkspaceConfig(selections: SetupSelections): st
   const monitors = getDeploymentMonitors(normalized.deploymentMonitor);
   const optionalTools = normalized.includeOhMyOpenAgent ? ['oh-my-openagent'] : [];
   const mcpServers = collectMcpServers(normalized);
-  const opencodeEnvNames = uniqueNames([...defaultDevRunnerEnvVarNames, ...normalized.opencodeEnvVarNames, ...normalized.modelProviderEnvVarNames]);
+  const opencodeEnvNames = uniqueNames([...defaultDevRunnerEnvVarNames]);
 
   return `workspace:
   name: Ewokbot Workspace
@@ -156,8 +156,6 @@ function collectMcpServers(selections: NormalizedSetupSelections): readonly McpS
 function collectEnvNames(normalized: NormalizedSetupSelections, selections: SetupSelections): readonly string[] {
   const names = [
     'OPENCODE_COMMAND',
-    ...normalized.opencodeEnvVarNames,
-    ...normalized.modelProviderEnvVarNames,
     'JIRA_BASE_URL',
     'GITHUB_ORG',
     ...getRequiredEnvPlaceholders(selections),

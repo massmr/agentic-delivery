@@ -1,4 +1,5 @@
 import type { WorkspaceConfig } from '../config/index.js';
+import { OpenCodeSetupAdapter } from './opencode-setup-adapter.js';
 
 export type DeploymentMonitorSelection = 'none' | 'railway' | 'vercel' | 'both';
 export type TicketProviderSelection = 'mock' | 'jira-mcp';
@@ -36,7 +37,9 @@ export interface SetupSelections {
 export interface SetupDetectionInput {
   readonly cwd: string;
   readonly env?: NodeJS.ProcessEnv;
+  readonly homeDirectory?: string | undefined;
   readonly fileExists?: (path: string) => boolean;
+  readonly readFile?: (path: string) => string | undefined;
   readonly commandExists?: (command: string) => boolean;
 }
 
@@ -120,17 +123,21 @@ const opencodeCapability = createCapability({
   nonSecretConfigKeys: ['dev_runner.provider', 'dev_runner.command'],
   requiredSecretEnvVars: [],
   detectExistingSetup(input) {
-    const command = input.env?.OPENCODE_COMMAND?.trim() || 'opencode';
+    const adapter = new OpenCodeSetupAdapter({
+      workspaceRoot: input.cwd,
+      homeDirectory: input.homeDirectory ?? input.cwd,
+      env: input.env ?? {},
+      fileExists: input.fileExists ?? (() => false),
+      readFile: input.readFile ?? (() => undefined),
+      commandExists: input.commandExists ?? (() => false),
+      runCommand: undefined
+    });
+    const detection = adapter.detect();
 
-    if (envHas(input.env, 'OPENCODE_COMMAND')) {
-      return { configured: true, details: ['OPENCODE_COMMAND is present in the environment.'] };
-    }
-
-    if (input.commandExists?.(command) === true) {
-      return { configured: true, details: [`${command} is available from the injected command check.`] };
-    }
-
-    return { configured: false, details: ['OPENCODE_COMMAND is missing and the injected command check did not find opencode.'] };
+    return {
+      configured: detection.state !== 'not_installed' && detection.state !== 'command_failed' && detection.state !== 'installed_unsupported',
+      details: [`OpenCode readiness state: ${detection.state}.`, ...detection.details]
+    };
   },
   validateGeneratedConfig(config) {
     return validationResult([

@@ -51,7 +51,8 @@ test('smoke command stops on doctor fail before MCP readiness or run state', asy
     cwd: rootPath,
     io: captured.io,
     doctorOptions: {
-      commandExists: (command) => command !== 'opencode'
+      commandExists: (command) => command !== 'opencode',
+      opencodeHomeDirectory: join(rootPath, 'opencode-home')
     },
     runtimeMcp: { mcpClients: clients }
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke']);
@@ -77,7 +78,7 @@ test('smoke command runs one MCP-backed ticket through production PR preparation
   const exitCode = await createCliProgram({
     cwd: rootPath,
     io: captured.io,
-    doctorOptions: { commandExists: () => true },
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
     runtimeMcp: {
       mcpClients: clients,
       mcpAuditSink: (records) => auditRecords.push(...records)
@@ -155,7 +156,7 @@ test('smoke command refuses an existing state file before delivery side effects'
   const exitCode = await createCliProgram({
     cwd: rootPath,
     io: captured.io,
-    doctorOptions: { commandExists: () => true },
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
     runtimeMcp: { mcpClients: clients },
     smokeDelivery: {
       now: fixedClock(),
@@ -196,7 +197,7 @@ test('smoke command refuses an existing run directory before delivery side effec
   const exitCode = await createCliProgram({
     cwd: rootPath,
     io: captured.io,
-    doctorOptions: { commandExists: () => true },
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
     runtimeMcp: { mcpClients: clients },
     smokeDelivery: {
       now: fixedClock(),
@@ -231,7 +232,7 @@ test('smoke command requires explicit MCP modes before runtime adapters', async 
   const exitCode = await createCliProgram({
     cwd: rootPath,
     io: captured.io,
-    doctorOptions: { commandExists: () => true },
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
     runtimeMcp: { mcpClients: clients }
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke']);
 
@@ -249,7 +250,7 @@ test('smoke command stops on MCP readiness failure before Jira read or run state
   const exitCode = await createCliProgram({
     cwd: rootPath,
     io: captured.io,
-    doctorOptions: { commandExists: () => true },
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
     runtimeMcp: { mcpClients: clients }
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke']);
 

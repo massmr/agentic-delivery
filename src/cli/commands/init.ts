@@ -1,10 +1,11 @@
-import { accessSync, constants, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
 import { createInterface } from 'node:readline';
 import { stdin as input, stdout as output } from 'node:process';
 
 import { createOnboardingFiles, defaultSetupSelections, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
+import { OpenCodeSetupAdapter, type DevToolCommandResult } from '../../setup/index.js';
 import { createEwokbotUserLayout, type ResolveEwokbotUserLayoutOptions } from '../../user-layout.js';
 import { ewokbotCacheDirectory, ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotLogsDirectory, ewokbotRunsDirectory, ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO } from '../program.js';
@@ -15,6 +16,8 @@ export interface InitCommandOptions {
   readonly args?: readonly string[];
   readonly prompter?: InitPrompter;
   readonly commandExists?: ((command: string) => boolean) | undefined;
+  readonly runCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
+  readonly opencodeHomeDirectory?: string | undefined;
   readonly userLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
 }
 
@@ -28,7 +31,6 @@ class InitArgumentError extends Error {
   }
 }
 
-const OPENCODE_INSTALL_COMMAND = 'curl -fsSL https://opencode.ai/install | bash';
 const defaultJiraMcpServer: McpServerSelection = { id: 'jira', command: 'jira-mcp', args: [], envVarNames: ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] };
 const defaultGitHubMcpServer: McpServerSelection = { id: 'github', command: 'github-mcp-server', args: [], envVarNames: ['GITHUB_TOKEN'] };
 const defaultRailwayMcpServer: McpServerSelection = { id: 'railway', command: 'railway-mcp', args: [], envVarNames: ['RAILWAY_TOKEN'] };
@@ -59,13 +61,25 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   }
 
   if (selections.devRunnerMode === 'opencode') {
-    const opencodeCommand = selections.opencodeCommand?.trim() || defaultSetupSelections.opencodeCommand || 'opencode';
-    const commandExists = options.commandExists ?? defaultCommandExists;
+    const detection = new OpenCodeSetupAdapter({
+      workspaceRoot: cwd,
+      homeDirectory: options.opencodeHomeDirectory ?? homedir(),
+      env: process.env,
+      command: selections.opencodeCommand,
+      fileExists: existsSync,
+      readFile: defaultReadFile,
+      commandExists: options.commandExists ?? defaultCommandExists,
+      runCommand: options.runCommand
+    }).detect();
 
-    if (!commandExists(opencodeCommand)) {
-      options.io.stderr(`OpenCode command "${opencodeCommand}" was not found. Install OpenCode with: ${OPENCODE_INSTALL_COMMAND}\n`);
-      options.io.stderr('Choose the mock dev runner to continue without OpenCode, or set OPENCODE_COMMAND to an installed command before selecting OpenCode.\n');
+    if (detection.state === 'not_installed' || detection.state === 'command_failed' || detection.state === 'installed_unsupported') {
+      options.io.stderr(`OpenCode command "${detection.command}" is not ready (${detection.state}).\n`);
+      options.io.stderr('Choose the mock dev runner to continue without OpenCode, or set OPENCODE_COMMAND to an installed command before selecting OpenCode. Ewokbot does not run installers or auth flows automatically.\n');
       return 1;
+    }
+
+    if (detection.state === 'installed_not_authenticated' || detection.state === 'installed_authenticated_no_model') {
+      options.io.stdout(`OpenCode readiness warning: ${detection.state}. Continue setup, then finish OpenCode auth/model configuration outside Ewokbot before real development runs.\n`);
     }
   }
 
@@ -249,22 +263,9 @@ export async function promptForSelectionsWithQuestioner(defaults: SetupSelection
     { label: 'Yes', value: true }
   ], false);
   let opencodeCommand = defaults.opencodeCommand;
-  let opencodeEnvVarNames = defaults.opencodeEnvVarNames ?? [];
-  let modelProviderEnvVarNames = defaults.modelProviderEnvVarNames ?? [];
 
   if (devRunnerMode === 'opencode') {
     opencodeCommand = (await ask(`OpenCode command [${defaults.opencodeCommand ?? 'opencode'}]: `)).trim() || defaults.opencodeCommand;
-    opencodeEnvVarNames = await askEnvVarPreset(ask, 'OpenCode-specific env vars', [
-      { label: 'None', value: [] },
-      { label: 'OPENCODE_API_KEY', value: ['OPENCODE_API_KEY'] }
-    ], []);
-    modelProviderEnvVarNames = await askEnvVarPreset(ask, 'Model/provider API key env vars for OpenCode', [
-      { label: 'None', value: [] },
-      { label: 'OPENAI_API_KEY', value: ['OPENAI_API_KEY'] },
-      { label: 'ANTHROPIC_API_KEY', value: ['ANTHROPIC_API_KEY'] },
-      { label: 'OPENAI_API_KEY and ANTHROPIC_API_KEY', value: ['OPENAI_API_KEY', 'ANTHROPIC_API_KEY'] }
-    ], []);
-    await collectEnvValues(ask, envValues, [...opencodeEnvVarNames, ...modelProviderEnvVarNames]);
   }
 
   const ticketProvider = await askChoice(ask, 'Ticket provider', [
@@ -327,8 +328,8 @@ export async function promptForSelectionsWithQuestioner(defaults: SetupSelection
     includeOhMyOpenAgent,
     devRunnerMode,
     opencodeCommand,
-    opencodeEnvVarNames,
-    modelProviderEnvVarNames,
+    opencodeEnvVarNames: [],
+    modelProviderEnvVarNames: [],
     ticketProvider,
     jiraBaseUrl,
     jiraProjectKeys,
@@ -453,5 +454,13 @@ function canExecute(path: string): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+function defaultReadFile(path: string): string | undefined {
+  try {
+    return readFileSync(path, 'utf8');
+  } catch {
+    return undefined;
   }
 }

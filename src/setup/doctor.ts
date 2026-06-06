@@ -17,6 +17,8 @@ import {
   type SetupGeneratedConfigMetadata,
   type SetupSelections
 } from './provider-capability.js';
+import type { DevToolCommandResult, DevToolDoctorCheck } from './dev-tool-setup-adapter.js';
+import { OpenCodeSetupAdapter } from './opencode-setup-adapter.js';
 import { ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotWorkspaceConfigPath } from '../workspace-layout.js';
 
 export type DoctorCheckStatus = 'pass' | 'warn' | 'fail';
@@ -47,6 +49,8 @@ export interface DoctorProbeOptions {
   readonly directoryExists?: (path: string) => boolean;
   readonly readFile?: (path: string) => string | undefined;
   readonly commandExists?: (command: string) => boolean;
+  readonly runCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
+  readonly opencodeHomeDirectory?: string | undefined;
   readonly fileMode?: (path: string) => number | undefined;
   readonly userLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
 }
@@ -58,6 +62,8 @@ interface DoctorProbeSet {
   readonly directoryExists: (path: string) => boolean;
   readonly readFile: (path: string) => string | undefined;
   readonly commandExists: (command: string) => boolean;
+  readonly runCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
+  readonly opencodeHomeDirectory: string;
   readonly fileMode: (path: string) => number | undefined;
 }
 
@@ -134,6 +140,8 @@ function createProbeSet(options: DoctorProbeOptions): DoctorProbeSet {
     directoryExists: options.directoryExists ?? defaultDirectoryExists,
     readFile: options.readFile ?? defaultReadFile,
     commandExists: options.commandExists ?? defaultCommandExists,
+    runCommand: options.runCommand,
+    opencodeHomeDirectory: options.opencodeHomeDirectory ?? homedir(),
     fileMode: options.fileMode ?? defaultFileMode
   };
 }
@@ -239,13 +247,16 @@ function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetad
     checks.push(failCheck('pnpm', 'pnpm was not found by the local command check.', 'Install pnpm before running worker or quality commands.'));
   }
 
-  const opencodeCommand = probes.env.OPENCODE_COMMAND?.trim() || config.devRunner.command;
-
-  if (probes.commandExists(opencodeCommand)) {
-    checks.push(passCheck('OpenCode', `${opencodeCommand} is available from the local command check.`));
-  } else {
-    checks.push(failCheck('OpenCode', `${opencodeCommand} was not found by the local command check.`, 'Install OpenCode or set OPENCODE_COMMAND.'));
-  }
+  checks.push(...mapDevToolDoctorChecks(new OpenCodeSetupAdapter({
+    workspaceRoot: cwd,
+    homeDirectory: probes.opencodeHomeDirectory,
+    env: probes.env,
+    configCommand: config.devRunner.command,
+    fileExists: probes.fileExists,
+    readFile: probes.readFile,
+    commandExists: probes.commandExists,
+    runCommand: probes.runCommand
+  }).doctor()));
 
   const optionalTools = metadata.optionalTools ?? [];
 
@@ -258,6 +269,15 @@ function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetad
   }
 
   return checks;
+}
+
+function mapDevToolDoctorChecks(checks: readonly DevToolDoctorCheck[]): readonly DoctorCheck[] {
+  return checks.map((check) => ({
+    status: check.status,
+    label: check.label,
+    message: check.message,
+    nextStep: check.nextStep
+  }));
 }
 
 function checkEnvExample(envExamplePath: string, selections: SetupSelections, probes: DoctorProbeSet): readonly DoctorCheck[] {

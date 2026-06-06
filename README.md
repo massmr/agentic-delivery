@@ -33,6 +33,7 @@ Current capabilities:
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
 - Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml`, `.ewokbot/.env`, and placeholder-only `.ewokbot/.env.example` setup files.
 - User-level Ewokbot config/data/auth/cache layout under XDG-style paths, with workspace delivery evidence still kept under `.ewokbot/`.
+- Dev tool setup detection adapters, starting with OpenCode command/config/auth/model readiness without taking ownership of OpenCode credentials.
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
@@ -251,7 +252,7 @@ The legacy `worker` command remains available for compatibility with existing lo
 
 ## Configuration
 
-`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. It supports interactive wizard choices for OpenCode, optional oh-my-openagent intent, model/provider environment variable names, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default.
+`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. It supports interactive wizard choices for OpenCode command selection, optional oh-my-openagent intent, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default. OpenCode-owned auth and model/provider credentials stay in OpenCode's own setup; Ewokbot init does not ask for or copy them into `.ewokbot/.env`.
 
 User-level paths follow XDG overrides when present and otherwise default to:
 
@@ -284,7 +285,7 @@ ewokbot init --non-interactive --deployment-monitor vercel
 ewokbot init --non-interactive --deployment-monitor both
 ```
 
-`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Jira, Railway, Vercel, discovered or explicit repository paths, staging/production branch settings, and static quality gate presence. Discovery mode warns clearly when no direct sibling Git repositories are found.
+`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Jira, Railway, Vercel, discovered or explicit repository paths, staging/production branch settings, and static quality gate presence. OpenCode readiness uses a dev-tool setup adapter with normalized states for missing commands, command failures, unsupported versions, missing authentication, missing model configuration, and ready setups. It checks configured/custom command paths, OpenCode config presence at `~/.config/opencode/opencode.json`, OpenCode auth presence at `~/.local/share/opencode/auth.json` or an explicitly injected `opencode auth list` probe, and project config at `<workspace-root>/opencode.json` without printing raw config or auth values. Discovery mode warns clearly when no direct sibling Git repositories are found.
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
