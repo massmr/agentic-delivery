@@ -166,7 +166,7 @@ export {
   runStagingVerification
 } from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
-export { LocalGitAdapter, buildWorkingBranchName, runGitCommand } from './git/index.js';
+export { LocalGitAdapter, buildWorkingBranchName, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff, isIgnoredMeaningfulDiffPath, meaningfulDiffIgnoredPathPatterns, parsePorcelainStatus, runGitCommand } from './git/index.js';
 export {
   MockMcpClient,
   McpToolAllowlistError,
@@ -290,6 +290,9 @@ export type {
   DeploymentResult,
   DeploymentStatus,
   HumanActionRequest,
+  MeaningfulDiffDecision,
+  MeaningfulDiffEvidence,
+  MeaningfulDiffSnapshot,
   PullRequestCheckStatus,
   PullRequestCheckSummary,
   PullRequestProvider,
@@ -354,7 +357,7 @@ export type {
   RunStagingVerificationInput,
   SmokeQualityRunner
 } from './delivery/index.js';
-export type { BuildWorkingBranchNameInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, PushLocalBranchInput } from './git/index.js';
+export type { BuildWorkingBranchNameInput, CaptureMeaningfulDiffSnapshotInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, InspectMeaningfulDiffInput, PushLocalBranchInput } from './git/index.js';
 export type {
   CreateMcpToolCallAuditRecordInput,
   CreateSdkRuntimeMcpClientOptions,

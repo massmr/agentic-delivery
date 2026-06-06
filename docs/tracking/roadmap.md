@@ -119,7 +119,7 @@ Status legend:
 - `[x]` Dev tool detection adapters, starting with OpenCode
 - `[x]` Inquirer TUI init
 - `[x]` Ewokbot auth commands separated from OpenCode auth
-- `[ ]` Meaningful diff guard for post-agent false positives
+- `[x]` Meaningful diff guard for post-agent false positives
 - `[ ]` Core safety loop for post-agent diff policy
 - `[ ]` Agent completion contract
 - `[ ]` Test relevance guard

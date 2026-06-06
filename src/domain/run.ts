@@ -50,6 +50,28 @@ export interface HumanActionRequest {
   readonly requestedAt: string;
 }
 
+export type MeaningfulDiffDecision = 'passed' | 'failed';
+
+export interface MeaningfulDiffSnapshot {
+  readonly changedFiles: readonly string[];
+  readonly diffSummary: string;
+}
+
+export interface MeaningfulDiffEvidence {
+  readonly decision: MeaningfulDiffDecision;
+  readonly reason: string;
+  readonly baselineChangedFiles: readonly string[];
+  readonly afterAgentChangedFiles: readonly string[];
+  readonly newChangedFiles: readonly string[];
+  readonly changedFiles: readonly string[];
+  readonly productFiles: readonly string[];
+  readonly ignoredFiles: readonly string[];
+  readonly ignoredPathPatterns: readonly string[];
+  readonly baselineDiffSummary: string;
+  readonly afterAgentDiffSummary: string;
+  readonly diffSummary: string;
+}
+
 export interface DeliveryRunStateRecord {
   readonly runId: string;
   readonly ticket: TicketRef;
@@ -61,6 +83,7 @@ export interface DeliveryRunStateRecord {
   readonly qualityReports: readonly QualityReport[];
   readonly devRuns: readonly DevRunResult[];
   readonly timestamps: RunTimestamps;
+  readonly meaningfulDiff?: MeaningfulDiffEvidence;
   readonly ticketAnalysis?: TicketAnalysis;
   readonly failure?: DeliveryRunFailure;
   readonly humanActionNeeded?: HumanActionRequest;

@@ -49,8 +49,10 @@ test('run-dev command executes one selected repository through local checks only
   const captured = createCapturedIO();
   const clients = createRunDevMcpClients('single');
   const gitCalls: GitCommandInput[] = [];
-  const devRunner = createFakeDevRunner();
+  const events: string[] = [];
+  const devRunner = createFakeDevRunner(events);
   const qualityReport = createPassedQualityReport(join(rootPath, 'frontend'));
+  const gitCommandRunner = createFakeGitRunner({ calls: gitCalls, events });
 
   await writeFile(join(rootPath, '.ewokbot', '.env'), ['OPENCODE_COMMAND=opencode-from-env', 'ANTHROPIC_API_KEY=workspace-secret', ''].join('\n'), 'utf8');
 
@@ -60,10 +62,7 @@ test('run-dev command executes one selected repository through local checks only
     runtimeMcp: { mcpClients: clients },
     runDevDelivery: {
       now: fixedClock(),
-      gitCommandRunner: async (input) => {
-        gitCalls.push(input);
-        return fakeGitResult(input);
-      },
+      gitCommandRunner,
       devRunner,
       qualityRunner: async ({ gates, logRootPath }) => {
         assert.deepEqual(gates.map((gate) => gate.name), ['test']);
@@ -94,7 +93,8 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(devRunInput.environment.ANTHROPIC_API_KEY, 'workspace-secret');
   assert.doesNotMatch(captured.stdout, /workspace-secret/u);
   assert.doesNotMatch(captured.stderr, /workspace-secret/u);
-  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse']);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff']);
+  assert.deepEqual(events, ['git:show-ref', 'git:checkout', 'git:rev-parse', 'git:status', 'git:diff', 'dev-run', 'git:status', 'git:diff']);
   assert.equal(gitCalls.some((call) => call.args[0] === 'push'), false);
 
   const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
@@ -105,9 +105,145 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(state.branches.length, 1);
   assert.equal(state.devRuns.length, 1);
   assert.equal(state.qualityReports.length, 1);
-  assert.match(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8'), /Development execution stopped after local OpenCode implementation and local quality gates/u);
+  assert.equal(state.meaningfulDiff?.decision, 'passed');
+  assert.deepEqual(state.meaningfulDiff.baselineChangedFiles, []);
+  assert.deepEqual(state.meaningfulDiff.afterAgentChangedFiles, ['src/app.ts']);
+  assert.deepEqual(state.meaningfulDiff.newChangedFiles, ['src/app.ts']);
+  assert.deepEqual(state.meaningfulDiff.productFiles, ['src/app.ts']);
+  const meaningfulDiff = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'), 'utf8')) as DeliveryRunStateRecord['meaningfulDiff'];
+  assert.equal(meaningfulDiff?.decision, 'passed');
+  const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8');
+  assert.match(finalReport, /Development execution remained local-only/u);
+  assert.match(finalReport, /Meaningful Diff/u);
+  assert.match(finalReport, /Agent Product Changed Files: src\/app\.ts/u);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'implementation-log.md'))).isFile(), true);
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md'))).isFile(), true);
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command fails before local checks when OpenCode only changes ignored artifacts', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const gitCalls: GitCommandInput[] = [];
+  const events: string[] = [];
+  const devRunner = createFakeDevRunner(events);
+  const gitCommandRunner = createFakeGitRunner({
+    calls: gitCalls,
+    events,
+    afterStatusPorcelain: ['?? .omo/session.json', '?? .ewokbot/runs/AI-101/dev-run-1/evidence.json', '?? logs/opencode.log', ''].join('\n'),
+    afterDiffStat: ''
+  });
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner,
+      devRunner,
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: FAILED/u);
+  assert.match(captured.stdout, /Meaningful Diff: FAILED/u);
+  assert.match(captured.stdout, /only ignored agent\/runtime artifacts/u);
+  assert.equal(captured.stderr, '');
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff']);
+  assert.deepEqual(events, ['git:show-ref', 'git:checkout', 'git:rev-parse', 'git:status', 'git:diff', 'dev-run', 'git:status', 'git:diff']);
+  assert.equal(devRunner.calls.length, 1);
+  assert.equal(qualityCalls, 0);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'FAILED');
+  assert.equal(state.failure?.state, 'IMPLEMENTING');
+  assert.match(state.failure?.reason ?? '', /only ignored agent\/runtime artifacts/u);
+  assert.equal(state.qualityReports.length, 0);
+  assert.equal(state.meaningfulDiff?.decision, 'failed');
+  assert.deepEqual(state.meaningfulDiff.baselineChangedFiles, []);
+  assert.deepEqual(state.meaningfulDiff.afterAgentChangedFiles, ['.omo/session.json', '.ewokbot/runs/AI-101/dev-run-1/evidence.json', 'logs/opencode.log']);
+  assert.deepEqual(state.meaningfulDiff.newChangedFiles, ['.omo/session.json', '.ewokbot/runs/AI-101/dev-run-1/evidence.json', 'logs/opencode.log']);
+  assert.deepEqual(state.meaningfulDiff.productFiles, []);
+  assert.deepEqual(state.meaningfulDiff.ignoredFiles, ['.omo/session.json', '.ewokbot/runs/AI-101/dev-run-1/evidence.json', 'logs/opencode.log']);
+
+  const meaningfulDiff = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'), 'utf8')) as DeliveryRunStateRecord['meaningfulDiff'];
+  assert.equal(meaningfulDiff?.decision, 'failed');
+  const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8');
+  assert.match(finalReport, /Meaningful Diff/u);
+  assert.match(finalReport, /Decision: FAILED/u);
+  assert.match(finalReport, /Agent Product Changed Files: none/u);
+  assert.match(finalReport, /Agent Ignored Files: \.omo\/session\.json/u);
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md')));
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command fails when only a pre-existing product diff is present after OpenCode', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const gitCalls: GitCommandInput[] = [];
+  const events: string[] = [];
+  const devRunner = createFakeDevRunner(events);
+  let qualityCalls = 0;
+  const preexistingStatus = ' M src/preexisting.ts\n';
+  const preexistingDiff = ' src/preexisting.ts | 1 +\n 1 file changed, 1 insertion(+)';
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({
+        calls: gitCalls,
+        events,
+        baselineStatusPorcelain: preexistingStatus,
+        baselineDiffStat: preexistingDiff,
+        afterStatusPorcelain: preexistingStatus,
+        afterDiffStat: preexistingDiff
+      }),
+      devRunner,
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: FAILED/u);
+  assert.match(captured.stdout, /no new changed files after the pre-OpenCode baseline/u);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff']);
+  assert.deepEqual(events, ['git:show-ref', 'git:checkout', 'git:rev-parse', 'git:status', 'git:diff', 'dev-run', 'git:status', 'git:diff']);
+  assert.equal(devRunner.calls.length, 1);
+  assert.equal(qualityCalls, 0);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'FAILED');
+  assert.equal(state.failure?.state, 'IMPLEMENTING');
+  assert.equal(state.qualityReports.length, 0);
+  assert.equal(state.meaningfulDiff?.decision, 'failed');
+  assert.deepEqual(state.meaningfulDiff.baselineChangedFiles, ['src/preexisting.ts']);
+  assert.deepEqual(state.meaningfulDiff.afterAgentChangedFiles, ['src/preexisting.ts']);
+  assert.deepEqual(state.meaningfulDiff.newChangedFiles, []);
+  assert.deepEqual(state.meaningfulDiff.productFiles, []);
+
+  const meaningfulDiff = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'), 'utf8')) as DeliveryRunStateRecord['meaningfulDiff'];
+  assert.deepEqual(meaningfulDiff?.baselineChangedFiles, ['src/preexisting.ts']);
+  assert.deepEqual(meaningfulDiff?.newChangedFiles, []);
+  const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8');
+  assert.match(finalReport, /Baseline Changed Files: src\/preexisting\.ts/u);
+  assert.match(finalReport, /Agent-New Changed Files: none/u);
+  assert.match(finalReport, /Agent Product Changed Files: none/u);
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md')));
   await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
 });
 
@@ -328,7 +464,10 @@ function railwayDeployment(): JsonObject {
   };
 }
 
-function fakeGitResult(input: GitCommandInput): GitCommandResult {
+function fakeGitResult(
+  input: GitCommandInput,
+  output: { readonly statusPorcelain?: string | undefined; readonly diffStat?: string | undefined } = {}
+): GitCommandResult {
   if (input.args[0] === 'show-ref') {
     return { stdout: '', stderr: '', exitCode: 1 };
   }
@@ -337,10 +476,49 @@ function fakeGitResult(input: GitCommandInput): GitCommandResult {
     return { stdout: 'local-head\n', stderr: '', exitCode: 0 };
   }
 
+  if (input.args[0] === 'status') {
+    return { stdout: output.statusPorcelain ?? ' M src/app.ts\n', stderr: '', exitCode: 0 };
+  }
+
+  if (input.args[0] === 'diff') {
+    return { stdout: output.diffStat ?? ' src/app.ts | 1 +\n 1 file changed, 1 insertion(+)', stderr: '', exitCode: 0 };
+  }
+
   return { stdout: '', stderr: '', exitCode: 0 };
 }
 
-function createFakeDevRunner(): DevRunner & { readonly calls: readonly DevRunInput[] } {
+function createFakeGitRunner(output: {
+  readonly calls?: GitCommandInput[] | undefined;
+  readonly events?: string[] | undefined;
+  readonly baselineStatusPorcelain?: string | undefined;
+  readonly baselineDiffStat?: string | undefined;
+  readonly afterStatusPorcelain?: string | undefined;
+  readonly afterDiffStat?: string | undefined;
+} = {}): (input: GitCommandInput) => Promise<GitCommandResult> {
+  let statusCalls = 0;
+  let diffCalls = 0;
+
+  return async (input) => {
+    output.calls?.push(input);
+    output.events?.push(`git:${input.args[0] ?? 'unknown'}`);
+
+    if (input.args[0] === 'status') {
+      statusCalls += 1;
+      const statusPorcelain = statusCalls === 1 ? output.baselineStatusPorcelain ?? '' : output.afterStatusPorcelain ?? ' M src/app.ts\n';
+      return fakeGitResult(input, { statusPorcelain });
+    }
+
+    if (input.args[0] === 'diff') {
+      diffCalls += 1;
+      const diffStat = diffCalls === 1 ? output.baselineDiffStat ?? '' : output.afterDiffStat ?? ' src/app.ts | 1 +\n 1 file changed, 1 insertion(+)';
+      return fakeGitResult(input, { diffStat });
+    }
+
+    return fakeGitResult(input);
+  };
+}
+
+function createFakeDevRunner(events?: string[]): DevRunner & { readonly calls: readonly DevRunInput[] } {
   const calls: DevRunInput[] = [];
 
   return {
@@ -348,6 +526,7 @@ function createFakeDevRunner(): DevRunner & { readonly calls: readonly DevRunInp
       return calls;
     },
     async run(input) {
+      events?.push('dev-run');
       calls.push(input);
       await mkdir(dirname(input.implementationLogPath), { recursive: true });
       await writeFile(input.implementationLogPath, `# Implementation Log\n\n${input.prompt}\n`, 'utf8');

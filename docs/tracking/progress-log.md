@@ -1,5 +1,46 @@
 # Progress Log
 
+## 2026-06-07
+
+Accepted Milestone AO and prepared Milestone AP:
+
+- Accepted AO Meaningful Diff Guard after Codex review of the baseline-vs-after-agent correction.
+- Confirmed validation passed with `pnpm typecheck`, `pnpm test` (`284/284`), and `git diff --check`.
+- Recorded the remaining non-blocking limitation as GitHub issue follow-up: the meaningful-diff delta is path-based, so future work should detect content changes in files that were already dirty before OpenCode.
+- Set AP Core Safety Loop v1 as the next approved implementation milestone.
+
+Fixed the AO review blocker for pre-existing product diffs:
+
+- Captured a meaningful-diff baseline immediately after local branch checkout and before OpenCode execution.
+- Changed the AO decision to use only files newly changed after that baseline, so pre-existing product diffs cannot make an empty OpenCode run pass.
+- Persisted baseline changed files, after-agent changed files, new agent-delta files, ignored files, product files, deterministic ignore patterns, and baseline/after-agent diff summaries in `meaningful-diff.json`.
+- Added fake-only regression coverage for a pre-existing product diff where OpenCode exits successfully but adds no product changes; `run-dev` now fails before quality gates in that case.
+- Adjusted local-only final-report wording so early AO failures no longer imply local quality gates ran.
+- Preserved AO scope only; AP forbidden-file policy, secret scanning, escalation categories, diff-size limits, PR handoff, staging, production, live providers, MCP startup, network calls, package-manager calls, and live OpenCode remain out of scope.
+
+Verification commands run for the AO blocker fix:
+
+- `pnpm typecheck`
+- `pnpm test`
+- `git diff --check`
+
+## 2026-06-07 Earlier
+
+Implemented Milestone AO Meaningful Diff Guard review candidate:
+
+- Added a post-OpenCode meaningful-diff inspection to `ewokbot run-dev` before local quality gates, so successful agent execution with only ignored artifacts cannot reach `LOCAL_CHECKS_PASSED`.
+- Captured changed files, ignored files, product files, deterministic ignore patterns, and diff summary under `.ewokbot/runs/<ticket-key>/<run-id>/meaningful-diff.json`.
+- Ignored `.omo/`, `.ewokbot/`, log/logs files and directories, and cache directories when deciding whether a product diff exists.
+- Surfaced the meaningful-diff decision in CLI output, `final-report.md`, persisted run state, and `ewokbot status` rendering.
+- Added fake-only coverage for ignored-artifact-only OpenCode success, safe product diffs, porcelain parsing, ignore matching, final reports, and status output.
+- Preserved AO scope only: no forbidden-file policy, secret scanning, dependency/migration/auth/payment/infra escalation, diff-size limits, GitHub PR handoff, staging verification, production merge, production deployment, live provider calls, MCP startup, network calls, package-manager calls, or OpenCode execution in tests.
+
+Verification commands run for AO:
+
+- `pnpm typecheck`
+- `pnpm test`
+- `git diff --check`
+
 ## 2026-06-06
 
 Refined post-AN milestones after the first real local OpenCode smoke:

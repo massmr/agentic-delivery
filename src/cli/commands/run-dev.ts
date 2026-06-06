@@ -108,7 +108,14 @@ function renderRunDevResult(io: CliProgramIO, ticketKey: string, result: Develop
   io.stdout(`Run Directory: ${result.runDirectoryPath}\n`);
   io.stdout(`Plan Report: ${result.planReportPath}\n`);
   io.stdout(`Implementation Log: ${result.implementationLogPath ?? 'n/a'}\n`);
+  io.stdout(`Meaningful Diff Report: ${result.meaningfulDiffReportPath ?? 'n/a'}\n`);
+  if (result.state.meaningfulDiff !== undefined) {
+    io.stdout(`Meaningful Diff: ${result.state.meaningfulDiff.decision.toUpperCase()} - ${result.state.meaningfulDiff.reason}\n`);
+  }
   io.stdout(`Quality Report: ${result.qualityReportPath ?? 'n/a'}\n`);
+  if (result.state.failure !== undefined) {
+    io.stdout(`Failure Reason: ${result.state.failure.reason}\n`);
+  }
   io.stdout(`Final Report: ${result.finalReportPath ?? 'n/a'}\n`);
   io.stdout('Local-only boundary preserved: no git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, production merge, or production deploy was attempted.\n');
 }

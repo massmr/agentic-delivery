@@ -155,6 +155,20 @@ test('renderRunStatus summarizes state, repositories, branches, PRs, quality, st
     humanActionNeeded: {
       reason: 'Review failed smoke check.',
       requestedAt: '2026-06-03T10:04:00.000Z'
+    },
+    meaningfulDiff: {
+      decision: 'failed',
+      reason: 'OpenCode reported success, but new changes after the pre-OpenCode baseline were only ignored agent/runtime artifacts and no product file changes.',
+      baselineChangedFiles: [],
+      afterAgentChangedFiles: ['.omo/session.json'],
+      newChangedFiles: ['.omo/session.json'],
+      changedFiles: ['.omo/session.json'],
+      productFiles: [],
+      ignoredFiles: ['.omo/session.json'],
+      ignoredPathPatterns: ['.omo/**', '.ewokbot/**'],
+      baselineDiffSummary: '',
+      afterAgentDiffSummary: '',
+      diffSummary: ''
     }
   } satisfies DeliveryRunStateRecord;
   const rendered = renderRunStatus(state, ['run-1', 'run-2']);
@@ -168,6 +182,12 @@ test('renderRunStatus summarizes state, repositories, branches, PRs, quality, st
   assert.match(rendered, /#101: agent\/LK-101-empty-state -> develop \(open\)/u);
   assert.match(rendered, /Status: PASSED/u);
   assert.match(rendered, /test PASSED/u);
+  assert.match(rendered, /Meaningful Diff/u);
+  assert.match(rendered, /Decision: FAILED/u);
+  assert.match(rendered, /Baseline Changed Files: none/u);
+  assert.match(rendered, /Agent-New Changed Files: \.omo\/session\.json/u);
+  assert.match(rendered, /Agent Product Changed Files: none/u);
+  assert.match(rendered, /Agent Ignored Files: \.omo\/session\.json/u);
   assert.match(rendered, /Deployment: mock-agentic-frontend-staging-develop-abc123/u);
   assert.match(rendered, /Smoke check failed/u);
   assert.match(rendered, /Review failed smoke check/u);

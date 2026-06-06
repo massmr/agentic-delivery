@@ -138,6 +138,10 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
           )
           .join('\n'),
     '',
+    '## Meaningful Diff',
+    '',
+    renderMeaningfulDiff(state.meaningfulDiff),
+    '',
     '## Quality',
     '',
     latestQuality === undefined
@@ -196,6 +200,26 @@ function summarizeSmokeChecks(smokeChecks: NonNullable<DeliveryRunStateRecord['s
   }
 
   return smokeChecks.map((check) => `${check.url} ${check.status.toUpperCase()}`).join(', ');
+}
+
+function renderMeaningfulDiff(evidence: DeliveryRunStateRecord['meaningfulDiff']): string {
+  if (evidence === undefined) {
+    return '- None';
+  }
+
+  return [
+    `- Decision: ${evidence.decision.toUpperCase()}`,
+    `- Reason: ${evidence.reason}`,
+    `- Baseline Changed Files: ${summarizeFiles(evidence.baselineChangedFiles)}`,
+    `- After-Agent Changed Files: ${summarizeFiles(evidence.afterAgentChangedFiles)}`,
+    `- Agent-New Changed Files: ${summarizeFiles(evidence.newChangedFiles)}`,
+    `- Agent Product Changed Files: ${summarizeFiles(evidence.productFiles)}`,
+    `- Agent Ignored Files: ${summarizeFiles(evidence.ignoredFiles)}`
+  ].join('\n');
+}
+
+function summarizeFiles(files: readonly string[]): string {
+  return files.length === 0 ? 'none' : files.join(', ');
 }
 
 const nextActionByState: Record<DeliveryRunState, string> = {

@@ -209,10 +209,27 @@ test('runProductionPullRequestPreparation guards state and opens main-target PR 
 test('MarkdownReportWriter writes final report with all major run evidence', async (t) => {
   const rootPath = await createTempRoot(t, 'agentic-final-report-');
   const writer = new MarkdownReportWriter(rootPath);
-  const state = recordProductionPullRequestOpened(createState('STAGING_VERIFIED'), createProductionPullRequest(201), '2026-06-03T10:04:00.000Z');
+  const state = {
+    ...recordProductionPullRequestOpened(createState('STAGING_VERIFIED'), createProductionPullRequest(201), '2026-06-03T10:04:00.000Z'),
+    meaningfulDiff: {
+      decision: 'passed',
+      reason: 'Meaningful agent product diff detected in 1 file after the pre-OpenCode baseline.',
+      baselineChangedFiles: ['.omo/session.json'],
+      afterAgentChangedFiles: ['.omo/session.json', 'src/app.ts'],
+      newChangedFiles: ['src/app.ts'],
+      changedFiles: ['src/app.ts'],
+      productFiles: ['src/app.ts'],
+      ignoredFiles: ['.omo/session.json'],
+      ignoredPathPatterns: ['.omo/**', '.ewokbot/**'],
+      baselineDiffSummary: '',
+      afterAgentDiffSummary: 'src/app.ts | 1 +',
+      diffSummary: 'src/app.ts | 1 +'
+    }
+  } satisfies DeliveryRunStateRecord;
   const relativePath = await writer.writeFinal(ticket.ref.key, 'run-1', state, {
     planReportPath: '.ewokbot/runs/LK-101/run-1/plan.md',
     implementationLogPath: '.ewokbot/runs/LK-101/run-1/implementation-log.md',
+    meaningfulDiffReportPath: '.ewokbot/runs/LK-101/run-1/meaningful-diff.json',
     qualityReportPath: '.ewokbot/runs/LK-101/run-1/quality-report.md',
     stagingReportPath: '.ewokbot/runs/LK-101/run-1/staging-report.md'
   });
@@ -222,12 +239,16 @@ test('MarkdownReportWriter writes final report with all major run evidence', asy
   assert.equal(body, renderFinalReportMarkdown(ticket.ref.key, 'run-1', state, {
     planReportPath: '.ewokbot/runs/LK-101/run-1/plan.md',
     implementationLogPath: '.ewokbot/runs/LK-101/run-1/implementation-log.md',
+    meaningfulDiffReportPath: '.ewokbot/runs/LK-101/run-1/meaningful-diff.json',
     qualityReportPath: '.ewokbot/runs/LK-101/run-1/quality-report.md',
     stagingReportPath: '.ewokbot/runs/LK-101/run-1/staging-report.md'
   }));
   assert.match(body, /Final State: PRODUCTION_PR_OPENED/u);
   assert.match(body, /Selected Repositories/u);
   assert.match(body, /Implementation Log: .ewokbot\/runs\/LK-101\/run-1\/implementation-log\.md/u);
+  assert.match(body, /Evidence: .ewokbot\/runs\/LK-101\/run-1\/meaningful-diff\.json/u);
+  assert.match(body, /Baseline Changed Files: \.omo\/session\.json/u);
+  assert.match(body, /Agent Product Changed Files: src\/app\.ts/u);
   assert.match(body, /Quality Report: .ewokbot\/runs\/LK-101\/run-1\/quality-report\.md/u);
   assert.match(body, /Staging Report: .ewokbot\/runs\/LK-101\/run-1\/staging-report\.md/u);
   assert.match(body, /Target: main/u);

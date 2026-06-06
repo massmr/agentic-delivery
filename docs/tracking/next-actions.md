@@ -9,8 +9,9 @@
 5. Milestone AL: Dev Tool Detection Adapters is complete and accepted, including the no-`runCommand` OpenCode model detection review fix.
 6. Milestone AM: Inquirer TUI Init is complete and accepted.
 7. Milestone AN: Ewokbot Auth Commands is complete and accepted.
-8. Milestone AO: Meaningful Diff Guard is the next approved implementation milestone.
-9. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until a new milestone is explicitly proposed and accepted.
+8. Milestone AO: Meaningful Diff Guard is complete and accepted.
+9. Milestone AP: Core Safety Loop v1 is the next approved implementation milestone.
+10. Do not implement AQ or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AP is reviewed and accepted and a new milestone is explicitly proposed and accepted.
 
 ## OpenCode Prompt
 
@@ -126,25 +127,39 @@ Supported Ewokbot provider metadata entries are Jira, GitHub, Railway, and Verce
 
 Doctor output now distinguishes Ewokbot auth metadata from OpenCode readiness, and redaction covers additional auth-like field names such as access tokens, refresh tokens, client secrets, credentials, and authorization values.
 
-Milestone AO - Meaningful Diff Guard is the next approved implementation milestone.
+Milestone AO - Meaningful Diff Guard is complete and accepted.
 
 AO exists because the first real local OpenCode smoke proved a false positive: OpenCode exited successfully, local quality gates passed, but the target repository had no product diff and only `.omo/` appeared as an ignored agent artifact.
 
-AO must make the controlled `run-dev` path refuse that result before it can reach `LOCAL_CHECKS_PASSED`.
+AO makes the controlled `run-dev` path refuse that result before it can reach `LOCAL_CHECKS_PASSED`.
+
+Implemented:
+
+- Capture a baseline changed-file/diff snapshot after local branch checkout and before OpenCode execution, then capture the after-agent snapshot after OpenCode exits.
+- Decide meaningful diff from the agent-introduced delta after that baseline, not from all existing repository changes.
+- Ignore `.omo/`, `.ewokbot/`, logs, caches, and run evidence when deciding whether the run produced meaningful product changes.
+- If OpenCode exits `0` but no new meaningful product file changed after the baseline, stop as `FAILED` or `NEEDS_HUMAN` with a clear reason.
+- Persist the meaningful-diff decision, baseline files, after-agent files, agent-delta files, product files, and ignored files under `.ewokbot/runs/<ticket-key>/<run-id>/`.
+- Surface the reason in `final-report.md` and status/report output.
+- Add tests for "OpenCode success but only ignored artifacts changed", "pre-existing product diff but no agent product diff", and "safe non-empty product diff can pass".
+
+Milestone AP - Core Safety Loop v1 is the next approved implementation milestone.
+
+AP must evaluate whether a non-empty agent diff is allowed, requires human review, or must fail before any later handoff can be considered.
 
 Build:
 
-- Capture changed files and diff summary after OpenCode execution.
-- Ignore `.omo/`, `.ewokbot/`, logs, caches, and run evidence when deciding whether the run produced meaningful product changes.
-- If OpenCode exits `0` but no meaningful product file changed, stop as `FAILED` or `NEEDS_HUMAN` with a clear reason.
-- Persist the meaningful-diff decision and ignored files under `.ewokbot/runs/<ticket-key>/<run-id>/`.
-- Surface the reason in `final-report.md` and status/report output.
-- Add tests for "OpenCode success but only ignored artifacts changed" and "safe non-empty product diff can pass".
+- Add forbidden-file detection for `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files that must not be changed by an agent.
+- Add secret-like content detection over changed diff additions without printing matched secret values.
+- Add diff-size limits for changed files and diff lines, with configurable defaults.
+- Detect human-review categories such as dependency lockfile changes, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
+- Return deterministic policy decisions: `pass`, `needs_human`, or `fail`.
+- Write a local safety report under the run directory.
+- Block later local success/handoff states when the safety policy returns `needs_human` or `fail`.
 
 Continue in this order:
 
-1. Implement AO - Meaningful Diff Guard.
-2. AP - Core Safety Loop v1.
+1. Implement AP - Core Safety Loop v1.
 3. AQ - Agent Completion Contract.
 4. AR - Test Relevance Guard.
 5. AS - Harness v1.
@@ -152,7 +167,7 @@ Continue in this order:
 7. AU - GitHub PR Handoff v1.
 8. AV - Operator Agent Action Sandbox.
 
-Anything outside AO must wait until AO is reviewed and accepted. Anything outside AP-AV must be proposed here first and must not be implemented until approved.
+Anything outside AP must wait until AP is reviewed and accepted. Anything outside AQ-AV must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -188,8 +203,8 @@ The next milestones should move in this order:
 12. AL - Dev Tool Detection Adapters. Completed.
 13. AM - Inquirer TUI Init. Completed.
 14. AN - Ewokbot Auth Commands. Completed.
-15. AO - Meaningful Diff Guard. Approved next.
-16. AP - Core Safety Loop v1. Planned after AO.
+15. AO - Meaningful Diff Guard. Completed.
+16. AP - Core Safety Loop v1. Approved next.
 17. AQ - Agent Completion Contract. Planned after AP.
 18. AR - Test Relevance Guard. Planned after AQ.
 19. AS - Harness v1. Planned after AR.

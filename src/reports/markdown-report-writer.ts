@@ -12,6 +12,7 @@ import { getRunDirectoryPath } from '../state/run-state-store.js';
 export interface FinalReportOptions {
   readonly planReportPath?: string;
   readonly implementationLogPath?: string;
+  readonly meaningfulDiffReportPath?: string;
   readonly qualityReportPath?: string;
   readonly stagingReportPath?: string;
   readonly mockOnlyNote?: string;
@@ -239,6 +240,10 @@ export function renderFinalReportMarkdown(
     '',
     renderDevRun(latestDevRun, options.implementationLogPath),
     '',
+    '## Meaningful Diff',
+    '',
+    renderMeaningfulDiff(state.meaningfulDiff, options.meaningfulDiffReportPath),
+    '',
     '## Quality Summary',
     '',
     renderQualitySummary(latestQualityReport, options.qualityReportPath),
@@ -296,6 +301,26 @@ function renderDevRun(devRun: DevRunResult | undefined, implementationLogPath: s
   ].join('\n');
 }
 
+function renderMeaningfulDiff(evidence: DeliveryRunStateRecord['meaningfulDiff'], reportPath: string | undefined): string {
+  if (evidence === undefined) {
+    return '- No meaningful diff decision recorded.';
+  }
+
+  return [
+    `- Decision: ${evidence.decision.toUpperCase()}`,
+    `- Reason: ${evidence.reason}`,
+    `- Evidence: ${reportPath ?? 'not recorded'}`,
+    `- Baseline Changed Files: ${renderInlineList(evidence.baselineChangedFiles)}`,
+    `- After-Agent Changed Files: ${renderInlineList(evidence.afterAgentChangedFiles)}`,
+    `- Agent-New Changed Files: ${renderInlineList(evidence.newChangedFiles)}`,
+    `- Agent Product Changed Files: ${renderInlineList(evidence.productFiles)}`,
+    `- Agent Ignored Files: ${renderInlineList(evidence.ignoredFiles)}`,
+    `- Ignored Path Patterns: ${renderInlineList(evidence.ignoredPathPatterns)}`,
+    `- Baseline Diff Summary: ${evidence.baselineDiffSummary.length === 0 ? 'not recorded' : evidence.baselineDiffSummary}`,
+    `- After-Agent Diff Summary: ${evidence.afterAgentDiffSummary.length === 0 ? 'not recorded' : evidence.afterAgentDiffSummary}`
+  ].join('\n');
+}
+
 function renderQualitySummary(report: QualityReport | undefined, reportPath: string | undefined): string {
   if (report === undefined) {
     return '- No quality report recorded.';
@@ -307,6 +332,10 @@ function renderQualitySummary(report: QualityReport | undefined, reportPath: str
     `- Required Gates: ${report.required.map((result) => `${result.name} ${result.status.toUpperCase()}`).join(', ') || 'none'}`,
     `- Optional Gates: ${report.optional.map((result) => `${result.name} ${result.status.toUpperCase()}`).join(', ') || 'none'}`
   ].join('\n');
+}
+
+function renderInlineList(values: readonly string[]): string {
+  return values.length === 0 ? 'none' : values.join(', ');
 }
 
 function renderPullRequest(pullRequest: PullRequestRef | undefined): string {

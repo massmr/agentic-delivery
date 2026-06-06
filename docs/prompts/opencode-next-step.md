@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, and AN are complete and accepted. Milestone AO: Meaningful Diff Guard is the next approved implementation milestone.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, and AO are complete and accepted. Milestone AP: Core Safety Loop v1 is the next approved implementation milestone.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -78,36 +78,36 @@ AN safety constraints that must be preserved during review and follow-up work:
 - Keep Ewokbot auth output redacted and metadata-only.
 - Production merge and production deployment remain human-only.
 
-AO must implement Meaningful Diff Guard for the controlled `run-dev` path.
+AO added the accepted Meaningful Diff Guard for the controlled `run-dev` path:
 
-Context from the first real local OpenCode smoke:
-
-- `ewokbot run-dev AD-101 --confirm-dev-execution` reached `LOCAL_CHECKS_PASSED`.
-- OpenCode exited `0`.
-- Local quality gates passed.
-- The target repository had no product diff.
-- The only new path was `.omo/`.
-
-AO must prevent that false positive:
-
-- Capture changed files and diff summary after OpenCode execution.
+- Capture a baseline changed-file/diff snapshot after local branch checkout and before OpenCode execution.
+- Capture the after-agent snapshot after OpenCode exits.
+- Decide meaningful diff from the agent-introduced delta after that baseline, not from all existing repository changes.
 - Ignore agent/runtime artifacts such as `.omo/`, `.ewokbot/`, logs, caches, and run evidence when deciding whether a product diff exists.
-- If OpenCode exits `0` but there is no meaningful product diff, stop the run as `FAILED` or `NEEDS_HUMAN` with a clear operator-readable reason.
-- Persist the meaningful-diff decision, ignored paths, and product changed files under `.ewokbot/runs/<ticket-key>/<run-id>/`.
-- Surface the no-diff reason in `final-report.md` and status/report output.
-- Add tests for an OpenCode success with only ignored artifacts and for a safe non-empty product diff.
+- Stop before quality gates when OpenCode exits `0` but no new meaningful product file changed.
 
-AO safety constraints:
+AP must implement Core Safety Loop v1 for non-empty agent diffs.
 
-- Do not implement the full Core Safety Loop v1 in AO; that is Milestone AP.
-- Do not implement secret scanning, forbidden-file policy, dependency/migration/auth/payment/infra escalation, or diff-size limits in AO unless a tiny shared helper is unavoidable for the meaningful-diff check.
+Build:
+
+- Add forbidden-file detection for `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files that must not be changed by an agent.
+- Add secret-like content detection over changed diff additions without printing matched secret values.
+- Add diff-size limits for changed files and diff lines, with configurable defaults.
+- Detect human-review categories such as dependency lockfile changes, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
+- Return deterministic policy decisions: `pass`, `needs_human`, or `fail`.
+- Write a local safety report under `.ewokbot/runs/<ticket-key>/<run-id>/`.
+- Block later local success or handoff states when the safety policy returns `needs_human` or `fail`.
+
+AP safety constraints:
+
+- Do not implement AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, or AV Operator Agent Action Sandbox.
 - Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
 - Do not add live provider calls, live MCP calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
 - Do not delete or revert user changes outside controlled temporary test repositories.
 - Do not print secret values, even when a secret scan fails.
 - Production merge and production deployment remain human-only.
 
-After AO is reviewed and accepted, the planned sequence is AP Core Safety Loop v1, AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, and AU GitHub PR Handoff v1. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
+After AP is reviewed and accepted, the planned sequence is AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, and AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
 
 ## Required Reading
 

@@ -1,10 +1,10 @@
 import { constants } from 'node:fs';
-import { access } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { access, mkdir, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 
 import type { WorkspaceConfig, WorkspaceRepositoryConfig } from '../config/index.js';
-import type { DeliveryRunStateRecord, DeliveryTicket, DevRunner, QualityGateDefinition, QualityReport, RepositoryConfig, RepositoryRef } from '../domain/index.js';
-import { LocalGitAdapter, buildWorkingBranchName } from '../git/index.js';
+import type { DeliveryRunStateRecord, DeliveryTicket, DevRunner, MeaningfulDiffEvidence, MeaningfulDiffSnapshot, QualityGateDefinition, QualityReport, RepositoryConfig, RepositoryRef } from '../domain/index.js';
+import { LocalGitAdapter, buildWorkingBranchName, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff } from '../git/index.js';
 import type { GitCommandRunner } from '../git/index.js';
 import { createTicketPlan, toRepositoryRef } from '../planning/index.js';
 import type { TicketPort } from '../ports/index.js';
@@ -39,6 +39,7 @@ export interface DevelopmentRunResult {
   readonly runDirectoryPath: string;
   readonly planReportPath: string;
   readonly implementationLogPath?: string | undefined;
+  readonly meaningfulDiffReportPath?: string | undefined;
   readonly qualityReportPath?: string | undefined;
   readonly finalReportPath?: string | undefined;
 }
@@ -154,6 +155,20 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     return buildResult(failedState, runId, planReportPath, { finalReportPath });
   }
 
+  let meaningfulDiffBaseline: MeaningfulDiffSnapshot;
+
+  try {
+    meaningfulDiffBaseline = await captureMeaningfulDiffSnapshot({
+      repositoryPath: repository.localPath,
+      gitCommandRunner: input.gitCommandRunner
+    });
+  } catch (error) {
+    const failedState = markFailed(stateAfterBranch, 'BRANCH_CREATED', `Meaningful diff baseline capture failed: ${formatError(error)}`, now().toISOString());
+    await stateStore.write(failedState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, { planReportPath, mockOnlyNote: localOnlyNote });
+    return buildResult(failedState, runId, planReportPath, { finalReportPath });
+  }
+
   const implementedState = await runOpenCodeImplementation({
     state: stateAfterBranch,
     ticket,
@@ -181,7 +196,46 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     return buildResult(implementedState, runId, planReportPath, { implementationLogPath, finalReportPath });
   }
 
-  const localChecksRunningState = transitionDeliveryRunState(implementedState, 'LOCAL_CHECKS_RUNNING', now().toISOString());
+  const meaningfulDiffReportPath = join(getRunDirectoryPath(ticket.ref.key, runId), 'meaningful-diff.json');
+  let stateAfterMeaningfulDiff: DeliveryRunStateRecord;
+
+  try {
+    const meaningfulDiff = await inspectMeaningfulDiff({
+      repositoryPath: repository.localPath,
+      baseline: meaningfulDiffBaseline,
+      gitCommandRunner: input.gitCommandRunner
+    });
+    stateAfterMeaningfulDiff = {
+      ...implementedState,
+      meaningfulDiff
+    };
+    await writeMeaningfulDiffEvidence(rootPath, meaningfulDiffReportPath, meaningfulDiff);
+    await stateStore.write(stateAfterMeaningfulDiff);
+  } catch (error) {
+    const failedState = markFailed(implementedState, 'IMPLEMENTING', `Meaningful diff inspection failed: ${formatError(error)}`, now().toISOString());
+    await stateStore.write(failedState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      mockOnlyNote: localOnlyNote
+    });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, finalReportPath });
+  }
+
+  if (stateAfterMeaningfulDiff.meaningfulDiff?.decision === 'failed') {
+    const failedState = markFailed(stateAfterMeaningfulDiff, 'IMPLEMENTING', stateAfterMeaningfulDiff.meaningfulDiff.reason, now().toISOString());
+    await stateStore.write(failedState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      mockOnlyNote: localOnlyNote
+    });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, finalReportPath });
+  }
+
+  const localChecksRunningState = transitionDeliveryRunState(stateAfterMeaningfulDiff, 'LOCAL_CHECKS_RUNNING', now().toISOString());
   await stateStore.write(localChecksRunningState);
 
   let qualityReport: QualityReport;
@@ -191,8 +245,8 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
   } catch (error) {
     const failedState = markFailed(localChecksRunningState, 'LOCAL_CHECKS_RUNNING', `Local quality gates failed to run: ${formatError(error)}`, now().toISOString());
     await stateStore.write(failedState);
-    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, { planReportPath, implementationLogPath, mockOnlyNote: localOnlyNote });
-    return buildResult(failedState, runId, planReportPath, { implementationLogPath, finalReportPath });
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, { planReportPath, implementationLogPath, meaningfulDiffReportPath, mockOnlyNote: localOnlyNote });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, finalReportPath });
   }
 
   const qualityReportPath = await reportWriter.writeQuality(ticket.ref.key, runId, qualityReport);
@@ -207,10 +261,11 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, {
       planReportPath,
       implementationLogPath,
+      meaningfulDiffReportPath,
       qualityReportPath,
       mockOnlyNote: localOnlyNote
     });
-    return buildResult(failedState, runId, planReportPath, { implementationLogPath, qualityReportPath, finalReportPath });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, qualityReportPath, finalReportPath });
   }
 
   const localChecksPassedState = transitionDeliveryRunState(stateWithQuality, 'LOCAL_CHECKS_PASSED', now().toISOString());
@@ -218,11 +273,12 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
   const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, localChecksPassedState, {
     planReportPath,
     implementationLogPath,
+    meaningfulDiffReportPath,
     qualityReportPath,
     mockOnlyNote: localOnlyNote
   });
 
-  return buildResult(localChecksPassedState, runId, planReportPath, { implementationLogPath, qualityReportPath, finalReportPath });
+  return buildResult(localChecksPassedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, qualityReportPath, finalReportPath });
 }
 
 export async function assertDevelopmentRunDoesNotExist(rootPath: string, ticketKey: string, runId: string): Promise<void> {
@@ -319,6 +375,7 @@ function buildResult(
   planReportPath: string,
   paths: {
     readonly implementationLogPath?: string | undefined;
+    readonly meaningfulDiffReportPath?: string | undefined;
     readonly qualityReportPath?: string | undefined;
     readonly finalReportPath?: string | undefined;
   }
@@ -330,6 +387,12 @@ function buildResult(
     planReportPath,
     ...paths
   };
+}
+
+async function writeMeaningfulDiffEvidence(rootPath: string, relativePath: string, evidence: MeaningfulDiffEvidence): Promise<void> {
+  const outputPath = join(rootPath, relativePath);
+  await mkdir(dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 }
 
 function createRunId(ticketKey: string, date: Date): string {
@@ -362,4 +425,4 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-const localOnlyNote = 'Development execution stopped after local OpenCode implementation and local quality gates. Ewokbot did not push git branches, open GitHub pull requests, call Railway/Vercel, verify deployments, merge production, or deploy production.';
+const localOnlyNote = 'Development execution remained local-only. Ewokbot did not push git branches, open GitHub pull requests, call Railway/Vercel, verify deployments, merge production, or deploy production.';
