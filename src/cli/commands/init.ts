@@ -1,11 +1,11 @@
 import { accessSync, constants, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, dirname, join } from 'node:path';
-import { createInterface } from 'node:readline';
-import { stdin as input, stdout as output } from 'node:process';
+
+import { checkbox, confirm, input as promptInput, select } from '@inquirer/prompts';
 
 import { createOnboardingFiles, defaultSetupSelections, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
-import { OpenCodeSetupAdapter, type DevToolCommandResult } from '../../setup/index.js';
+import { OpenCodeSetupAdapter, type DevToolCommandResult, type DevToolDetectionResult, type DevToolReadinessState } from '../../setup/index.js';
 import { createEwokbotUserLayout, type ResolveEwokbotUserLayoutOptions } from '../../user-layout.js';
 import { ewokbotCacheDirectory, ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotLogsDirectory, ewokbotRunsDirectory, ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
 import type { CliProgramIO } from '../program.js';
@@ -21,8 +21,26 @@ export interface InitCommandOptions {
   readonly userLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
 }
 
-export type InitPrompter = (defaults: SetupSelections) => Promise<SetupSelections>;
-export type InitQuestioner = (question: string) => Promise<string>;
+export type InitPrompter = (defaults: SetupSelections, context: InitPromptContext) => Promise<SetupSelections>;
+
+export interface InitPromptContext {
+  readonly opencodeDetection: DevToolDetectionResult;
+  readonly detectOpenCode: (command?: string | undefined) => DevToolDetectionResult;
+  readonly io: CliProgramIO;
+}
+
+export interface InitPromptChoice<T extends string | boolean> {
+  readonly label: string;
+  readonly value: T;
+  readonly description?: string | undefined;
+}
+
+export interface InitPromptAdapter {
+  readonly select: <T extends string | boolean>(input: { readonly message: string; readonly choices: readonly InitPromptChoice<T>[]; readonly defaultValue: T }) => Promise<T>;
+  readonly confirm: (input: { readonly message: string; readonly defaultValue: boolean }) => Promise<boolean>;
+  readonly input: (input: { readonly message: string; readonly defaultValue?: string | undefined }) => Promise<string>;
+  readonly checkbox: <T extends string>(input: { readonly message: string; readonly choices: readonly InitPromptChoice<T>[]; readonly defaultValues: readonly T[] }) => Promise<readonly T[]>;
+}
 
 class InitArgumentError extends Error {
   constructor(message: string) {
@@ -42,6 +60,13 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
   const envExamplePath = join(cwd, ewokbotEnvExamplePath);
   let selections: SetupSelections;
 
+  const existingPaths = [targetPath, envPath, envExamplePath].filter((path) => existsSync(path));
+
+  if (existingPaths.length > 0) {
+    options.io.stderr(`Refusing to overwrite existing Ewokbot onboarding file(s): ${existingPaths.join(', ')}\n`);
+    return 1;
+  }
+
   try {
     selections = await resolveSelections(options);
   } catch (error) {
@@ -53,24 +78,8 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
     throw error;
   }
 
-  const existingPaths = [targetPath, envPath, envExamplePath].filter((path) => existsSync(path));
-
-  if (existingPaths.length > 0) {
-    options.io.stderr(`Refusing to overwrite existing Ewokbot onboarding file(s): ${existingPaths.join(', ')}\n`);
-    return 1;
-  }
-
   if (selections.devRunnerMode === 'opencode') {
-    const detection = new OpenCodeSetupAdapter({
-      workspaceRoot: cwd,
-      homeDirectory: options.opencodeHomeDirectory ?? homedir(),
-      env: process.env,
-      command: selections.opencodeCommand,
-      fileExists: existsSync,
-      readFile: defaultReadFile,
-      commandExists: options.commandExists ?? defaultCommandExists,
-      runCommand: options.runCommand
-    }).detect();
+    const detection = detectOpenCode(cwd, options, selections.opencodeCommand);
 
     if (detection.state === 'not_installed' || detection.state === 'command_failed' || detection.state === 'installed_unsupported') {
       options.io.stderr(`OpenCode command "${detection.command}" is not ready (${detection.state}).\n`);
@@ -109,21 +118,45 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
 }
 
 async function resolveSelections(options: InitCommandOptions): Promise<SetupSelections> {
+  const cwd = options.cwd ?? process.cwd();
   const parsed = parseInitArgs(options.args ?? []);
 
   if (parsed.nonInteractive) {
     return parsed.selections;
   }
 
+  const context = createInitPromptContext(cwd, options, parsed.selections.opencodeCommand);
+
   if (options.prompter !== undefined) {
-    return options.prompter(parsed.selections);
+    return options.prompter(parsed.selections, context);
   }
 
   if (process.stdin.isTTY && process.stdout.isTTY) {
-    return promptForSelections(parsed.selections);
+    return promptForSelections(parsed.selections, context);
   }
 
   return parsed.selections;
+}
+
+function createInitPromptContext(cwd: string, options: InitCommandOptions, command: string | undefined): InitPromptContext {
+  return {
+    opencodeDetection: detectOpenCode(cwd, options, command),
+    detectOpenCode: (customCommand) => detectOpenCode(cwd, options, customCommand ?? command),
+    io: options.io
+  };
+}
+
+function detectOpenCode(cwd: string, options: InitCommandOptions, command: string | undefined): DevToolDetectionResult {
+  return new OpenCodeSetupAdapter({
+    workspaceRoot: cwd,
+    homeDirectory: options.opencodeHomeDirectory ?? homedir(),
+    env: process.env,
+    command,
+    fileExists: existsSync,
+    readFile: defaultReadFile,
+    commandExists: options.commandExists ?? defaultCommandExists,
+    runCommand: options.runCommand
+  }).detect();
 }
 
 function parseInitArgs(args: readonly string[]): { readonly nonInteractive: boolean; readonly selections: SetupSelections } {
@@ -237,89 +270,71 @@ function readFlagValue(args: readonly string[], index: number, flag: string, cho
   return value;
 }
 
-async function promptForSelections(defaults: SetupSelections): Promise<SetupSelections> {
-  const readline = createInterface({ input, output });
-  const keepAlive = setInterval(() => undefined, 60_000);
-
-  input.resume();
-
-  try {
-    return await promptForSelectionsWithQuestioner(defaults, (question) => askReadline(readline, question));
-  } finally {
-    clearInterval(keepAlive);
-    readline.close();
-    input.pause();
-  }
+async function promptForSelections(defaults: SetupSelections, context: InitPromptContext): Promise<SetupSelections> {
+  return promptForSelectionsWithPromptAdapter(defaults, createInquirerPromptAdapter(), context);
 }
 
-export async function promptForSelectionsWithQuestioner(defaults: SetupSelections, ask: InitQuestioner): Promise<SetupSelections> {
+export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelections, prompts: InitPromptAdapter, context: InitPromptContext): Promise<SetupSelections> {
   const envValues: Record<string, string | undefined> = { ...(defaults.envValues ?? {}) };
-  const devRunnerMode = await askChoice(ask, 'Development runner', [
-    { label: 'Mock', value: 'mock' as const },
-    { label: 'OpenCode', value: 'opencode' as const }
-  ], defaults.devRunnerMode ?? 'mock');
-  const includeOhMyOpenAgent = await askChoice(ask, 'Include oh-my-openagent setup notes?', [
-    { label: 'No', value: false },
-    { label: 'Yes', value: true }
-  ], false);
-  let opencodeCommand = defaults.opencodeCommand;
+  const opencodeChoice = await promptForOpenCodeSelection(defaults, prompts, context);
+  const devRunnerMode = opencodeChoice.devRunnerMode;
+  const opencodeCommand = opencodeChoice.opencodeCommand;
+  const includeOhMyOpenAgent = await prompts.confirm({ message: 'Include oh-my-openagent setup notes?', defaultValue: defaults.includeOhMyOpenAgent });
 
-  if (devRunnerMode === 'opencode') {
-    opencodeCommand = (await ask(`OpenCode command [${defaults.opencodeCommand ?? 'opencode'}]: `)).trim() || defaults.opencodeCommand;
-  }
-
-  const ticketProvider = await askChoice(ask, 'Ticket provider', [
+  const ticketProvider = await prompts.select({ message: 'Ticket provider', choices: [
     { label: 'Mock', value: 'mock' as const },
     { label: 'Jira MCP', value: 'jira-mcp' as const }
-  ], defaults.ticketProvider ?? 'mock');
+  ], defaultValue: defaults.ticketProvider ?? 'mock' });
   let jiraBaseUrl = defaults.jiraBaseUrl;
   let jiraProjectKeys = defaults.jiraProjectKeys;
   let jiraMcpServer = defaults.jiraMcpServer;
 
   if (ticketProvider === 'jira-mcp') {
-    jiraBaseUrl = (await ask(`Jira base URL [${defaults.jiraBaseUrl ?? 'https://jira.example.test'}]: `)).trim() || defaults.jiraBaseUrl;
-    jiraProjectKeys = withDefaultList(parseCsv(await ask(`Jira project keys, comma-separated [${(defaults.jiraProjectKeys ?? ['AD']).join(',')}]: `)), defaults.jiraProjectKeys);
-    envValues.JIRA_EMAIL = await askSecret(ask, 'JIRA_EMAIL value: ');
-    envValues.JIRA_API_TOKEN = await askSecret(ask, 'JIRA_API_TOKEN value: ');
-    jiraMcpServer = await promptForMcpServer(ask, 'Jira MCP', defaults.jiraMcpServer ?? defaultJiraMcpServer);
+    jiraBaseUrl = nonEmptyPromptValue(await prompts.input({ message: 'Jira base URL', defaultValue: defaults.jiraBaseUrl ?? 'https://jira.example.test' }), defaults.jiraBaseUrl);
+    jiraProjectKeys = withDefaultList(parseCsv(await prompts.input({ message: 'Jira project keys, comma-separated', defaultValue: (defaults.jiraProjectKeys ?? ['AD']).join(',') })), defaults.jiraProjectKeys);
+    envValues.JIRA_EMAIL = await askSecret(prompts, 'JIRA_EMAIL value');
+    envValues.JIRA_API_TOKEN = await askSecret(prompts, 'JIRA_API_TOKEN value');
+    jiraMcpServer = await promptForMcpServer(prompts, 'Jira MCP', defaults.jiraMcpServer ?? defaultJiraMcpServer);
   }
 
-  const codeHostProvider = await askChoice(ask, 'Code host provider', [
+  const codeHostProvider = await prompts.select({ message: 'Code host provider', choices: [
     { label: 'Mock', value: 'mock' as const },
     { label: 'GitHub MCP', value: 'github-mcp' as const }
-  ], defaults.codeHostProvider ?? 'mock');
+  ], defaultValue: defaults.codeHostProvider ?? 'mock' });
   let githubOrganization = defaults.githubOrganization;
   let githubMcpServer = defaults.githubMcpServer;
 
   if (codeHostProvider === 'github-mcp') {
-    githubOrganization = (await ask(`GitHub organization [${defaults.githubOrganization ?? 'agentic'}]: `)).trim() || defaults.githubOrganization;
-    envValues.GITHUB_TOKEN = await askSecret(ask, 'GITHUB_TOKEN value: ');
-    githubMcpServer = await promptForMcpServer(ask, 'GitHub MCP', defaults.githubMcpServer ?? defaultGitHubMcpServer);
+    githubOrganization = nonEmptyPromptValue(await prompts.input({ message: 'GitHub organization', defaultValue: defaults.githubOrganization ?? 'agentic' }), defaults.githubOrganization);
+    envValues.GITHUB_TOKEN = await askSecret(prompts, 'GITHUB_TOKEN value');
+    githubMcpServer = await promptForMcpServer(prompts, 'GitHub MCP', defaults.githubMcpServer ?? defaultGitHubMcpServer);
   }
 
-  const deploymentMonitor = await askChoice(ask, 'Deployment/CI monitor', [
-    { label: 'None', value: 'none' as const },
-    { label: 'Railway', value: 'railway' as const },
-    { label: 'Vercel', value: 'vercel' as const },
-    { label: 'Railway and Vercel', value: 'both' as const }
-  ], defaults.deploymentMonitor);
+  const deploymentMonitor = deploymentMonitorFromChoices(await prompts.checkbox({
+    message: 'Deployment/CI monitors',
+    choices: [
+      { label: 'Railway', value: 'railway' as const },
+      { label: 'Vercel', value: 'vercel' as const }
+    ],
+    defaultValues: deploymentMonitorToChoices(defaults.deploymentMonitor)
+  }));
   let railwayProvider = defaults.railwayProvider;
   let railwayMcpServer = defaults.railwayMcpServer;
 
   if (deploymentMonitor === 'railway' || deploymentMonitor === 'both') {
-    railwayProvider = await askChoice(ask, 'Railway provider', [
+    railwayProvider = await prompts.select({ message: 'Railway provider', choices: [
       { label: 'Mock', value: 'mock' as const },
       { label: 'Railway MCP', value: 'railway-mcp' as const }
-    ], defaults.railwayProvider ?? 'mock');
+    ], defaultValue: defaults.railwayProvider ?? 'mock' });
 
     if (railwayProvider === 'railway-mcp') {
-      envValues.RAILWAY_TOKEN = await askSecret(ask, 'RAILWAY_TOKEN value: ');
-      railwayMcpServer = await promptForMcpServer(ask, 'Railway MCP', defaults.railwayMcpServer ?? defaultRailwayMcpServer);
+      envValues.RAILWAY_TOKEN = await askSecret(prompts, 'RAILWAY_TOKEN value');
+      railwayMcpServer = await promptForMcpServer(prompts, 'Railway MCP', defaults.railwayMcpServer ?? defaultRailwayMcpServer);
     }
   }
 
   if (deploymentMonitor === 'vercel' || deploymentMonitor === 'both') {
-    envValues.VERCEL_TOKEN = await askSecret(ask, 'VERCEL_TOKEN value: ');
+    envValues.VERCEL_TOKEN = await askSecret(prompts, 'VERCEL_TOKEN value');
   }
 
   return {
@@ -343,23 +358,100 @@ export async function promptForSelectionsWithQuestioner(defaults: SetupSelection
   };
 }
 
-async function promptForMcpServer(ask: InitQuestioner, label: string, defaults: McpServerSelection): Promise<McpServerSelection> {
-  const id = (await ask(`${label} server id [${defaults.id}]: `)).trim() || defaults.id;
-  const command = (await ask(`${label} command [${defaults.command}]: `)).trim() || defaults.command;
-  const args = withDefaultList(parseCsv(await ask(`${label} args, comma-separated [${defaults.args.join(',')}]: `)), defaults.args);
-  const envVarNames = withDefaultList(parseCsv(await ask(`${label} env_var_names, comma-separated [${defaults.envVarNames.join(',')}]: `)), defaults.envVarNames);
+async function promptForOpenCodeSelection(
+  defaults: SetupSelections,
+  prompts: InitPromptAdapter,
+  context: InitPromptContext
+): Promise<{ readonly devRunnerMode: DevRunnerModeSelection; readonly opencodeCommand: string | undefined }> {
+  const detection = context.opencodeDetection;
+
+  context.io.stdout(renderOpenCodeReadiness(detection));
+
+  if (detection.state === 'installed_ready') {
+    const devRunnerMode = await prompts.select({ message: 'Development runner', choices: [
+      { label: 'Mock', value: 'mock' as const, description: 'Keep all development execution fake and local.' },
+      { label: `OpenCode (${detection.command} ready)`, value: 'opencode' as const, description: 'Use OpenCode without collecting provider API keys in Ewokbot.' }
+    ], defaultValue: defaults.devRunnerMode ?? 'mock' });
+
+    return { devRunnerMode, opencodeCommand: devRunnerMode === 'opencode' ? detection.command : defaults.opencodeCommand };
+  }
+
+  if (detection.state === 'installed_not_authenticated' || detection.state === 'installed_authenticated_no_model') {
+    const choice = await prompts.select({ message: 'Development runner', choices: [
+      { label: 'Mock', value: 'mock' as const, description: 'Continue safely without real OpenCode runs.' },
+      { label: `OpenCode (${detection.state})`, value: 'opencode' as const, description: 'Continue only after explicit acknowledgement; finish OpenCode setup outside Ewokbot.' },
+      { label: 'Show OpenCode setup instructions and use mock', value: 'instructions' as const, description: 'Print next steps without launching installers or auth flows.' }
+    ], defaultValue: defaults.devRunnerMode ?? 'mock' });
+
+    if (choice === 'instructions') {
+      context.io.stdout(renderOpenCodeInstructions(detection));
+      return { devRunnerMode: 'mock', opencodeCommand: defaults.opencodeCommand };
+    }
+
+    if (choice === 'opencode') {
+      const acknowledged = await prompts.confirm({
+        message: `Continue with OpenCode state ${detection.state} and finish setup outside Ewokbot before real development runs?`,
+        defaultValue: false
+      });
+
+      if (!acknowledged) {
+        return { devRunnerMode: 'mock', opencodeCommand: defaults.opencodeCommand };
+      }
+    }
+
+    return { devRunnerMode: choice, opencodeCommand: choice === 'opencode' ? detection.command : defaults.opencodeCommand };
+  }
+
+  const choice = await prompts.select({ message: 'Development runner', choices: [
+    { label: 'Mock', value: 'mock' as const, description: 'Continue without OpenCode.' },
+    { label: 'Enter custom OpenCode command path', value: 'custom' as const, description: 'Check another local command without installing anything.' },
+    { label: 'Show OpenCode setup instructions and use mock', value: 'instructions' as const, description: 'Print next steps without launching installers or auth flows.' }
+  ], defaultValue: 'mock' });
+
+  if (choice === 'instructions') {
+    context.io.stdout(renderOpenCodeInstructions(detection));
+    return { devRunnerMode: 'mock', opencodeCommand: defaults.opencodeCommand };
+  }
+
+  if (choice === 'custom') {
+    const customCommand = nonEmptyPromptValue(await prompts.input({ message: 'OpenCode command path', defaultValue: defaults.opencodeCommand ?? 'opencode' }), defaults.opencodeCommand ?? 'opencode');
+    const customDetection = context.detectOpenCode(customCommand);
+
+    context.io.stdout(renderOpenCodeReadiness(customDetection));
+
+    if (customDetection.state === 'installed_ready') {
+      return { devRunnerMode: 'opencode', opencodeCommand: customDetection.command };
+    }
+
+    if (customDetection.state === 'installed_not_authenticated' || customDetection.state === 'installed_authenticated_no_model') {
+      const acknowledged = await prompts.confirm({
+        message: `Continue with OpenCode state ${customDetection.state} and finish setup outside Ewokbot before real development runs?`,
+        defaultValue: false
+      });
+
+      return acknowledged
+        ? { devRunnerMode: 'opencode', opencodeCommand: customDetection.command }
+        : { devRunnerMode: 'mock', opencodeCommand: customCommand };
+    }
+
+    context.io.stdout(renderOpenCodeInstructions(customDetection));
+    return { devRunnerMode: 'mock', opencodeCommand: customCommand };
+  }
+
+  return { devRunnerMode: 'mock', opencodeCommand: defaults.opencodeCommand };
+}
+
+async function promptForMcpServer(prompts: InitPromptAdapter, label: string, defaults: McpServerSelection): Promise<McpServerSelection> {
+  const id = nonEmptyPromptValue(await prompts.input({ message: `${label} server id`, defaultValue: defaults.id }), defaults.id);
+  const command = nonEmptyPromptValue(await prompts.input({ message: `${label} command`, defaultValue: defaults.command }), defaults.command);
+  const args = withDefaultList(parseCsv(await prompts.input({ message: `${label} args, comma-separated`, defaultValue: defaults.args.join(',') })), defaults.args);
+  const envVarNames = withDefaultList(parseCsv(await prompts.input({ message: `${label} env_var_names, comma-separated`, defaultValue: defaults.envVarNames.join(',') })), defaults.envVarNames);
 
   return { id, command, args, envVarNames };
 }
 
-async function collectEnvValues(ask: InitQuestioner, envValues: Record<string, string | undefined>, names: readonly string[]): Promise<void> {
-  for (const name of [...new Set(names)]) {
-    envValues[name] = await askSecret(ask, `${name} value: `);
-  }
-}
-
-async function askSecret(ask: InitQuestioner, question: string): Promise<string> {
-  return (await ask(question)).trim();
+async function askSecret(prompts: InitPromptAdapter, message: string): Promise<string> {
+  return (await prompts.input({ message })).trim();
 }
 
 function withDefaultList(values: readonly string[], fallback: readonly string[] | undefined): readonly string[] {
@@ -370,68 +462,95 @@ function parseCsv(value: string): readonly string[] {
   return value.split(',').map((part) => part.trim()).filter((part) => part.length > 0);
 }
 
-interface ChoiceOption<T extends string | boolean> {
-  readonly label: string;
-  readonly value: T;
+function createInquirerPromptAdapter(): InitPromptAdapter {
+  return {
+    async select(input) {
+      return select({
+        message: input.message,
+        choices: input.choices.map((choice) => ({ name: choice.label, value: choice.value, description: choice.description })),
+        default: input.defaultValue
+      });
+    },
+    async confirm(input) {
+      return confirm({ message: input.message, default: input.defaultValue });
+    },
+    async input(input) {
+      return promptInput({ message: input.message, default: input.defaultValue });
+    },
+    async checkbox(input) {
+      return checkbox({
+        message: input.message,
+        choices: input.choices.map((choice) => ({ name: choice.label, value: choice.value, description: choice.description, checked: input.defaultValues.includes(choice.value) }))
+      });
+    }
+  };
 }
 
-interface EnvVarPreset {
-  readonly label: string;
-  readonly value: readonly string[];
+function nonEmptyPromptValue(value: string, fallback: string | undefined): string {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : fallback ?? '';
 }
 
-async function askChoice<T extends string | boolean>(ask: InitQuestioner, label: string, options: readonly ChoiceOption<T>[], defaultValue: T): Promise<T> {
-  const defaultIndex = Math.max(0, options.findIndex((option) => option.value === defaultValue));
-  const prompt = [
-    `${label}:`,
-    ...options.map((option, index) => `  ${index + 1}. ${option.label}`),
-    `Choose [${defaultIndex + 1}]: `
-  ].join('\n');
-
-  while (true) {
-    const answer = (await ask(prompt)).trim();
-
-    if (answer.length === 0) {
-      return options[defaultIndex].value;
-    }
-
-    const numeric = Number.parseInt(answer, 10);
-
-    if (Number.isInteger(numeric) && numeric >= 1 && numeric <= options.length) {
-      return options[numeric - 1].value;
-    }
-
-    const match = options.find((option) => String(option.value).toLowerCase() === answer.toLowerCase() || option.label.toLowerCase() === answer.toLowerCase());
-
-    if (match !== undefined) {
-      return match.value;
-    }
-  }
-}
-
-async function askEnvVarPreset(
-  ask: InitQuestioner,
-  label: string,
-  presets: readonly EnvVarPreset[],
-  defaultValue: readonly string[]
-): Promise<readonly string[]> {
-  const customValue = '__custom__';
-  const choice = await askChoice<string>(ask, label, [
-    ...presets.map((preset) => ({ label: preset.label, value: preset.value.join(',') })),
-    { label: 'Custom comma-separated list', value: customValue }
-  ], defaultValue.join(','));
-
-  if (choice === customValue) {
-    return parseCsv(await ask(`${label} custom env var names, comma-separated: `));
+function deploymentMonitorToChoices(selection: DeploymentMonitorSelection): readonly ('railway' | 'vercel')[] {
+  if (selection === 'both') {
+    return ['railway', 'vercel'];
   }
 
-  return parseCsv(choice);
+  if (selection === 'railway' || selection === 'vercel') {
+    return [selection];
+  }
+
+  return [];
 }
 
-function askReadline(readline: ReturnType<typeof createInterface>, question: string): Promise<string> {
-  return new Promise((resolve) => {
-    readline.question(question, resolve);
-  });
+function deploymentMonitorFromChoices(values: readonly ('railway' | 'vercel')[]): DeploymentMonitorSelection {
+  const selected = new Set(values);
+
+  if (selected.has('railway') && selected.has('vercel')) {
+    return 'both';
+  }
+
+  if (selected.has('railway')) {
+    return 'railway';
+  }
+
+  if (selected.has('vercel')) {
+    return 'vercel';
+  }
+
+  return 'none';
+}
+
+function renderOpenCodeReadiness(detection: DevToolDetectionResult): string {
+  return [`OpenCode readiness: ${detection.command} is ${readinessLabel(detection.state)}.`, ...detection.details.map((detail) => `- ${detail}`), ''].join('\n');
+}
+
+function renderOpenCodeInstructions(detection: DevToolDetectionResult): string {
+  return [`OpenCode setup instructions for ${detection.command}:`, ...detection.nextSteps.map((step) => `- ${step}`), 'Ewokbot did not run installers, auth flows, or OpenCode commands for setup.', ''].join('\n');
+}
+
+function readinessLabel(state: DevToolReadinessState): string {
+  if (state === 'installed_ready') {
+    return 'ready';
+  }
+
+  if (state === 'installed_not_authenticated') {
+    return 'installed but not authenticated';
+  }
+
+  if (state === 'installed_authenticated_no_model') {
+    return 'authenticated but missing model configuration';
+  }
+
+  if (state === 'not_installed') {
+    return 'not installed';
+  }
+
+  if (state === 'installed_unsupported') {
+    return 'installed but unsupported';
+  }
+
+  return 'not ready because command detection failed';
 }
 
 function defaultCommandExists(command: string): boolean {

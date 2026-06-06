@@ -2,6 +2,20 @@
 
 ## 2026-06-06
 
+Implemented Milestone AM Inquirer TUI Init review candidate:
+
+- Added `@inquirer/prompts` and replaced the readline-style interactive init wizard with an injectable prompt adapter using guided selections, confirmations, text input, and checkbox monitor selection.
+- Preserved deterministic `--non-interactive` init, fake-only tests, and injected prompt seams so test coverage does not require a real TTY.
+- Surfaced AL OpenCode readiness in init: ready OpenCode can be selected without Ewokbot API-key prompts, not-authenticated/no-model states require explicit acknowledgement, and missing/failed/unsupported states offer mock mode, setup instructions, or custom command checks without installers or auth flows.
+- Kept OpenCode credentials owned by OpenCode, kept generated files limited to `.ewokbot/` plus AK user-level Ewokbot paths, and refused existing `.ewokbot/workspace.yml`, `.ewokbot/.env`, or `.ewokbot/.env.example` before prompting.
+- Preserved AM scope only: no AN Ewokbot auth commands, Telegram/dashboard/daemonization, live provider automation, production merge, or production deployment work was added.
+
+Accepted Milestone AL and prepared Milestone AM:
+
+- Marked AL Dev Tool Detection Adapters as complete and accepted after Codex review.
+- Set AM Inquirer TUI Init as the next approved/current implementation milestone, backed by AK and accepted AL.
+- Kept AN Ewokbot Auth Commands explicitly future-only after AM, with Telegram, dashboard, daemonization, later PR handoff, staging verification, and production automation still out of scope.
+
 Fixed AL OpenCode readiness detection review issue:
 
 - Updated the no-`runCommand` OpenCode detection path to still inspect global and project OpenCode config files for model/provider configuration before resolving readiness.

@@ -6,9 +6,10 @@
 2. The next approved product direction remains the npm-installable CLI and VPS runtime path.
 3. Milestone AJ: Interactive Init Wizard And Credential Setup is accepted after the prompt UX hardening commit.
 4. Milestone AK: User-Level Ewokbot Layout is complete and accepted.
-5. Milestone AL: Dev Tool Detection Adapters is implemented as a review candidate, with the no-`runCommand` OpenCode model detection review fix applied.
-6. Milestones AM and AN are approved in order as future work, but must not be implemented before AL is reviewed and accepted.
-7. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
+5. Milestone AL: Dev Tool Detection Adapters is complete and accepted, including the no-`runCommand` OpenCode model detection review fix.
+6. Milestone AM: Inquirer TUI Init is implemented as a review candidate.
+7. Milestone AN: Ewokbot Auth Commands remains approved after AM only and must not be implemented before AM is reviewed and accepted.
+8. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
 
 ## OpenCode Prompt
 
@@ -103,13 +104,16 @@ AK uses XDG-aware path helpers, creates user-level directories only through expl
 
 AK doctor/readiness output reports user config, auth, state, and cache presence without reading or printing auth file contents. Tests use injected home/XDG paths and avoid real home-directory mutation, live providers, MCP/OAuth flows, OpenCode execution, network calls, automatic secret migration, and OpenCode credential storage in Ewokbot auth.
 
-Milestone AL implementation candidate is now present and should be reviewed before the next milestone starts.
+Milestone AL - Dev Tool Detection Adapters is complete and accepted.
+
+Milestone AM - Inquirer TUI Init is implemented as a review candidate.
+
+AM replaced the readline-style interactive init wizard with an injectable `@inquirer/prompts` TUI that uses guided selections, confirmations, inputs, and checkboxes while preserving deterministic `--non-interactive` init for tests and automation. The TUI surfaces AL OpenCode readiness before choosing the dev runner: ready OpenCode can be selected without asking for OpenAI, Anthropic, or OpenCode API keys; missing, failed, unsupported, not-authenticated, and no-model states offer explicit mock, instructions, custom command, or acknowledgement paths without installing OpenCode or launching auth automatically. Jira, GitHub, Railway, and Vercel provider choices remain guided, generated files remain limited to `.ewokbot/`, existing onboarding files are refused before prompts, and tests remain fake-only with injected prompt adapters.
 
 Continue in this order:
 
-1. Review and accept AL - Dev Tool Detection Adapters, starting with OpenCode `detect()`, `doctor()`, `launchSetup()`, and `getConfigSummary()`.
-2. AM - Inquirer TUI Init using `@inquirer/prompts`, backed by AK and AL, only after AL review/acceptance.
-3. AN - Ewokbot Auth Commands, separate from OpenCode auth, only after AM.
+1. Review and accept AM - Inquirer TUI Init.
+2. AN - Ewokbot Auth Commands, separate from OpenCode auth, only after AM is accepted.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -144,9 +148,9 @@ The next milestones should move in this order:
 9. AI - Controlled Single-Repository Dev Execution. Completed.
 10. AJ - Interactive Init Wizard And Credential Setup. Completed.
 11. AK - User-Level Ewokbot Layout. Completed.
-12. AL - Dev Tool Detection Adapters. Implemented review candidate.
-13. AM - Inquirer TUI Init. Approved after AL review/acceptance.
-14. AN - Ewokbot Auth Commands. Approved after AM.
+12. AL - Dev Tool Detection Adapters. Completed.
+13. AM - Inquirer TUI Init. Implemented review candidate.
+14. AN - Ewokbot Auth Commands. Approved after AM acceptance.
 
 Non-goals for the immediate next milestone:
 

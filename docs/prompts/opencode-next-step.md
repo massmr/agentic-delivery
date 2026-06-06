@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, and AK are complete and accepted. Milestone AL: Dev Tool Detection Adapters is implemented as a review candidate and must be reviewed and accepted before AM begins.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, and AL are complete and accepted. Milestone AM: Inquirer TUI Init is implemented as a review candidate and must be reviewed and accepted before AN begins.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -47,7 +47,19 @@ AL safety constraints that must be preserved during review and follow-up work:
 - Keep tests fake-only with no real OpenCode, package-manager, OAuth, network, MCP, provider, or home-directory mutation side effects.
 - Production merge and production deployment remain human-only.
 
-Do not start AM, AN, or any later milestone until AL is reviewed and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step.
+AM replaced the readline-style interactive init wizard with an injectable `@inquirer/prompts` TUI while preserving deterministic `--non-interactive` init. It surfaces AL OpenCode readiness in the init flow, lets ready OpenCode be selected without asking for OpenAI, Anthropic, or OpenCode API keys, and keeps missing or not-ready OpenCode on explicit safe paths such as mock mode, setup instructions, custom command checks, or acknowledged continuation.
+
+AM safety constraints that must be preserved during review and follow-up work:
+
+- Do not implement AN auth commands until AM is reviewed and accepted.
+- Do not add Telegram, WhatsApp, dashboard, daemonization, production merge, or production deployment automation.
+- Do not run OpenCode install scripts, package managers, `opencode auth login`, auth flows, or setup actions automatically.
+- Do not read, print, parse, copy, or store raw OpenCode secret values.
+- Keep OpenCode credentials owned by OpenCode; do not copy them into `.ewokbot/.env` or Ewokbot auth.
+- Keep tests fake-only with no real OpenCode, package-manager, OAuth, network, MCP, provider, or home-directory mutation side effects.
+- Production merge and production deployment remain human-only.
+
+Do not start AN or any later milestone until AM is reviewed and accepted or `docs/tracking/next-actions.md` explicitly approves the next implementation step. The next milestone after AM acceptance is AN: Ewokbot Auth Commands.
 
 ## Required Reading
 

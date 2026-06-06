@@ -116,9 +116,9 @@ Status legend:
 - `[x]` Controlled single-repository dev execution
 - `[x]` Interactive init wizard and credential setup
 - `[x]` User-level Ewokbot config/data/auth/cache layout
-- `[~]` Dev tool detection adapters, starting with OpenCode
-- `[ ]` Inquirer TUI init
-- `[ ]` Ewokbot auth commands separated from OpenCode auth
+- `[x]` Dev tool detection adapters, starting with OpenCode
+- `[~]` Inquirer TUI init review candidate
+- `[ ]` Ewokbot auth commands separated from OpenCode auth after AM acceptance
 
 ## Future Control Surfaces
 
