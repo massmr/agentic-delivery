@@ -307,12 +307,15 @@ Optional gates:
 - dependency audit
 - e2e
 
-## Core Safety Loop
+## Meaningful Diff And Core Safety Loop
 
-The controlled development path must evaluate the agent-produced diff before any later handoff. Ewokbot should inspect changed files and diff content after the dev agent runs, produce a deterministic `pass`, `needs_human`, or `fail` decision, and persist a local safety report in the run directory.
+The controlled development path must first prove that the dev agent produced a meaningful product diff. Ewokbot should inspect changed files after the dev agent runs, ignore agent/runtime artifacts such as `.omo/`, `.ewokbot/`, logs, caches, and run evidence, and fail or escalate runs where OpenCode exits successfully but no product file changed.
+
+After a meaningful product diff exists, Ewokbot should evaluate whether that diff is safe enough to proceed. The full safety loop should inspect changed files and diff content, produce a deterministic `pass`, `needs_human`, or `fail` decision, and persist local evidence in the run directory.
 
 Initial policy checks:
 
+- no-meaningful-diff detection after ignored artifacts are removed;
 - forbidden file changes such as `.env`, `.env.*`, private keys, credential files, and Ewokbot-owned auth/config files;
 - secret-like additions in diffs, with matched values redacted from output;
 - maximum changed file and diff line thresholds;

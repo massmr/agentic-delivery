@@ -9,7 +9,7 @@
 5. Milestone AL: Dev Tool Detection Adapters is complete and accepted, including the no-`runCommand` OpenCode model detection review fix.
 6. Milestone AM: Inquirer TUI Init is complete and accepted.
 7. Milestone AN: Ewokbot Auth Commands is complete and accepted.
-8. Milestone AO: Core Safety Loop v1 is the next approved implementation milestone.
+8. Milestone AO: Meaningful Diff Guard is the next approved implementation milestone.
 9. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until a new milestone is explicitly proposed and accepted.
 
 ## OpenCode Prompt
@@ -126,22 +126,32 @@ Supported Ewokbot provider metadata entries are Jira, GitHub, Railway, and Verce
 
 Doctor output now distinguishes Ewokbot auth metadata from OpenCode readiness, and redaction covers additional auth-like field names such as access tokens, refresh tokens, client secrets, credentials, and authorization values.
 
-Milestone AO - Core Safety Loop v1 is the next approved implementation milestone.
+Milestone AO - Meaningful Diff Guard is the next approved implementation milestone.
 
-AO must make the controlled `run-dev` path safer by evaluating the repository diff after the coding agent runs and before later handoff states can be considered. The first version should add post-agent diff policy checks, forbidden-file detection, redacted secret-like diff scanning, changed-file and diff-line limits, sensitive-category escalation for dependencies, migrations, auth, payments, and infra/deployment paths, and a local safety report under the run directory.
+AO exists because the first real local OpenCode smoke proved a false positive: OpenCode exited successfully, local quality gates passed, but the target repository had no product diff and only `.omo/` appeared as an ignored agent artifact.
 
-AO decisions must be deterministic:
+AO must make the controlled `run-dev` path refuse that result before it can reach `LOCAL_CHECKS_PASSED`.
 
-- `pass` for safe code-only changes.
-- `needs_human` for sensitive but reviewable changes such as dependency lockfiles, migrations, auth/payment/infra paths, or large diffs.
-- `fail` for forbidden files or secret-like additions.
+Build:
+
+- Capture changed files and diff summary after OpenCode execution.
+- Ignore `.omo/`, `.ewokbot/`, logs, caches, and run evidence when deciding whether the run produced meaningful product changes.
+- If OpenCode exits `0` but no meaningful product file changed, stop as `FAILED` or `NEEDS_HUMAN` with a clear reason.
+- Persist the meaningful-diff decision and ignored files under `.ewokbot/runs/<ticket-key>/<run-id>/`.
+- Surface the reason in `final-report.md` and status/report output.
+- Add tests for "OpenCode success but only ignored artifacts changed" and "safe non-empty product diff can pass".
 
 Continue in this order:
 
-1. Implement AO - Core Safety Loop v1.
-2. Propose the next milestone in this file before implementing anything after AO.
+1. Implement AO - Meaningful Diff Guard.
+2. AP - Core Safety Loop v1.
+3. AQ - Agent Completion Contract.
+4. AR - Test Relevance Guard.
+5. AS - Harness v1.
+6. AT - Real Provider Smoke v1.
+7. AU - GitHub PR Handoff v1.
 
-Any other task must be proposed here first and must not be implemented until approved.
+Anything outside AO must wait until AO is reviewed and accepted. Anything outside AP-AU must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -177,7 +187,13 @@ The next milestones should move in this order:
 12. AL - Dev Tool Detection Adapters. Completed.
 13. AM - Inquirer TUI Init. Completed.
 14. AN - Ewokbot Auth Commands. Completed.
-15. AO - Core Safety Loop v1. Approved next.
+15. AO - Meaningful Diff Guard. Approved next.
+16. AP - Core Safety Loop v1. Planned after AO.
+17. AQ - Agent Completion Contract. Planned after AP.
+18. AR - Test Relevance Guard. Planned after AQ.
+19. AS - Harness v1. Planned after AR.
+20. AT - Real Provider Smoke v1. Planned after AS.
+21. AU - GitHub PR Handoff v1. Planned after AT.
 
 Non-goals for the immediate next milestone:
 

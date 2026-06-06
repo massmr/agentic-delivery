@@ -80,6 +80,7 @@ Deliverables:
 - Quality profile fallback.
 - Command runner.
 - Quality report.
+- Meaningful diff guard after agent execution.
 - Post-agent diff safety policy.
 - Forbidden-file, redacted secret-like diff, diff-size, and sensitive-path checks.
 
@@ -88,6 +89,7 @@ Acceptance criteria:
 - Required gates run in order.
 - A failed gate stops the workflow before push.
 - Reports include command, exit code, duration, and summary.
+- Agent success with no meaningful product diff does not reach local success.
 - Agent-produced forbidden file or secret-like changes fail before handoff.
 - Sensitive or oversized diffs enter `NEEDS_HUMAN` with a clear local safety report.
 

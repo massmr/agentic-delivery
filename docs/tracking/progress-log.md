@@ -2,10 +2,18 @@
 
 ## 2026-06-06
 
+Refined post-AN milestones after the first real local OpenCode smoke:
+
+- Confirmed `ewokbot run-dev AD-101 --confirm-dev-execution` can invoke local OpenCode headlessly and reach `LOCAL_CHECKS_PASSED` outside the Codex filesystem sandbox.
+- Found a real false positive: OpenCode exited `0` and local quality gates passed, but the target repository had no product diff and only `.omo/` appeared as an agent artifact.
+- Re-scoped AO from broad Core Safety Loop v1 to Meaningful Diff Guard so the next implementation directly prevents empty-agent-success runs.
+- Planned the follow-up sequence after AO: AP Core Safety Loop v1, AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, and AU GitHub PR Handoff v1.
+- Kept Sentry, PostHog, Notion, support/SEO signal ingestion, Telegram/WhatsApp, dashboard, autonomous production merge, and production deployment out of scope.
+
 Accepted Milestone AN and prepared Milestone AO:
 
 - Marked AN Ewokbot Auth Commands as complete and accepted after Codex review and commit `58f4506`.
-- Set AO Core Safety Loop v1 as the next approved implementation milestone.
+- Initially set AO Core Safety Loop v1 as the next approved implementation milestone.
 - Defined AO around post-agent diff policy for `run-dev`: changed-file capture, forbidden-file checks, redacted secret-like diff scanning, diff-size limits, sensitive-category escalation, deterministic `pass`/`needs_human`/`fail` decisions, and a local safety report.
 - Kept Sentry, PostHog, Notion, support/SEO signal ingestion, Telegram/WhatsApp, dashboard, later PR handoff, staging verification, production merge, and production deployment out of scope until explicitly approved.
 

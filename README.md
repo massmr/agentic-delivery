@@ -423,7 +423,8 @@ Near-term direction:
 
 - completed CLI control commands for status, runs, pause/resume, and approval,
 - one explicit real-provider smoke command with operator confirmation,
-- core safety loop for post-agent diff policy,
+- meaningful diff guard so an agent success with only ignored artifacts cannot pass as implemented work,
+- core safety loop for post-agent diff policy after the meaningful-diff guard,
 - richer GitHub, Jira, Railway, and Vercel integrations after safety controls are stronger.
 
 Track detailed planning in:

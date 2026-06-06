@@ -847,21 +847,51 @@ Explicit safety constraints:
 - Do not treat Ewokbot auth as a substitute for OpenCode auth when OpenCode is the selected runner.
 - Production merge and production deployment remain human-only.
 
-### Milestone AO: Core Safety Loop v1
+### Milestone AO: Meaningful Diff Guard
 
 Goal:
 
-Turn the current controlled `run-dev` path into a safer supervised loop by evaluating the repository diff after the coding agent runs and before any later handoff can be considered.
+Prevent false-positive development runs where the coding agent exits successfully and local quality gates pass, but no meaningful product code changed.
+
+Build:
+
+- Capture changed files and diff summary after OpenCode execution in `run-dev`.
+- Ignore agent/runtime artifacts such as `.omo/`, `.ewokbot/`, logs, caches, and generated run evidence when deciding whether the run produced a meaningful product diff.
+- If the agent exits `0` but there is no meaningful product diff, stop the run as `FAILED` or `NEEDS_HUMAN` with a clear reason.
+- Persist the meaningful-diff decision and ignored files in the run directory.
+- Surface the reason in `final-report.md`, status output, and implementation/safety evidence.
+- Add tests for an OpenCode success with only ignored artifacts and for a safe non-empty product diff.
+
+Acceptance:
+
+- `run-dev` cannot reach `LOCAL_CHECKS_PASSED` when only ignored artifacts changed.
+- `run-dev` can still reach `LOCAL_CHECKS_PASSED` when a meaningful product diff exists and local quality gates pass.
+- The run report makes the no-diff failure obvious to an operator.
+- Ignored paths are deterministic and documented.
+- Tests use fake repositories and fake diffs only; no live providers, OpenCode, MCP, network, package-manager, or home-directory mutation.
+
+Explicit safety constraints:
+
+- Do not implement the full diff safety policy in AO; that is Milestone AP.
+- Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, or external signal ingestion in AO.
+- Do not delete or revert user changes outside a controlled temporary test repository.
+- Do not print secret values, even when a secret scan fails.
+- Production merge and production deployment remain human-only.
+
+### Milestone AP: Core Safety Loop v1
+
+Goal:
+
+Evaluate whether a non-empty agent diff is allowed, requires human review, or must fail before any later handoff can be considered.
 
 Build:
 
 - Add a policy module for post-agent diff evaluation.
-- Capture the modified file list and diff summary after OpenCode execution in `run-dev`.
 - Add forbidden-file detection for `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files that must not be changed by an agent.
-- Add secret-like content detection over the changed diff without printing matched secret values.
+- Add secret-like content detection over changed diff additions without printing matched secret values.
 - Add diff-size limits for changed files and diff lines, with configurable defaults.
 - Detect human-review categories such as dependency lockfile changes, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
-- Return a deterministic policy decision: `pass`, `needs_human`, or `fail`.
+- Return deterministic policy decisions: `pass`, `needs_human`, or `fail`.
 - Write a local safety report under the run directory.
 - Block later local success/handoff states when the safety policy returns `needs_human` or `fail`.
 
@@ -872,11 +902,139 @@ Acceptance:
 - Secret-like additions fail with redacted output only.
 - Large diffs and sensitive categories escalate to `NEEDS_HUMAN` with clear reasons.
 - `run-dev` persists safety evidence in `.ewokbot/runs/<ticket-key>/<run-id>/`.
-- Tests use fake repositories and fake diffs only; no live providers, OpenCode, MCP, network, package-manager, or home-directory mutation.
+- Tests use fake repositories and fake diffs only.
 
 Explicit safety constraints:
 
-- Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, or external signal ingestion in AO.
-- Do not delete or revert user changes outside a controlled temporary test repository.
+- Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, or external signal ingestion in AP.
+- Do not make live provider, MCP, network, package-manager, or real OpenCode calls in tests.
 - Do not print secret values, even when a secret scan fails.
+- Production merge and production deployment remain human-only.
+
+### Milestone AQ: Agent Completion Contract
+
+Goal:
+
+Make development-run success depend on a clear agent completion signal instead of only subprocess exit code and local quality gates.
+
+Build:
+
+- Tighten the OpenCode prompt so the agent must finish implementation, summarize changed files, mention tests, and state known limits.
+- Capture or parse a completion summary from the agent output where practical.
+- Detect obvious incomplete-agent output such as unfinished todos, exploration-only summaries, or "waiting for background agents" endings.
+- Fail or escalate when the agent reports no implementation, no changed files, or unresolved blockers.
+- Persist the completion evaluation under the run directory.
+
+Acceptance:
+
+- Exploration-only agent output does not count as successful implementation.
+- Completed implementation output can pass when paired with meaningful diff, safety pass, and quality gates.
+- Tests use fake agent outputs and fake diffs only.
+
+Explicit safety constraints:
+
+- Do not require live OpenCode execution in tests.
+- Do not make success depend on brittle wording alone when diff and quality evidence contradict it.
+- Production merge and production deployment remain human-only.
+
+### Milestone AR: Test Relevance Guard
+
+Goal:
+
+Avoid treating trivial stub scripts as strong evidence that a generated feature is correct.
+
+Build:
+
+- Detect obviously trivial quality scripts such as `node -e "console.log('ok')"` and equivalent no-op commands.
+- Mark test relevance as `pass`, `warn`, or `needs_human`.
+- Include test relevance in the run report and quality report.
+- Keep the heuristic conservative and transparent.
+
+Acceptance:
+
+- Stub-only tests are surfaced as weak evidence.
+- Realistic test commands are not blocked by default.
+- The guard does not prevent local development, but can escalate the run before provider handoff.
+
+Explicit safety constraints:
+
+- Do not attempt to infer full semantic test quality in this milestone.
+- Do not run package-manager installs automatically.
+- Production merge and production deployment remain human-only.
+
+### Milestone AS: Harness v1
+
+Goal:
+
+Turn the temporary real smoke learnings into a reproducible local harness that can score Ewokbot behavior against fixtures.
+
+Build:
+
+- Add a fixture format for tickets, repositories, and expected outcomes.
+- Add a minimal Node fixture repository and the AD-101-style ticket fixture.
+- Add `ewokbot harness run <fixture-id>` and `ewokbot harness run --all`.
+- Score expected outcomes such as meaningful diff, selected repository, policy decision, quality result, and report presence.
+- Keep harness fixtures local and deterministic.
+
+Acceptance:
+
+- The harness catches a no-meaningful-diff false positive.
+- Harness tests do not call live OpenCode, Jira, GitHub, Railway, Vercel, MCP, or network services.
+- Harness output is readable enough for CI and local development.
+
+Explicit safety constraints:
+
+- Do not add live provider credentials or live service calls.
+- Do not make harness execution mutate user repositories.
+- Production merge and production deployment remain human-only.
+
+### Milestone AT: Real Provider Smoke v1
+
+Goal:
+
+Run one controlled smoke using a real Jira MCP ticket while keeping development and provider mutations tightly bounded.
+
+Build:
+
+- Use Jira MCP to read one explicitly selected sandbox ticket.
+- Reuse planning, `run-dev`, meaningful-diff, safety, completion, test relevance, and local quality evidence.
+- Do not open GitHub PRs or call deployment providers in this milestone.
+- Produce an operator report that explains exactly what was read and what local actions happened.
+
+Acceptance:
+
+- One real Jira ticket can drive `scan`, `plan`, and `run-dev` locally.
+- Missing Jira MCP readiness fails before repository or agent side effects.
+- No GitHub, Railway, Vercel, production, or remote mutation is attempted.
+
+Explicit safety constraints:
+
+- Use sandbox or explicitly selected tickets only.
+- Do not transition Jira tickets unless a later milestone explicitly approves it.
+- Production merge and production deployment remain human-only.
+
+### Milestone AU: GitHub PR Handoff v1
+
+Goal:
+
+After local evidence passes, hand off a validated branch to GitHub as a draft pull request without merging.
+
+Build:
+
+- Push the local branch through the allowed local git/native fallback path.
+- Open or reuse a draft PR against the configured develop branch through the typed CodeHostPort.
+- Attach the run report, safety decision, quality evidence, and known limitations to the PR body/comment.
+- Add idempotency protection for repeated handoff attempts.
+
+Acceptance:
+
+- PR handoff requires meaningful diff, safety pass or accepted human review, completion pass, and quality gates.
+- Re-running the same handoff does not duplicate branches, PRs, or comments.
+- Tests use fake CodeHostPort and fake git remotes only.
+
+Explicit safety constraints:
+
+- Do not merge PRs automatically.
+- Do not open production PRs in AU.
+- Do not perform real remote pushes in tests.
 - Production merge and production deployment remain human-only.

@@ -92,6 +92,7 @@ Quality gates are a subprocess/native boundary, not an MCP provider boundary. Th
 
 ## Future Guards
 
+- Meaningful diff guard so an agent success with only ignored artifacts cannot pass as implemented work.
 - Core safety loop for post-agent diffs.
 - Forbidden file checks for environment files, credentials, private keys, and Ewokbot-owned auth/config.
 - Secret-like diff scanning with redacted output.

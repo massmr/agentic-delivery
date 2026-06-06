@@ -119,7 +119,13 @@ Status legend:
 - `[x]` Dev tool detection adapters, starting with OpenCode
 - `[x]` Inquirer TUI init
 - `[x]` Ewokbot auth commands separated from OpenCode auth
+- `[ ]` Meaningful diff guard for post-agent false positives
 - `[ ]` Core safety loop for post-agent diff policy
+- `[ ]` Agent completion contract
+- `[ ]` Test relevance guard
+- `[ ]` Harness v1 for fixture-based scoring
+- `[ ]` Real provider smoke v1 with Jira MCP and local run-dev
+- `[ ]` GitHub draft PR handoff after validated local evidence
 
 ## Future Control Surfaces
 

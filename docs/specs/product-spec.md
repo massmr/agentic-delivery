@@ -144,7 +144,14 @@ The MVP can use mock connectors where real credentials are not yet configured, b
 
 Ewokbot must become a verifier around coding agents, not only a runner. OpenCode or another `DevAgentPort` may produce code changes, but Ewokbot owns the decision about whether those changes can proceed.
 
-The next product layer is a core safety loop for the controlled development path:
+The next product layer starts with a meaningful-diff guard for the controlled development path:
+
+- inspect the files and diff produced by the coding agent;
+- ignore agent/runtime artifacts such as `.omo/`, `.ewokbot/`, logs, caches, and run evidence when deciding whether product code changed;
+- fail or escalate an agent run that exits successfully but produces no meaningful product diff;
+- persist the no-diff decision before local success or later handoff can be considered.
+
+After that, the core safety loop expands the decision model:
 
 - inspect the files and diff produced by the coding agent;
 - fail forbidden file changes such as `.env`, credentials, private keys, and Ewokbot-owned auth/config files;
