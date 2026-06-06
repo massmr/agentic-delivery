@@ -136,7 +136,7 @@ test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted e
     calls.push(input);
     return { stdout: 'stdout-ok', stderr: 'stderr-ok', exitCode: 0 };
   };
-  const secretArgs = ['run', '--no-network', '--token', 'plain-token-value', '--api_key=abc123', '--password', 'hunter2', 'sk-test-secret'];
+  const secretArgs = ['--no-network', '--token', 'plain-token-value', '--api_key=abc123', '--password', 'hunter2', 'sk-test-secret'];
   const result = await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
     ticketKey: ticket.ref.key,
     runId: 'run-1',
@@ -160,16 +160,17 @@ test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted e
   });
 
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0]?.args, secretArgs);
+  assert.deepEqual(calls[0]?.args, ['run', ...secretArgs, '--dir', workingDirectory, 'mock prompt']);
   assert.equal(calls[0]?.executable, 'opencode');
   assert.equal(calls[0]?.cwd, workingDirectory);
-  assert.equal(calls[0]?.stdin, 'mock prompt');
+  assert.equal(calls[0]?.stdin, '');
   assert.deepEqual(calls[0]?.env, { PATH: '/usr/bin', HOME: '/tmp/home' });
   assert.equal(calls[0]?.timeoutMs, 30000);
 
   const log = await readFile(logPath, 'utf8');
   assert.equal(result.status, 'passed');
-  assert.match(result.command, /opencode run --no-network --token \[redacted\] --api_key=\[redacted\] --password \[redacted\] \[redacted\]/u);
+  assert.match(result.command, /opencode run --no-network --token \[redacted\] --api_key=\[redacted\] --password \[redacted\] \[redacted\] --dir /u);
+  assert.match(result.command, /<prompt>/u);
   assert.equal(result.attempts[0]?.command, result.command);
   assert.equal(result.attempts.length, 1);
   assert.equal(result.attempts[0]?.exitCode, 0);
@@ -215,7 +216,7 @@ test('MockOpenCodeRunner redacts secret-like command args in persisted fields an
     branchName: branch.name,
     baseBranch: branch.baseBranch,
     command: 'opencode',
-    commandArgs: ['run', '--secret', 'plain-secret-value', '--password=super-password', 'sk-mock-secret'],
+    commandArgs: ['--secret', 'plain-secret-value', '--password=super-password', 'sk-mock-secret'],
     workingDirectory: rootPath,
     workspaceRoot: rootPath,
     prompt: 'mock prompt',

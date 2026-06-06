@@ -25,8 +25,8 @@ export class OpenCodeSubprocessRunner implements DevRunner {
 
   async run(input: DevRunInput): Promise<DevRunResult> {
     const executable = validateExecutable(input.command);
-    const args = [...(input.commandArgs ?? [])];
     const workingDirectory = validateWorkingDirectory(input.workingDirectory, input.workspaceRoot);
+    const invocation = buildOpenCodeInvocation(workingDirectory, input.commandArgs ?? [], input.prompt);
     const env = buildAllowlistedEnvironment(this.baseEnvironment, input.environment, input.environmentAllowlist ?? []);
     const startedAtDate = this.now();
     const startedAt = startedAtDate.toISOString();
@@ -34,17 +34,17 @@ export class OpenCodeSubprocessRunner implements DevRunner {
     const maxAttempts = Math.max(1, input.maxAttempts);
 
     await mkdir(dirname(input.implementationLogPath), { recursive: true });
-    await writeFile(input.implementationLogPath, renderLogHeader(input, executable, args, workingDirectory), 'utf8');
+    await writeFile(input.implementationLogPath, renderLogHeader(input, executable, invocation.loggedArgs, workingDirectory), 'utf8');
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const attemptStartedAtDate = this.now();
       const attemptStartedAt = attemptStartedAtDate.toISOString();
       const execution = await this.executor({
         executable,
-        args,
+        args: invocation.executorArgs,
         cwd: workingDirectory,
         env,
-        stdin: input.prompt,
+        stdin: '',
         timeoutMs: input.timeoutMs,
         abortSignal: input.abortSignal
       });
@@ -53,7 +53,7 @@ export class OpenCodeSubprocessRunner implements DevRunner {
       const status = statusFromExecution(execution);
       const attemptResult: DevRunAttemptResult = {
         attempt,
-        command: redactCommand(executable, args),
+        command: redactCommand(executable, invocation.loggedArgs),
         workingDirectory,
         startedAt: attemptStartedAt,
         finishedAt: attemptFinishedAt,
@@ -86,7 +86,7 @@ export class OpenCodeSubprocessRunner implements DevRunner {
       repository: input.repository,
       branchName: input.branchName,
       baseBranch: input.baseBranch,
-      command: redactCommand(executable, args),
+      command: redactCommand(executable, invocation.loggedArgs),
       workingDirectory,
       implementationLogPath: input.implementationLogPath,
       startedAt,
@@ -97,6 +97,11 @@ export class OpenCodeSubprocessRunner implements DevRunner {
       summary: summarizeRun(status, attempts.length, lastAttempt)
     };
   }
+}
+
+interface OpenCodeInvocation {
+  readonly executorArgs: readonly string[];
+  readonly loggedArgs: readonly string[];
 }
 
 function validateExecutable(command: string): string {
@@ -124,6 +129,23 @@ function validateWorkingDirectory(workingDirectory: string, workspaceRoot: strin
   }
 
   throw new Error(`OpenCode working directory must stay inside workspace root '${resolvedWorkspaceRoot}': ${resolvedWorkingDirectory}`);
+}
+
+function buildOpenCodeInvocation(workingDirectory: string, commandArgs: readonly string[], prompt: string): OpenCodeInvocation {
+  const trimmedPrompt = prompt.trim();
+
+  if (trimmedPrompt.length === 0) {
+    throw new Error('OpenCode prompt must be a non-empty string.');
+  }
+
+  const normalizedCommandArgs = [...commandArgs];
+  const extraArgs = normalizedCommandArgs[0] === 'run'
+    ? normalizedCommandArgs.slice(1)
+    : normalizedCommandArgs;
+  const executorArgs = ['run', ...extraArgs, '--dir', workingDirectory, trimmedPrompt];
+  const loggedArgs = ['run', ...extraArgs, '--dir', workingDirectory, '<prompt>'];
+
+  return { executorArgs, loggedArgs };
 }
 
 function buildAllowlistedEnvironment(
