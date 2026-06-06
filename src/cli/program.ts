@@ -10,6 +10,7 @@ import {
   runResumeCommand,
   runRunsCommand
 } from './commands/control.js';
+import { runAuthCommand } from './commands/auth.js';
 import { runInitCommand } from './commands/init.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runPlanCommand } from './commands/plan.js';
@@ -36,6 +37,10 @@ const HELP_TEXT = [
   'Usage:',
   '  ewokbot [--help]',
   '  ewokbot init',
+  '  ewokbot auth status',
+  '  ewokbot auth login <provider>',
+  '  ewokbot auth logout <provider>',
+  '  ewokbot auth list',
   '  ewokbot doctor',
   '  ewokbot scan',
   '  ewokbot plan <ticket-key>',
@@ -56,6 +61,7 @@ const HELP_TEXT = [
   '',
   'Commands:',
   `  init        Create ${ewokbotWorkspaceConfigPath}, .ewokbot/.env, and .ewokbot/.env.example for local onboarding.`,
+  '  auth        Manage Ewokbot-owned provider auth metadata; OpenCode auth stays external.',
   '  doctor      Validate local setup files without live provider calls.',
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
   '  plan        Create a local dry-run plan through the configured typed TicketPort; no delivery side effects.',
@@ -96,6 +102,7 @@ export interface CliProgramOptions {
   readonly initRunCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
   readonly initOpenCodeHomeDirectory?: string | undefined;
   readonly initUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
+  readonly authUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
   readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
@@ -160,6 +167,10 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
           opencodeHomeDirectory: options.initOpenCodeHomeDirectory,
           userLayoutOptions: options.initUserLayoutOptions
         });
+      }
+
+      if (args[0] === 'auth') {
+        return runAuthCommand({ args: args.slice(1), io, userLayoutOptions: options.authUserLayoutOptions });
       }
 
       if (args[0] === 'doctor') {

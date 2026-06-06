@@ -117,8 +117,8 @@ Status legend:
 - `[x]` Interactive init wizard and credential setup
 - `[x]` User-level Ewokbot config/data/auth/cache layout
 - `[x]` Dev tool detection adapters, starting with OpenCode
-- `[~]` Inquirer TUI init review candidate
-- `[ ]` Ewokbot auth commands separated from OpenCode auth after AM acceptance
+- `[x]` Inquirer TUI init
+- `[~]` Ewokbot auth commands separated from OpenCode auth review candidate
 
 ## Future Control Surfaces
 

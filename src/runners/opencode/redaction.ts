@@ -1,9 +1,11 @@
-const secretKeyPattern = /^(?:-+)?(?:api[_-]?key|token|secret|password)$/iu;
-const secretAssignmentPattern = /((?:api[_-]?key|token|secret|password)\s*[:=]\s*)\S+/giu;
+const secretNamePattern = '(?:api[_-]?key|token|secret|password|credential|access[_-]?token|refresh[_-]?token|client[_-]?secret|accessToken|refreshToken|clientSecret|authorization)';
+const secretKeyPattern = new RegExp(`^(?:-+)?${secretNamePattern}$`, 'iu');
+const secretAssignmentPattern = new RegExp(`((${secretNamePattern})\\s*[:=]\\s*)\\S+`, 'giu');
 
 export function redactSensitiveText(value: string): string {
   return value
     .replace(/sk-[A-Za-z0-9_-]+/gu, '[redacted]')
+    .replace(/(authorization\s*[:=]\s*)(?:Bearer\s+)?\S+/giu, '$1[redacted]')
     .replace(secretAssignmentPattern, '$1[redacted]');
 }
 

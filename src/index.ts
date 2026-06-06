@@ -39,6 +39,21 @@ export {
   renderRunLogs,
   renderRunsList
 } from './control/index.js';
+export {
+  createEwokbotAuthStore,
+  ewokbotAuthProviders,
+  externalAuthProviders,
+  isEwokbotAuthProvider,
+  isExternalAuthProvider
+} from './auth/index.js';
+export type {
+  EwokbotAuthProvider,
+  EwokbotAuthProviderRecord,
+  EwokbotAuthState,
+  EwokbotAuthStore,
+  EwokbotAuthStoreOptions,
+  ExternalAuthProvider
+} from './auth/index.js';
 export type {
   ListedRun,
   RunControlDecision,

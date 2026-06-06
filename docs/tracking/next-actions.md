@@ -7,9 +7,9 @@
 3. Milestone AJ: Interactive Init Wizard And Credential Setup is accepted after the prompt UX hardening commit.
 4. Milestone AK: User-Level Ewokbot Layout is complete and accepted.
 5. Milestone AL: Dev Tool Detection Adapters is complete and accepted, including the no-`runCommand` OpenCode model detection review fix.
-6. Milestone AM: Inquirer TUI Init is implemented as a review candidate.
-7. Milestone AN: Ewokbot Auth Commands remains approved after AM only and must not be implemented before AM is reviewed and accepted.
-8. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until those milestones are explicitly approved.
+6. Milestone AM: Inquirer TUI Init is complete and accepted.
+7. Milestone AN: Ewokbot Auth Commands is implemented as a review candidate.
+8. No later milestone is approved. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until a new milestone is explicitly proposed and accepted.
 
 ## OpenCode Prompt
 
@@ -106,14 +106,29 @@ AK doctor/readiness output reports user config, auth, state, and cache presence 
 
 Milestone AL - Dev Tool Detection Adapters is complete and accepted.
 
-Milestone AM - Inquirer TUI Init is implemented as a review candidate.
+Milestone AM - Inquirer TUI Init is complete and accepted.
 
 AM replaced the readline-style interactive init wizard with an injectable `@inquirer/prompts` TUI that uses guided selections, confirmations, inputs, and checkboxes while preserving deterministic `--non-interactive` init for tests and automation. The TUI surfaces AL OpenCode readiness before choosing the dev runner: ready OpenCode can be selected without asking for OpenAI, Anthropic, or OpenCode API keys; missing, failed, unsupported, not-authenticated, and no-model states offer explicit mock, instructions, custom command, or acknowledgement paths without installing OpenCode or launching auth automatically. Jira, GitHub, Railway, and Vercel provider choices remain guided, generated files remain limited to `.ewokbot/`, existing onboarding files are refused before prompts, and tests remain fake-only with injected prompt adapters.
 
+Milestone AN - Ewokbot Auth Commands is implemented as a review candidate.
+
+AN added Ewokbot-owned auth commands for provider metadata while keeping OpenCode auth entirely external:
+
+```bash
+ewokbot auth status
+ewokbot auth login <provider>
+ewokbot auth logout <provider>
+ewokbot auth list
+```
+
+Supported Ewokbot provider metadata entries are Jira, GitHub, Railway, and Vercel. The commands store metadata-only records in the AK user-level auth file at `~/.local/share/ewokbot/auth.json` or the configured XDG data equivalent. They do not write auth state into workspace `.ewokbot/`, do not perform live OAuth/provider/MCP/network calls, and do not print secret values. `ewokbot auth login opencode` and `ewokbot auth logout opencode` refuse with guidance that OpenCode auth is owned by OpenCode and should be managed through OpenCode directly.
+
+Doctor output now distinguishes Ewokbot auth metadata from OpenCode readiness, and redaction covers additional auth-like field names such as access tokens, refresh tokens, client secrets, credentials, and authorization values.
+
 Continue in this order:
 
-1. Review and accept AM - Inquirer TUI Init.
-2. AN - Ewokbot Auth Commands, separate from OpenCode auth, only after AM is accepted.
+1. Review and accept AN - Ewokbot Auth Commands.
+2. Propose the next milestone in this file before implementing anything after AN.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -149,8 +164,8 @@ The next milestones should move in this order:
 10. AJ - Interactive Init Wizard And Credential Setup. Completed.
 11. AK - User-Level Ewokbot Layout. Completed.
 12. AL - Dev Tool Detection Adapters. Completed.
-13. AM - Inquirer TUI Init. Implemented review candidate.
-14. AN - Ewokbot Auth Commands. Approved after AM acceptance.
+13. AM - Inquirer TUI Init. Completed.
+14. AN - Ewokbot Auth Commands. Implemented review candidate.
 
 Non-goals for the immediate next milestone:
 

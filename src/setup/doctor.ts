@@ -219,16 +219,16 @@ function checkUserDirectory(label: string, directory: string, probes: DoctorProb
 
 function checkUserAuth(authFile: string, probes: DoctorProbeSet): DoctorCheck {
   if (!probes.fileExists(authFile)) {
-    return warnCheck('User auth', `${authFile} is missing.`, 'Run ewokbot init to create an empty Ewokbot auth metadata file.');
+    return warnCheck('Ewokbot auth', `${authFile} is missing.`, 'Run ewokbot init to create an empty Ewokbot-owned auth metadata file.');
   }
 
   const mode = probes.fileMode(authFile);
 
   if (process.platform !== 'win32' && mode !== undefined && (mode & 0o077) !== 0) {
-    return warnCheck('User auth', `${authFile} is present but is readable by group or others. Contents were not inspected.`, `Restrict ${authFile} to owner-only permissions.`);
+    return warnCheck('Ewokbot auth', `${authFile} is present but is readable by group or others. Ewokbot-owned auth metadata was not inspected.`, `Restrict ${authFile} to owner-only permissions.`);
   }
 
-  return passCheck('User auth', `${authFile} is present with owner-only permissions where supported. Contents were not inspected.`);
+  return passCheck('Ewokbot auth', `${authFile} is present with owner-only permissions where supported. OpenCode auth is checked separately and this file was not inspected.`);
 }
 
 function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetadata, cwd: string, probes: DoctorProbeSet): readonly DoctorCheck[] {

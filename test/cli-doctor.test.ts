@@ -90,7 +90,8 @@ test('ewokbot doctor validates generated local setup without provider calls', as
   assert.match(capturedDoctor.stdout, /WARN: OpenCode: opencode-from-env is installed but OpenCode authentication was not detected/u);
   assert.match(capturedDoctor.stdout, /PASS: \.ewokbot\/\.env/u);
   assert.match(capturedDoctor.stdout, /PASS: User config:/u);
-  assert.match(capturedDoctor.stdout, /PASS: User auth:/u);
+  assert.match(capturedDoctor.stdout, /PASS: Ewokbot auth:/u);
+  assert.match(capturedDoctor.stdout, /OpenCode auth is checked separately/u);
   assert.match(capturedDoctor.stdout, /PASS: User state:/u);
   assert.match(capturedDoctor.stdout, /PASS: User cache:/u);
 });

@@ -2,6 +2,15 @@
 
 ## 2026-06-06
 
+Implemented Milestone AN Ewokbot Auth Commands review candidate:
+
+- Added `ewokbot auth status`, `ewokbot auth login <provider>`, `ewokbot auth logout <provider>`, and `ewokbot auth list` for Ewokbot-owned Jira, GitHub, Railway, and Vercel auth metadata.
+- Stored auth state only in the AK user-level auth file (`~/.local/share/ewokbot/auth.json` or the configured XDG data equivalent) with metadata-only provider records; workspace `.ewokbot/` auth state and raw provider secrets are not written.
+- Kept OpenCode auth external: `auth login opencode` and `auth logout opencode` refuse with operator guidance to use OpenCode directly, and no OpenCode config/auth files are mutated.
+- Updated doctor wording to distinguish Ewokbot auth metadata from OpenCode readiness and hardened redaction for access-token, refresh-token, client-secret, credential, and authorization-style fields.
+- Added fake-only tests for empty auth state, provider login/logout, OpenCode refusal, secret-like output redaction, help text, and doctor wording; no live provider, OAuth, MCP, network, OpenCode, or package-manager flows were introduced.
+- Marked AN as a review candidate only. No post-AN milestone, Telegram/dashboard/daemonization, later PR handoff, staging verification, production merge, or production deployment work was started.
+
 Implemented Milestone AM Inquirer TUI Init review candidate:
 
 - Added `@inquirer/prompts` and replaced the readline-style interactive init wizard with an injectable prompt adapter using guided selections, confirmations, text input, and checkbox monitor selection.

@@ -208,7 +208,7 @@ test('doctor reports user-level paths missing and present without reading auth c
   });
 
   assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User config'), true);
-  assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User auth'), true);
+  assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'Ewokbot auth'), true);
   assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User state'), true);
   assert.equal(missingReport.checks.some((check) => check.status === 'warn' && check.label === 'User cache'), true);
 
@@ -228,7 +228,7 @@ test('doctor reports user-level paths missing and present without reading auth c
   const rendered = JSON.stringify(presentReport);
 
   assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User config'), true);
-  assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User auth'), true);
+  assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'Ewokbot auth'), true);
   assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User state'), true);
   assert.equal(presentReport.checks.some((check) => check.status === 'pass' && check.label === 'User cache'), true);
   assert.doesNotMatch(rendered, /secret-user-auth-value/u);

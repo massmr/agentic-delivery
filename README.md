@@ -33,6 +33,7 @@ Current capabilities:
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
 - Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml`, `.ewokbot/.env`, and placeholder-only `.ewokbot/.env.example` setup files.
 - User-level Ewokbot config/data/auth/cache layout under XDG-style paths, with workspace delivery evidence still kept under `.ewokbot/`.
+- Ewokbot-owned auth metadata commands for Jira, GitHub, Railway, and Vercel that keep OpenCode auth external.
 - Dev tool setup detection adapters, starting with OpenCode command/config/auth/model readiness without taking ownership of OpenCode credentials.
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
@@ -154,6 +155,15 @@ Inspect available commands:
 node dist/src/cli/index.js --help
 ```
 
+Inspect Ewokbot-owned provider auth metadata without touching OpenCode auth:
+
+```bash
+node dist/src/cli/index.js auth status
+node dist/src/cli/index.js auth list
+node dist/src/cli/index.js auth login github
+node dist/src/cli/index.js auth logout github
+```
+
 Scan the configured Jira backlog from `.ewokbot/workspace.yml`. Mock mode remains the default; when Jira is configured as MCP, scan uses the typed `TicketPort` without writing run evidence:
 
 ```bash
@@ -263,7 +273,7 @@ User-level paths follow XDG overrides when present and otherwise default to:
 ~/.cache/ewokbot/
 ```
 
-The generated user `auth.json` is Ewokbot auth metadata only; OpenCode credentials remain owned by OpenCode and provider secrets remain in `.ewokbot/.env`. Where supported, `auth.json` is created with owner-only permissions. `ewokbot doctor` reports whether these user-level paths are present without reading or printing auth contents.
+The generated user `auth.json` is Ewokbot auth metadata only; OpenCode credentials remain owned by OpenCode and provider secrets remain in `.ewokbot/.env`. Where supported, `auth.json` is created with owner-only permissions. `ewokbot auth status`, `ewokbot auth list`, `ewokbot auth login <provider>`, and `ewokbot auth logout <provider>` manage metadata-only Jira, GitHub, Railway, and Vercel entries in that user-level auth file without live OAuth/provider calls or workspace `.ewokbot/` auth writes. `ewokbot auth login opencode` refuses and points operators to OpenCode because OpenCode auth is managed by OpenCode. `ewokbot doctor` reports whether these user-level paths are present without reading or printing auth contents.
 
 The generated `.ewokbot/.env.example` file is placeholder-only. Secret values belong only in `.ewokbot/.env`, and `init` refuses to overwrite existing `.ewokbot/workspace.yml`, `.ewokbot/.env`, or `.ewokbot/.env.example` by default.
 
