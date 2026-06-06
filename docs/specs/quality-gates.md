@@ -92,10 +92,14 @@ Quality gates are a subprocess/native boundary, not an MCP provider boundary. Th
 
 ## Future Guards
 
-- Secret scanning.
-- Dependency audit.
+- Core safety loop for post-agent diffs.
+- Forbidden file checks for environment files, credentials, private keys, and Ewokbot-owned auth/config.
+- Secret-like diff scanning with redacted output.
+- Diff size limits.
+- Dependency change escalation.
+- Database migration checks.
+- Auth, payment, and infrastructure path escalation.
 - Coverage threshold.
 - Browser smoke tests.
 - API contract tests.
-- Database migration checks.
 - Bundle size regression checks.

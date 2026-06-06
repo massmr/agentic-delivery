@@ -118,7 +118,8 @@ Status legend:
 - `[x]` User-level Ewokbot config/data/auth/cache layout
 - `[x]` Dev tool detection adapters, starting with OpenCode
 - `[x]` Inquirer TUI init
-- `[~]` Ewokbot auth commands separated from OpenCode auth review candidate
+- `[x]` Ewokbot auth commands separated from OpenCode auth
+- `[ ]` Core safety loop for post-agent diff policy
 
 ## Future Control Surfaces
 

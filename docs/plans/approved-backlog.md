@@ -846,3 +846,37 @@ Explicit safety constraints:
 - Do not store secrets in `.ewokbot/workspace.yml`, tracked docs, test fixtures, or stdout/stderr.
 - Do not treat Ewokbot auth as a substitute for OpenCode auth when OpenCode is the selected runner.
 - Production merge and production deployment remain human-only.
+
+### Milestone AO: Core Safety Loop v1
+
+Goal:
+
+Turn the current controlled `run-dev` path into a safer supervised loop by evaluating the repository diff after the coding agent runs and before any later handoff can be considered.
+
+Build:
+
+- Add a policy module for post-agent diff evaluation.
+- Capture the modified file list and diff summary after OpenCode execution in `run-dev`.
+- Add forbidden-file detection for `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files that must not be changed by an agent.
+- Add secret-like content detection over the changed diff without printing matched secret values.
+- Add diff-size limits for changed files and diff lines, with configurable defaults.
+- Detect human-review categories such as dependency lockfile changes, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
+- Return a deterministic policy decision: `pass`, `needs_human`, or `fail`.
+- Write a local safety report under the run directory.
+- Block later local success/handoff states when the safety policy returns `needs_human` or `fail`.
+
+Acceptance:
+
+- Safe code-only changes can pass the policy.
+- Forbidden files fail before any PR, staging, production, provider, or remote side effect.
+- Secret-like additions fail with redacted output only.
+- Large diffs and sensitive categories escalate to `NEEDS_HUMAN` with clear reasons.
+- `run-dev` persists safety evidence in `.ewokbot/runs/<ticket-key>/<run-id>/`.
+- Tests use fake repositories and fake diffs only; no live providers, OpenCode, MCP, network, package-manager, or home-directory mutation.
+
+Explicit safety constraints:
+
+- Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, or external signal ingestion in AO.
+- Do not delete or revert user changes outside a controlled temporary test repository.
+- Do not print secret values, even when a secret scan fails.
+- Production merge and production deployment remain human-only.

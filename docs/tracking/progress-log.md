@@ -2,6 +2,13 @@
 
 ## 2026-06-06
 
+Accepted Milestone AN and prepared Milestone AO:
+
+- Marked AN Ewokbot Auth Commands as complete and accepted after Codex review and commit `58f4506`.
+- Set AO Core Safety Loop v1 as the next approved implementation milestone.
+- Defined AO around post-agent diff policy for `run-dev`: changed-file capture, forbidden-file checks, redacted secret-like diff scanning, diff-size limits, sensitive-category escalation, deterministic `pass`/`needs_human`/`fail` decisions, and a local safety report.
+- Kept Sentry, PostHog, Notion, support/SEO signal ingestion, Telegram/WhatsApp, dashboard, later PR handoff, staging verification, production merge, and production deployment out of scope until explicitly approved.
+
 Implemented Milestone AN Ewokbot Auth Commands review candidate:
 
 - Added `ewokbot auth status`, `ewokbot auth login <provider>`, `ewokbot auth logout <provider>`, and `ewokbot auth list` for Ewokbot-owned Jira, GitHub, Railway, and Vercel auth metadata.

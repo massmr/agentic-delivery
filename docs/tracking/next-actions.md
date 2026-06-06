@@ -8,8 +8,9 @@
 4. Milestone AK: User-Level Ewokbot Layout is complete and accepted.
 5. Milestone AL: Dev Tool Detection Adapters is complete and accepted, including the no-`runCommand` OpenCode model detection review fix.
 6. Milestone AM: Inquirer TUI Init is complete and accepted.
-7. Milestone AN: Ewokbot Auth Commands is implemented as a review candidate.
-8. No later milestone is approved. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, or production automation work until a new milestone is explicitly proposed and accepted.
+7. Milestone AN: Ewokbot Auth Commands is complete and accepted.
+8. Milestone AO: Core Safety Loop v1 is the next approved implementation milestone.
+9. Do not implement later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until a new milestone is explicitly proposed and accepted.
 
 ## OpenCode Prompt
 
@@ -110,7 +111,7 @@ Milestone AM - Inquirer TUI Init is complete and accepted.
 
 AM replaced the readline-style interactive init wizard with an injectable `@inquirer/prompts` TUI that uses guided selections, confirmations, inputs, and checkboxes while preserving deterministic `--non-interactive` init for tests and automation. The TUI surfaces AL OpenCode readiness before choosing the dev runner: ready OpenCode can be selected without asking for OpenAI, Anthropic, or OpenCode API keys; missing, failed, unsupported, not-authenticated, and no-model states offer explicit mock, instructions, custom command, or acknowledgement paths without installing OpenCode or launching auth automatically. Jira, GitHub, Railway, and Vercel provider choices remain guided, generated files remain limited to `.ewokbot/`, existing onboarding files are refused before prompts, and tests remain fake-only with injected prompt adapters.
 
-Milestone AN - Ewokbot Auth Commands is implemented as a review candidate.
+Milestone AN - Ewokbot Auth Commands is complete and accepted.
 
 AN added Ewokbot-owned auth commands for provider metadata while keeping OpenCode auth entirely external:
 
@@ -125,10 +126,20 @@ Supported Ewokbot provider metadata entries are Jira, GitHub, Railway, and Verce
 
 Doctor output now distinguishes Ewokbot auth metadata from OpenCode readiness, and redaction covers additional auth-like field names such as access tokens, refresh tokens, client secrets, credentials, and authorization values.
 
+Milestone AO - Core Safety Loop v1 is the next approved implementation milestone.
+
+AO must make the controlled `run-dev` path safer by evaluating the repository diff after the coding agent runs and before later handoff states can be considered. The first version should add post-agent diff policy checks, forbidden-file detection, redacted secret-like diff scanning, changed-file and diff-line limits, sensitive-category escalation for dependencies, migrations, auth, payments, and infra/deployment paths, and a local safety report under the run directory.
+
+AO decisions must be deterministic:
+
+- `pass` for safe code-only changes.
+- `needs_human` for sensitive but reviewable changes such as dependency lockfiles, migrations, auth/payment/infra paths, or large diffs.
+- `fail` for forbidden files or secret-like additions.
+
 Continue in this order:
 
-1. Review and accept AN - Ewokbot Auth Commands.
-2. Propose the next milestone in this file before implementing anything after AN.
+1. Implement AO - Core Safety Loop v1.
+2. Propose the next milestone in this file before implementing anything after AO.
 
 Any other task must be proposed here first and must not be implemented until approved.
 
@@ -165,7 +176,8 @@ The next milestones should move in this order:
 11. AK - User-Level Ewokbot Layout. Completed.
 12. AL - Dev Tool Detection Adapters. Completed.
 13. AM - Inquirer TUI Init. Completed.
-14. AN - Ewokbot Auth Commands. Implemented review candidate.
+14. AN - Ewokbot Auth Commands. Completed.
+15. AO - Core Safety Loop v1. Approved next.
 
 Non-goals for the immediate next milestone:
 
@@ -176,4 +188,5 @@ Non-goals for the immediate next milestone:
 - Live MCP server startup or OAuth flows during tests.
 - Automatic global installs without explicit user confirmation.
 - Demanding OpenAI/Anthropic API keys during Ewokbot init when OpenCode owns the selected runner auth flow.
+- Sentry, PostHog, Notion, support, SEO, or other signal ingestion.
 - Autonomous production merge or production deployment.

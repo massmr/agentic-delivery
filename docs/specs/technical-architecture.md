@@ -60,6 +60,11 @@ src/
     runtime.ts
     decision-policy.ts
     operation-ledger.ts
+  policy/
+    diff-policy.ts
+    forbidden-file-policy.ts
+    secret-diff-policy.ts
+    safety-report.ts
   ports/
     ticket-port.ts
     code-host-port.ts
@@ -301,6 +306,19 @@ Optional gates:
 - secret scan
 - dependency audit
 - e2e
+
+## Core Safety Loop
+
+The controlled development path must evaluate the agent-produced diff before any later handoff. Ewokbot should inspect changed files and diff content after the dev agent runs, produce a deterministic `pass`, `needs_human`, or `fail` decision, and persist a local safety report in the run directory.
+
+Initial policy checks:
+
+- forbidden file changes such as `.env`, `.env.*`, private keys, credential files, and Ewokbot-owned auth/config files;
+- secret-like additions in diffs, with matched values redacted from output;
+- maximum changed file and diff line thresholds;
+- sensitive review categories such as dependency lockfiles, database migrations, auth paths, payment paths, and infrastructure/deployment config paths.
+
+The safety loop is runtime-owned local policy. It must not call providers, MCP servers, OpenCode, package managers, GitHub, Railway, Vercel, or production controls.
 
 ## Reporting
 

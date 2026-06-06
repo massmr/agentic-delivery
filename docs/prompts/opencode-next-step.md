@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, and AM are complete and accepted. Milestone AN: Ewokbot Auth Commands is implemented as a review candidate and must be reviewed and accepted before any later milestone begins.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, and AN are complete and accepted. Milestone AO: Core Safety Loop v1 is the next approved implementation milestone.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -71,7 +71,6 @@ AN stores metadata-only Jira, GitHub, Railway, and Vercel provider auth records 
 
 AN safety constraints that must be preserved during review and follow-up work:
 
-- Do not implement any post-AN milestone until AN is reviewed and accepted and a next milestone is explicitly approved in `docs/tracking/next-actions.md`.
 - Do not add Telegram, WhatsApp, dashboard, daemonization, production merge, or production deployment automation.
 - Do not add live provider OAuth, live MCP auth, OpenCode auth execution, package-manager setup, provider network calls, or real home-directory mutation to tests.
 - Do not read, print, parse, copy, or store raw OpenCode secret values.
@@ -79,7 +78,27 @@ AN safety constraints that must be preserved during review and follow-up work:
 - Keep Ewokbot auth output redacted and metadata-only.
 - Production merge and production deployment remain human-only.
 
-Do not start any later milestone until AN is reviewed and accepted and `docs/tracking/next-actions.md` explicitly approves the next implementation step.
+AO must implement Core Safety Loop v1 for the controlled `run-dev` path:
+
+- Evaluate the repository diff after the coding agent runs.
+- Capture changed files and a diff summary.
+- Detect forbidden files such as `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files.
+- Scan changed diff content for secret-like additions without printing matched secret values.
+- Enforce configurable defaults for maximum changed files and maximum diff lines.
+- Escalate sensitive review categories such as dependency lockfiles, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
+- Return deterministic policy decisions: `pass`, `needs_human`, or `fail`.
+- Write a local safety report under `.ewokbot/runs/<ticket-key>/<run-id>/`.
+- Block later local success or handoff states when the safety policy returns `needs_human` or `fail`.
+
+AO safety constraints:
+
+- Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
+- Do not add live provider calls, live MCP calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
+- Do not delete or revert user changes outside controlled temporary test repositories.
+- Do not print secret values, even when a secret scan fails.
+- Production merge and production deployment remain human-only.
+
+Do not start any later milestone until AO is reviewed and accepted and `docs/tracking/next-actions.md` explicitly approves the next implementation step.
 
 ## Required Reading
 

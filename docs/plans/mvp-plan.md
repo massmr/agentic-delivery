@@ -80,12 +80,16 @@ Deliverables:
 - Quality profile fallback.
 - Command runner.
 - Quality report.
+- Post-agent diff safety policy.
+- Forbidden-file, redacted secret-like diff, diff-size, and sensitive-path checks.
 
 Acceptance criteria:
 
 - Required gates run in order.
 - A failed gate stops the workflow before push.
 - Reports include command, exit code, duration, and summary.
+- Agent-produced forbidden file or secret-like changes fail before handoff.
+- Sensitive or oversized diffs enter `NEEDS_HUMAN` with a clear local safety report.
 
 ## Milestone 6: GitHub PR Interfaces
 

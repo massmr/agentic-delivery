@@ -397,6 +397,8 @@ Requires a human:
 
 Never commit `.env` files or provider credentials. Use generated `.ewokbot/.env` for local workspace secrets, keep `.ewokbot/.env.example` placeholder-only, and use the wizard or Ewokbot-owned files when intentionally changing workspace-local runtime environment values.
 
+The next safety milestone is the core post-agent diff loop. Ewokbot should inspect the changes produced by the coding runner, fail forbidden file or secret-like changes, escalate large or sensitive diffs to `NEEDS_HUMAN`, and write a local safety report before any later PR, staging, or production handoff can be considered.
+
 ## Development
 
 Common commands:
@@ -421,7 +423,8 @@ Near-term direction:
 
 - completed CLI control commands for status, runs, pause/resume, and approval,
 - one explicit real-provider smoke command with operator confirmation,
-- richer GitHub, Jira, Railway, and Vercel integrations.
+- core safety loop for post-agent diff policy,
+- richer GitHub, Jira, Railway, and Vercel integrations after safety controls are stronger.
 
 Track detailed planning in:
 
