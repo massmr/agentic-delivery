@@ -126,6 +126,7 @@ Status legend:
 - `[ ]` Harness v1 for fixture-based scoring
 - `[ ]` Real provider smoke v1 with Jira MCP and local run-dev
 - `[ ]` GitHub draft PR handoff after validated local evidence
+- `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 
 ## Future Control Surfaces
 

@@ -1038,3 +1038,35 @@ Explicit safety constraints:
 - Do not open production PRs in AU.
 - Do not perform real remote pushes in tests.
 - Production merge and production deployment remain human-only.
+
+### Milestone AV: Operator Agent Action Sandbox
+
+Goal:
+
+Add an Ewokbot operator agent that can converse with the user and drive the existing delivery flow only through an explicit registry of approved Ewokbot actions.
+
+Build:
+
+- Add an operator-agent action registry with typed actions such as list tickets, plan ticket, start dev run, inspect run, summarize run, request human approval, and later prepare PR.
+- Require schemas for every action input and reject unknown or malformed actions.
+- Map approved actions to internal Ewokbot command handlers or service functions instead of giving the agent a raw shell.
+- Add confirmation policy per action, including mandatory human confirmation before side effects such as starting development, pushing branches, opening PRs, or provider mutations.
+- Keep raw MCP tools, provider tokens, filesystem access, and shell commands unavailable to the operator agent.
+- Persist an audit trail of proposed, approved, executed, refused, and failed actions.
+- Keep OpenCode or other coding agents behind the existing dev-runner boundary; the operator agent supervises, but does not become a free-form coding shell.
+
+Acceptance:
+
+- The operator agent can propose and execute only registered Ewokbot actions.
+- Attempts to call unregistered actions, raw shell commands, raw MCP tools, or provider credentials are refused and audited.
+- Human confirmation is required for side-effectful actions.
+- Existing CLI commands remain usable without the operator agent.
+- Tests use fake LLM/action proposals only and do not call live providers, MCP servers, OpenCode, shells, or networks.
+
+Explicit safety constraints:
+
+- Do not expose a raw shell to the operator agent.
+- Do not expose raw MCP tool calling to the operator agent.
+- Do not expose provider credentials or OpenCode credentials to the operator agent.
+- Do not implement Telegram, WhatsApp, or dashboard surfaces in AV.
+- Production merge and production deployment remain human-only.

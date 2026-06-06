@@ -150,8 +150,9 @@ Continue in this order:
 5. AS - Harness v1.
 6. AT - Real Provider Smoke v1.
 7. AU - GitHub PR Handoff v1.
+8. AV - Operator Agent Action Sandbox.
 
-Anything outside AO must wait until AO is reviewed and accepted. Anything outside AP-AU must be proposed here first and must not be implemented until approved.
+Anything outside AO must wait until AO is reviewed and accepted. Anything outside AP-AV must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -194,6 +195,7 @@ The next milestones should move in this order:
 19. AS - Harness v1. Planned after AR.
 20. AT - Real Provider Smoke v1. Planned after AS.
 21. AU - GitHub PR Handoff v1. Planned after AT.
+22. AV - Operator Agent Action Sandbox. Planned after AU.
 
 Non-goals for the immediate next milestone:
 
