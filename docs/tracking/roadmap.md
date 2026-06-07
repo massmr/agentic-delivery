@@ -120,7 +120,7 @@ Status legend:
 - `[x]` Inquirer TUI init
 - `[x]` Ewokbot auth commands separated from OpenCode auth
 - `[x]` Meaningful diff guard for post-agent false positives
-- `[ ]` Core safety loop for post-agent diff policy
+- `[~]` Core safety loop for post-agent diff policy
 - `[ ]` Agent completion contract
 - `[ ]` Test relevance guard
 - `[ ]` Harness v1 for fixture-based scoring

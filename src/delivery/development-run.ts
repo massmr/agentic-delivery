@@ -3,10 +3,11 @@ import { access, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 import type { WorkspaceConfig, WorkspaceRepositoryConfig } from '../config/index.js';
-import type { DeliveryRunStateRecord, DeliveryTicket, DevRunner, MeaningfulDiffEvidence, MeaningfulDiffSnapshot, QualityGateDefinition, QualityReport, RepositoryConfig, RepositoryRef } from '../domain/index.js';
-import { LocalGitAdapter, buildWorkingBranchName, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff } from '../git/index.js';
+import type { CoreSafetyLimits, CoreSafetyReport, DeliveryRunStateRecord, DeliveryTicket, DevRunner, MeaningfulDiffEvidence, MeaningfulDiffSnapshot, QualityGateDefinition, QualityReport, RepositoryConfig, RepositoryRef } from '../domain/index.js';
+import { LocalGitAdapter, buildWorkingBranchName, captureDiffAdditions, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff } from '../git/index.js';
 import type { GitCommandRunner } from '../git/index.js';
 import { createTicketPlan, toRepositoryRef } from '../planning/index.js';
+import { evaluateCoreSafety } from '../policy/index.js';
 import type { TicketPort } from '../ports/index.js';
 import { buildQualityGateDefinitions, loadRepositoryQualityConfig, QualityRunner } from '../quality/index.js';
 import { MarkdownReportWriter } from '../reports/index.js';
@@ -40,6 +41,7 @@ export interface DevelopmentRunResult {
   readonly planReportPath: string;
   readonly implementationLogPath?: string | undefined;
   readonly meaningfulDiffReportPath?: string | undefined;
+  readonly coreSafetyReportPath?: string | undefined;
   readonly qualityReportPath?: string | undefined;
   readonly finalReportPath?: string | undefined;
 }
@@ -58,7 +60,9 @@ export interface RunDevelopmentExecutionInput {
   readonly runId?: string | undefined;
   readonly now?: (() => Date) | undefined;
   readonly gitCommandRunner?: GitCommandRunner | undefined;
+  readonly readFile?: ((path: string) => Promise<string>) | undefined;
   readonly qualityRunner?: DevelopmentQualityRunner | undefined;
+  readonly coreSafetyLimits?: Partial<CoreSafetyLimits> | undefined;
   readonly stateStore?: RunStateStore | undefined;
   readonly reportWriter?: MarkdownReportWriter | undefined;
   readonly environment?: Readonly<Record<string, string | undefined>> | undefined;
@@ -209,7 +213,7 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
       ...implementedState,
       meaningfulDiff
     };
-    await writeMeaningfulDiffEvidence(rootPath, meaningfulDiffReportPath, meaningfulDiff);
+    await writeJsonEvidence(rootPath, meaningfulDiffReportPath, meaningfulDiff);
     await stateStore.write(stateAfterMeaningfulDiff);
   } catch (error) {
     const failedState = markFailed(implementedState, 'IMPLEMENTING', `Meaningful diff inspection failed: ${formatError(error)}`, now().toISOString());
@@ -235,7 +239,67 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, finalReportPath });
   }
 
-  const localChecksRunningState = transitionDeliveryRunState(stateAfterMeaningfulDiff, 'LOCAL_CHECKS_RUNNING', now().toISOString());
+  const coreSafetyReportPath = join(getRunDirectoryPath(ticket.ref.key, runId), 'core-safety.json');
+  let stateAfterCoreSafety: DeliveryRunStateRecord;
+
+  try {
+    const additions = await captureDiffAdditions({
+      repositoryPath: repository.localPath,
+      changedFiles: stateAfterMeaningfulDiff.meaningfulDiff?.newChangedFiles ?? [],
+      gitCommandRunner: input.gitCommandRunner,
+      readFile: input.readFile
+    });
+    const coreSafety = evaluateCoreSafety({
+      changedFiles: stateAfterMeaningfulDiff.meaningfulDiff?.newChangedFiles ?? [],
+      additions,
+      limits: input.coreSafetyLimits
+    });
+    stateAfterCoreSafety = {
+      ...stateAfterMeaningfulDiff,
+      coreSafety
+    };
+    await writeJsonEvidence(rootPath, coreSafetyReportPath, coreSafety);
+    await stateStore.write(stateAfterCoreSafety);
+  } catch (error) {
+    const failedState = markFailed(stateAfterMeaningfulDiff, 'IMPLEMENTING', `Core safety evaluation failed: ${formatError(error)}`, now().toISOString());
+    await stateStore.write(failedState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      coreSafetyReportPath,
+      mockOnlyNote: localOnlyNote
+    });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, finalReportPath });
+  }
+
+  if (stateAfterCoreSafety.coreSafety?.decision === 'fail') {
+    const failedState = markFailed(stateAfterCoreSafety, 'IMPLEMENTING', stateAfterCoreSafety.coreSafety.reason, now().toISOString());
+    await stateStore.write(failedState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      coreSafetyReportPath,
+      mockOnlyNote: localOnlyNote
+    });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, finalReportPath });
+  }
+
+  if (stateAfterCoreSafety.coreSafety?.decision === 'needs_human') {
+    const needsHumanState = markNeedsHuman(stateAfterCoreSafety, stateAfterCoreSafety.coreSafety.reason, now().toISOString());
+    await stateStore.write(needsHumanState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, needsHumanState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      coreSafetyReportPath,
+      mockOnlyNote: localOnlyNote
+    });
+    return buildResult(needsHumanState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, finalReportPath });
+  }
+
+  const localChecksRunningState = transitionDeliveryRunState(stateAfterCoreSafety, 'LOCAL_CHECKS_RUNNING', now().toISOString());
   await stateStore.write(localChecksRunningState);
 
   let qualityReport: QualityReport;
@@ -245,8 +309,8 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
   } catch (error) {
     const failedState = markFailed(localChecksRunningState, 'LOCAL_CHECKS_RUNNING', `Local quality gates failed to run: ${formatError(error)}`, now().toISOString());
     await stateStore.write(failedState);
-    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, { planReportPath, implementationLogPath, meaningfulDiffReportPath, mockOnlyNote: localOnlyNote });
-    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, finalReportPath });
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, failedState, { planReportPath, implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, mockOnlyNote: localOnlyNote });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, finalReportPath });
   }
 
   const qualityReportPath = await reportWriter.writeQuality(ticket.ref.key, runId, qualityReport);
@@ -262,10 +326,11 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
       planReportPath,
       implementationLogPath,
       meaningfulDiffReportPath,
+      coreSafetyReportPath,
       qualityReportPath,
       mockOnlyNote: localOnlyNote
     });
-    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, qualityReportPath, finalReportPath });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, qualityReportPath, finalReportPath });
   }
 
   const localChecksPassedState = transitionDeliveryRunState(stateWithQuality, 'LOCAL_CHECKS_PASSED', now().toISOString());
@@ -274,11 +339,12 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     planReportPath,
     implementationLogPath,
     meaningfulDiffReportPath,
+    coreSafetyReportPath,
     qualityReportPath,
     mockOnlyNote: localOnlyNote
   });
 
-  return buildResult(localChecksPassedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, qualityReportPath, finalReportPath });
+  return buildResult(localChecksPassedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, coreSafetyReportPath, qualityReportPath, finalReportPath });
 }
 
 export async function assertDevelopmentRunDoesNotExist(rootPath: string, ticketKey: string, runId: string): Promise<void> {
@@ -369,6 +435,16 @@ function markFailed(state: DeliveryRunStateRecord, failedFromState: DeliveryRunS
   };
 }
 
+function markNeedsHuman(state: DeliveryRunStateRecord, reason: string, requestedAt: string): DeliveryRunStateRecord {
+  return {
+    ...transitionDeliveryRunState(state, 'NEEDS_HUMAN', requestedAt),
+    humanActionNeeded: {
+      reason,
+      requestedAt
+    }
+  };
+}
+
 function buildResult(
   state: DeliveryRunStateRecord,
   runId: string,
@@ -376,6 +452,7 @@ function buildResult(
   paths: {
     readonly implementationLogPath?: string | undefined;
     readonly meaningfulDiffReportPath?: string | undefined;
+    readonly coreSafetyReportPath?: string | undefined;
     readonly qualityReportPath?: string | undefined;
     readonly finalReportPath?: string | undefined;
   }
@@ -389,7 +466,7 @@ function buildResult(
   };
 }
 
-async function writeMeaningfulDiffEvidence(rootPath: string, relativePath: string, evidence: MeaningfulDiffEvidence): Promise<void> {
+async function writeJsonEvidence(rootPath: string, relativePath: string, evidence: MeaningfulDiffEvidence | CoreSafetyReport): Promise<void> {
   const outputPath = join(rootPath, relativePath);
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');

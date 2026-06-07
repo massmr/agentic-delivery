@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { loadWorkspaceConfig } from '../../config/index.js';
 import { runDevelopmentExecution } from '../../delivery/index.js';
 import type { DevelopmentRunBoundary, DevelopmentRunResult, DevelopmentQualityRunner } from '../../delivery/index.js';
-import type { DevRunner } from '../../domain/index.js';
+import type { CoreSafetyLimits, DevRunner } from '../../domain/index.js';
 import type { GitCommandRunner } from '../../git/index.js';
 import { mapMcpError } from '../../mcp/index.js';
 import { createDevRunner, createRuntimeTicketPort } from '../../providers/index.js';
@@ -13,7 +13,9 @@ import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface RunDevCommandDeliveryOptions {
   readonly gitCommandRunner?: GitCommandRunner | undefined;
+  readonly readFile?: ((path: string) => Promise<string>) | undefined;
   readonly qualityRunner?: DevelopmentQualityRunner | undefined;
+  readonly coreSafetyLimits?: Partial<CoreSafetyLimits> | undefined;
   readonly devRunner?: DevRunner | undefined;
   readonly now?: (() => Date) | undefined;
 }
@@ -56,7 +58,9 @@ export async function runRunDevCommand(ticketKey: string, options: RunDevCommand
       runId: options.runId,
       now: options.delivery?.now,
       gitCommandRunner: options.delivery?.gitCommandRunner,
+      readFile: options.delivery?.readFile,
       qualityRunner: options.delivery?.qualityRunner,
+      coreSafetyLimits: options.delivery?.coreSafetyLimits,
       environment,
       onBoundaryReady: (boundary) => renderBoundary(options.io, boundary)
     });
@@ -112,9 +116,16 @@ function renderRunDevResult(io: CliProgramIO, ticketKey: string, result: Develop
   if (result.state.meaningfulDiff !== undefined) {
     io.stdout(`Meaningful Diff: ${result.state.meaningfulDiff.decision.toUpperCase()} - ${result.state.meaningfulDiff.reason}\n`);
   }
+  io.stdout(`Core Safety Report: ${result.coreSafetyReportPath ?? 'n/a'}\n`);
+  if (result.state.coreSafety !== undefined) {
+    io.stdout(`Core Safety: ${result.state.coreSafety.decision.toUpperCase()} - ${result.state.coreSafety.reason}\n`);
+  }
   io.stdout(`Quality Report: ${result.qualityReportPath ?? 'n/a'}\n`);
   if (result.state.failure !== undefined) {
     io.stdout(`Failure Reason: ${result.state.failure.reason}\n`);
+  }
+  if (result.state.humanActionNeeded !== undefined) {
+    io.stdout(`Human Action Needed: ${result.state.humanActionNeeded.reason}\n`);
   }
   io.stdout(`Final Report: ${result.finalReportPath ?? 'n/a'}\n`);
   io.stdout('Local-only boundary preserved: no git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, production merge, or production deploy was attempted.\n');

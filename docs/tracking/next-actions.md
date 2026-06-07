@@ -10,7 +10,7 @@
 6. Milestone AM: Inquirer TUI Init is complete and accepted.
 7. Milestone AN: Ewokbot Auth Commands is complete and accepted.
 8. Milestone AO: Meaningful Diff Guard is complete and accepted.
-9. Milestone AP: Core Safety Loop v1 is the next approved implementation milestone.
+9. Milestone AP: Core Safety Loop v1 is implemented as a review candidate.
 10. Do not implement AQ or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AP is reviewed and accepted and a new milestone is explicitly proposed and accepted.
 
 ## OpenCode Prompt
@@ -143,29 +143,31 @@ Implemented:
 - Surface the reason in `final-report.md` and status/report output.
 - Add tests for "OpenCode success but only ignored artifacts changed", "pre-existing product diff but no agent product diff", and "safe non-empty product diff can pass".
 
-Milestone AP - Core Safety Loop v1 is the next approved implementation milestone.
+Milestone AP - Core Safety Loop v1 is implemented as a review candidate.
 
-AP must evaluate whether a non-empty agent diff is allowed, requires human review, or must fail before any later handoff can be considered.
+AP evaluates whether a non-empty agent diff is allowed, requires human review, or must fail before any later handoff can be considered.
 
-Build:
+Implemented:
 
 - Add forbidden-file detection for `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files that must not be changed by an agent.
-- Add secret-like content detection over changed diff additions without printing matched secret values.
-- Add diff-size limits for changed files and diff lines, with configurable defaults.
+- Add secret-like content detection over changed diff additions without printing or persisting matched secret values.
+- Add diff-size limits for changed files and diff lines, with configurable defaults and a test-overridable policy seam.
 - Detect human-review categories such as dependency lockfile changes, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
 - Return deterministic policy decisions: `pass`, `needs_human`, or `fail`.
-- Write a local safety report under the run directory.
-- Block later local success/handoff states when the safety policy returns `needs_human` or `fail`.
+- Write `.ewokbot/runs/<ticket-key>/<run-id>/core-safety.json` after AO meaningful diff passes.
+- Block local quality and later handoff states when the safety policy returns `needs_human` or `fail`; `fail` marks `FAILED`, and `needs_human` marks `NEEDS_HUMAN` with `humanActionNeeded`.
+- Surface the core safety report path and decision in `run-dev` CLI output, final reports, and status output.
+- Add fake-only unit and run-dev integration tests for pass, forbidden file fail, redacted secret-like addition fail, diff-limit `NEEDS_HUMAN`, and human-review-category `NEEDS_HUMAN`.
 
 Continue in this order:
 
-1. Implement AP - Core Safety Loop v1.
-3. AQ - Agent Completion Contract.
-4. AR - Test Relevance Guard.
-5. AS - Harness v1.
-6. AT - Real Provider Smoke v1.
-7. AU - GitHub PR Handoff v1.
-8. AV - Operator Agent Action Sandbox.
+1. Review and accept AP - Core Safety Loop v1.
+2. AQ - Agent Completion Contract.
+3. AR - Test Relevance Guard.
+4. AS - Harness v1.
+5. AT - Real Provider Smoke v1.
+6. AU - GitHub PR Handoff v1.
+7. AV - Operator Agent Action Sandbox.
 
 Anything outside AP must wait until AP is reviewed and accepted. Anything outside AQ-AV must be proposed here first and must not be implemented until approved.
 
@@ -204,7 +206,7 @@ The next milestones should move in this order:
 13. AM - Inquirer TUI Init. Completed.
 14. AN - Ewokbot Auth Commands. Completed.
 15. AO - Meaningful Diff Guard. Completed.
-16. AP - Core Safety Loop v1. Approved next.
+16. AP - Core Safety Loop v1. Review candidate.
 17. AQ - Agent Completion Contract. Planned after AP.
 18. AR - Test Relevance Guard. Planned after AQ.
 19. AS - Harness v1. Planned after AR.

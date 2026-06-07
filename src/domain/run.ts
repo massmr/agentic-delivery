@@ -52,6 +52,14 @@ export interface HumanActionRequest {
 
 export type MeaningfulDiffDecision = 'passed' | 'failed';
 
+export type CoreSafetyDecision = 'pass' | 'needs_human' | 'fail';
+
+export type CoreSafetyFindingSeverity = 'fail' | 'needs_human';
+
+export type CoreSafetyFindingKind = 'forbidden_file' | 'secret_like_addition' | 'diff_limit' | 'human_review_category';
+
+export type CoreSafetyHumanReviewCategory = 'dependency_lockfile' | 'db_migration' | 'auth_path' | 'payment_billing_path' | 'infra_deployment_config';
+
 export interface MeaningfulDiffSnapshot {
   readonly changedFiles: readonly string[];
   readonly diffSummary: string;
@@ -72,6 +80,48 @@ export interface MeaningfulDiffEvidence {
   readonly diffSummary: string;
 }
 
+export interface CoreSafetyLimits {
+  readonly maxChangedFiles: number;
+  readonly maxAddedLines: number;
+}
+
+export interface CoreSafetyForbiddenFileFinding {
+  readonly filePath: string;
+  readonly reason: string;
+}
+
+export interface CoreSafetySecretFinding {
+  readonly filePath: string;
+  readonly lineNumber?: number | undefined;
+  readonly detector: string;
+}
+
+export interface CoreSafetyHumanReviewFinding {
+  readonly filePath: string;
+  readonly category: CoreSafetyHumanReviewCategory;
+  readonly reason: string;
+}
+
+export interface CoreSafetyLimitFinding {
+  readonly limit: keyof CoreSafetyLimits;
+  readonly actual: number;
+  readonly maximum: number;
+  readonly reason: string;
+}
+
+export interface CoreSafetyReport {
+  readonly decision: CoreSafetyDecision;
+  readonly reason: string;
+  readonly changedFiles: readonly string[];
+  readonly changedFileCount: number;
+  readonly addedLineCount: number;
+  readonly limits: CoreSafetyLimits;
+  readonly forbiddenFiles: readonly CoreSafetyForbiddenFileFinding[];
+  readonly secretFindings: readonly CoreSafetySecretFinding[];
+  readonly limitFindings: readonly CoreSafetyLimitFinding[];
+  readonly humanReviewFindings: readonly CoreSafetyHumanReviewFinding[];
+}
+
 export interface DeliveryRunStateRecord {
   readonly runId: string;
   readonly ticket: TicketRef;
@@ -84,6 +134,7 @@ export interface DeliveryRunStateRecord {
   readonly devRuns: readonly DevRunResult[];
   readonly timestamps: RunTimestamps;
   readonly meaningfulDiff?: MeaningfulDiffEvidence;
+  readonly coreSafety?: CoreSafetyReport;
   readonly ticketAnalysis?: TicketAnalysis;
   readonly failure?: DeliveryRunFailure;
   readonly humanActionNeeded?: HumanActionRequest;

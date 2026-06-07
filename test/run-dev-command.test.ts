@@ -93,8 +93,8 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(devRunInput.environment.ANTHROPIC_API_KEY, 'workspace-secret');
   assert.doesNotMatch(captured.stdout, /workspace-secret/u);
   assert.doesNotMatch(captured.stderr, /workspace-secret/u);
-  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff']);
-  assert.deepEqual(events, ['git:show-ref', 'git:checkout', 'git:rev-parse', 'git:status', 'git:diff', 'dev-run', 'git:status', 'git:diff']);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff']);
+  assert.deepEqual(events, ['git:show-ref', 'git:checkout', 'git:rev-parse', 'git:status', 'git:diff', 'dev-run', 'git:status', 'git:diff', 'git:status', 'git:diff']);
   assert.equal(gitCalls.some((call) => call.args[0] === 'push'), false);
 
   const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
@@ -106,18 +106,26 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(state.devRuns.length, 1);
   assert.equal(state.qualityReports.length, 1);
   assert.equal(state.meaningfulDiff?.decision, 'passed');
+  assert.equal(state.coreSafety?.decision, 'pass');
+  assert.equal(state.coreSafety.changedFileCount, 1);
+  assert.equal(state.coreSafety.addedLineCount, 1);
   assert.deepEqual(state.meaningfulDiff.baselineChangedFiles, []);
   assert.deepEqual(state.meaningfulDiff.afterAgentChangedFiles, ['src/app.ts']);
   assert.deepEqual(state.meaningfulDiff.newChangedFiles, ['src/app.ts']);
   assert.deepEqual(state.meaningfulDiff.productFiles, ['src/app.ts']);
   const meaningfulDiff = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'), 'utf8')) as DeliveryRunStateRecord['meaningfulDiff'];
   assert.equal(meaningfulDiff?.decision, 'passed');
+  const coreSafety = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json'), 'utf8')) as DeliveryRunStateRecord['coreSafety'];
+  assert.equal(coreSafety?.decision, 'pass');
   const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8');
   assert.match(finalReport, /Development execution remained local-only/u);
   assert.match(finalReport, /Meaningful Diff/u);
+  assert.match(finalReport, /Core Safety/u);
+  assert.match(finalReport, /Decision: PASS/u);
   assert.match(finalReport, /Agent Product Changed Files: src\/app\.ts/u);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'implementation-log.md'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'))).isFile(), true);
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md'))).isFile(), true);
   await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
 });
@@ -244,6 +252,178 @@ test('run-dev command fails when only a pre-existing product diff is present aft
   assert.match(finalReport, /Agent-New Changed Files: none/u);
   assert.match(finalReport, /Agent Product Changed Files: none/u);
   await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md')));
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command fails before local checks when core safety finds a forbidden file', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const gitCalls: GitCommandInput[] = [];
+  const events: string[] = [];
+  const devRunner = createFakeDevRunner(events);
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({
+        calls: gitCalls,
+        events,
+        afterStatusPorcelain: ' M .env.local\n',
+        afterDiffStat: ' .env.local | 1 +\n 1 file changed, 1 insertion(+)',
+        afterDiffPatch: diffPatch('.env.local', ['SAFE_PLACEHOLDER=1'])
+      }),
+      devRunner,
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: FAILED/u);
+  assert.match(captured.stdout, /Core Safety: FAIL/u);
+  assert.equal(captured.stderr, '');
+  assert.equal(qualityCalls, 0);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff']);
+  assert.deepEqual(events, ['git:show-ref', 'git:checkout', 'git:rev-parse', 'git:status', 'git:diff', 'dev-run', 'git:status', 'git:diff', 'git:status', 'git:diff']);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'FAILED');
+  assert.equal(state.coreSafety?.decision, 'fail');
+  assert.deepEqual(state.coreSafety.forbiddenFiles.map((finding) => finding.filePath), ['.env.local']);
+  assert.equal(state.qualityReports.length, 0);
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md')));
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command fails secret-like additions without persisting or printing raw values', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const rawSecret = 'super-secret-token-1234567890';
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({
+        afterStatusPorcelain: '?? src/config.ts\n',
+        afterDiffStat: ''
+      }),
+      readFile: async () => `const token = "${rawSecret}";\n`,
+      devRunner: createFakeDevRunner(),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Core Safety: FAIL/u);
+  assert.doesNotMatch(captured.stdout, new RegExp(rawSecret, 'u'));
+  assert.doesNotMatch(captured.stderr, new RegExp(rawSecret, 'u'));
+  assert.equal(qualityCalls, 0);
+
+  const coreSafetyPath = join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json');
+  const finalReportPath = join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md');
+  const statePath = join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1'));
+  const coreSafety = await readFile(coreSafetyPath, 'utf8');
+  const finalReport = await readFile(finalReportPath, 'utf8');
+  const stateJson = await readFile(statePath, 'utf8');
+  assert.doesNotMatch(coreSafety, new RegExp(rawSecret, 'u'));
+  assert.doesNotMatch(finalReport, new RegExp(rawSecret, 'u'));
+  assert.doesNotMatch(stateJson, new RegExp(rawSecret, 'u'));
+  const state = JSON.parse(stateJson) as DeliveryRunStateRecord;
+  assert.equal(state.coreSafety?.secretFindings.length, 1);
+  assert.equal(state.qualityReports.length, 0);
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command needs human before local checks when core safety changed-file limit is exceeded', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      coreSafetyLimits: { maxChangedFiles: 1, maxAddedLines: 50 },
+      gitCommandRunner: createFakeGitRunner({
+        afterStatusPorcelain: [' M src/a.ts', ' M src/b.ts', ''].join('\n'),
+        afterDiffStat: ' src/a.ts | 1 +\n src/b.ts | 1 +\n 2 files changed, 2 insertions(+)',
+        afterDiffPatch: [diffPatch('src/a.ts', ['export const a = 1;']), diffPatch('src/b.ts', ['export const b = 1;'])].join('\n')
+      }),
+      devRunner: createFakeDevRunner(),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Core Safety: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Human Action Needed:/u);
+  assert.equal(qualityCalls, 0);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'NEEDS_HUMAN');
+  assert.equal(state.humanActionNeeded?.reason, state.coreSafety?.reason);
+  assert.deepEqual(state.coreSafety?.limitFindings.map((finding) => finding.limit), ['maxChangedFiles']);
+  assert.equal(state.qualityReports.length, 0);
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command needs human before local checks for dependency lockfile changes', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({
+        afterStatusPorcelain: ' M pnpm-lock.yaml\n',
+        afterDiffStat: ' pnpm-lock.yaml | 1 +\n 1 file changed, 1 insertion(+)',
+        afterDiffPatch: diffPatch('pnpm-lock.yaml', ['lockfileVersion: 9.0'])
+      }),
+      devRunner: createFakeDevRunner(),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /dependency lockfile/i);
+  assert.equal(qualityCalls, 0);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'NEEDS_HUMAN');
+  assert.equal(state.coreSafety?.decision, 'needs_human');
+  assert.deepEqual(state.coreSafety.humanReviewFindings.map((finding) => finding.category), ['dependency_lockfile']);
+  assert.equal(state.qualityReports.length, 0);
   await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
 });
 
@@ -466,7 +646,7 @@ function railwayDeployment(): JsonObject {
 
 function fakeGitResult(
   input: GitCommandInput,
-  output: { readonly statusPorcelain?: string | undefined; readonly diffStat?: string | undefined } = {}
+  output: { readonly statusPorcelain?: string | undefined; readonly diffStat?: string | undefined; readonly diffPatch?: string | undefined } = {}
 ): GitCommandResult {
   if (input.args[0] === 'show-ref') {
     return { stdout: '', stderr: '', exitCode: 1 };
@@ -481,6 +661,10 @@ function fakeGitResult(
   }
 
   if (input.args[0] === 'diff') {
+    if (input.args.includes('--unified=0')) {
+      return { stdout: output.diffPatch ?? diffPatch('src/app.ts', ['export const changed = true;']), stderr: '', exitCode: 0 };
+    }
+
     return { stdout: output.diffStat ?? ' src/app.ts | 1 +\n 1 file changed, 1 insertion(+)', stderr: '', exitCode: 0 };
   }
 
@@ -494,6 +678,7 @@ function createFakeGitRunner(output: {
   readonly baselineDiffStat?: string | undefined;
   readonly afterStatusPorcelain?: string | undefined;
   readonly afterDiffStat?: string | undefined;
+  readonly afterDiffPatch?: string | undefined;
 } = {}): (input: GitCommandInput) => Promise<GitCommandResult> {
   let statusCalls = 0;
   let diffCalls = 0;
@@ -509,6 +694,10 @@ function createFakeGitRunner(output: {
     }
 
     if (input.args[0] === 'diff') {
+      if (input.args.includes('--unified=0')) {
+        return fakeGitResult(input, { diffPatch: output.afterDiffPatch });
+      }
+
       diffCalls += 1;
       const diffStat = diffCalls === 1 ? output.baselineDiffStat ?? '' : output.afterDiffStat ?? ' src/app.ts | 1 +\n 1 file changed, 1 insertion(+)';
       return fakeGitResult(input, { diffStat });
@@ -516,6 +705,17 @@ function createFakeGitRunner(output: {
 
     return fakeGitResult(input);
   };
+}
+
+function diffPatch(filePath: string, additions: readonly string[]): string {
+  return [
+    `diff --git a/${filePath} b/${filePath}`,
+    `--- a/${filePath}`,
+    `+++ b/${filePath}`,
+    `@@ -1,0 +1,${additions.length} @@`,
+    ...additions.map((line) => `+${line}`),
+    ''
+  ].join('\n');
 }
 
 function createFakeDevRunner(events?: string[]): DevRunner & { readonly calls: readonly DevRunInput[] } {

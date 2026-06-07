@@ -142,6 +142,10 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
     '',
     renderMeaningfulDiff(state.meaningfulDiff),
     '',
+    '## Core Safety',
+    '',
+    renderCoreSafety(state.coreSafety),
+    '',
     '## Quality',
     '',
     latestQuality === undefined
@@ -215,6 +219,22 @@ function renderMeaningfulDiff(evidence: DeliveryRunStateRecord['meaningfulDiff']
     `- Agent-New Changed Files: ${summarizeFiles(evidence.newChangedFiles)}`,
     `- Agent Product Changed Files: ${summarizeFiles(evidence.productFiles)}`,
     `- Agent Ignored Files: ${summarizeFiles(evidence.ignoredFiles)}`
+  ].join('\n');
+}
+
+function renderCoreSafety(report: DeliveryRunStateRecord['coreSafety']): string {
+  if (report === undefined) {
+    return '- None';
+  }
+
+  return [
+    `- Decision: ${report.decision.toUpperCase()}`,
+    `- Reason: ${report.reason}`,
+    `- Changed Files: ${summarizeFiles(report.changedFiles)}`,
+    `- Added Lines: ${report.addedLineCount}`,
+    `- Forbidden Files: ${report.forbiddenFiles.length}`,
+    `- Secret-Like Findings: ${report.secretFindings.length}`,
+    `- Human Review Findings: ${report.humanReviewFindings.map((finding) => `${finding.category}:${finding.filePath}`).join(', ') || 'none'}`
   ].join('\n');
 }
 

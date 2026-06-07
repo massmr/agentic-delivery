@@ -166,7 +166,7 @@ export {
   runStagingVerification
 } from './delivery/index.js';
 export { deliveryRunStates } from './domain/index.js';
-export { LocalGitAdapter, buildWorkingBranchName, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff, isIgnoredMeaningfulDiffPath, meaningfulDiffIgnoredPathPatterns, parsePorcelainStatus, runGitCommand } from './git/index.js';
+export { LocalGitAdapter, buildWorkingBranchName, captureDiffAdditions, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff, isIgnoredMeaningfulDiffPath, meaningfulDiffIgnoredPathPatterns, parseDiffAdditions, parsePorcelainStatus, runGitCommand } from './git/index.js';
 export {
   MockMcpClient,
   McpToolAllowlistError,
@@ -196,6 +196,8 @@ export {
   NativeFallbackContractNotFoundError,
   NativeFallbackContractViolationError,
   assertAdapterAllowedForAction,
+  defaultCoreSafetyLimits,
+  evaluateCoreSafety,
   getNativeFallbackContract,
   isAdapterAllowed,
   isAdapterAllowedForAction,
@@ -274,6 +276,16 @@ export type {
   BranchPolicy,
   BranchRef,
   BuiltInQualityGateName,
+  CoreSafetyDecision,
+  CoreSafetyFindingKind,
+  CoreSafetyFindingSeverity,
+  CoreSafetyForbiddenFileFinding,
+  CoreSafetyHumanReviewCategory,
+  CoreSafetyHumanReviewFinding,
+  CoreSafetyLimitFinding,
+  CoreSafetyLimits,
+  CoreSafetyReport,
+  CoreSafetySecretFinding,
   DeliveryRunFailure,
   DeliveryRunState,
   DeliveryRunStateRecord,
@@ -357,7 +369,7 @@ export type {
   RunStagingVerificationInput,
   SmokeQualityRunner
 } from './delivery/index.js';
-export type { BuildWorkingBranchNameInput, CaptureMeaningfulDiffSnapshotInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, InspectMeaningfulDiffInput, PushLocalBranchInput } from './git/index.js';
+export type { BuildWorkingBranchNameInput, CaptureDiffAdditionsInput, CaptureMeaningfulDiffSnapshotInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, InspectMeaningfulDiffInput, PushLocalBranchInput } from './git/index.js';
 export type {
   CreateMcpToolCallAuditRecordInput,
   CreateSdkRuntimeMcpClientOptions,
@@ -392,7 +404,7 @@ export type {
   RuntimeMcpStdioTransportParameters
 } from './mcp/index.js';
 export type { TicketPlan } from './planning/index.js';
-export type { AdapterKind, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
+export type { AdapterKind, CoreSafetyDiffAddition, EvaluateCoreSafetyInput, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
 export type {
   ProviderFactoryEnvironment,

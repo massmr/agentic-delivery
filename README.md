@@ -39,7 +39,7 @@ Current capabilities:
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
 - Direct sibling Git repository discovery for parent workspace dry runs.
-- Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, and local quality evidence only.
+- Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, post-agent diff safety, and local quality evidence only.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
@@ -184,7 +184,7 @@ Execute one explicitly confirmed development-only ticket after planning selects 
 node dist/src/cli/index.js run-dev LK-101 --confirm-dev-execution
 ```
 
-The `run-dev` command reuses the Jira ticket intake and repository planning boundary, refuses to start without `--confirm-dev-execution`, prints the selected ticket, repository, branch, quality gates, evidence path, and local-only stop boundary before creating state or git/OpenCode/quality side effects, then creates a local branch only in the selected repository. It invokes the configured OpenCode runner through the existing execution contract, runs local quality gates, and writes implementation and quality evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`. It does not open GitHub pull requests, push branches, call Railway or Vercel, verify deployments, write an operation ledger, merge production, deploy production, or enable autonomous production automation.
+The `run-dev` command reuses the Jira ticket intake and repository planning boundary, refuses to start without `--confirm-dev-execution`, prints the selected ticket, repository, branch, quality gates, evidence path, and local-only stop boundary before creating state or git/OpenCode/quality side effects, then creates a local branch only in the selected repository. It invokes the configured OpenCode runner through the existing execution contract, writes `meaningful-diff.json`, evaluates core safety into `core-safety.json`, then runs local quality gates only when the diff is meaningful and the safety decision is `pass`. Safety `fail` stops as `FAILED`; safety `needs_human` stops as `NEEDS_HUMAN` with a human-action reason. It does not open GitHub pull requests, push branches, call Railway or Vercel, verify deployments, write an operation ledger, merge production, deploy production, or enable autonomous production automation.
 
 Run one mock ticket end to end:
 

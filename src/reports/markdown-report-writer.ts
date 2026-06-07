@@ -13,6 +13,7 @@ export interface FinalReportOptions {
   readonly planReportPath?: string;
   readonly implementationLogPath?: string;
   readonly meaningfulDiffReportPath?: string;
+  readonly coreSafetyReportPath?: string;
   readonly qualityReportPath?: string;
   readonly stagingReportPath?: string;
   readonly mockOnlyNote?: string;
@@ -244,6 +245,10 @@ export function renderFinalReportMarkdown(
     '',
     renderMeaningfulDiff(state.meaningfulDiff, options.meaningfulDiffReportPath),
     '',
+    '## Core Safety',
+    '',
+    renderCoreSafety(state.coreSafety, options.coreSafetyReportPath),
+    '',
     '## Quality Summary',
     '',
     renderQualitySummary(latestQualityReport, options.qualityReportPath),
@@ -318,6 +323,26 @@ function renderMeaningfulDiff(evidence: DeliveryRunStateRecord['meaningfulDiff']
     `- Ignored Path Patterns: ${renderInlineList(evidence.ignoredPathPatterns)}`,
     `- Baseline Diff Summary: ${evidence.baselineDiffSummary.length === 0 ? 'not recorded' : evidence.baselineDiffSummary}`,
     `- After-Agent Diff Summary: ${evidence.afterAgentDiffSummary.length === 0 ? 'not recorded' : evidence.afterAgentDiffSummary}`
+  ].join('\n');
+}
+
+function renderCoreSafety(report: DeliveryRunStateRecord['coreSafety'], reportPath: string | undefined): string {
+  if (report === undefined) {
+    return '- No core safety decision recorded.';
+  }
+
+  return [
+    `- Decision: ${report.decision.toUpperCase()}`,
+    `- Reason: ${report.reason}`,
+    `- Evidence: ${reportPath ?? 'not recorded'}`,
+    `- Changed Files: ${renderInlineList(report.changedFiles)}`,
+    `- Changed File Count: ${report.changedFileCount}`,
+    `- Added Line Count: ${report.addedLineCount}`,
+    `- Limits: ${report.limits.maxChangedFiles} changed files, ${report.limits.maxAddedLines} added lines`,
+    `- Forbidden Files: ${report.forbiddenFiles.length === 0 ? 'none' : report.forbiddenFiles.map((finding) => `${finding.filePath} (${finding.reason})`).join('; ')}`,
+    `- Secret-Like Findings: ${report.secretFindings.length === 0 ? 'none' : report.secretFindings.map((finding) => `${finding.filePath}${finding.lineNumber === undefined ? '' : `:${finding.lineNumber}`} (${finding.detector})`).join('; ')}`,
+    `- Diff Limit Findings: ${report.limitFindings.length === 0 ? 'none' : report.limitFindings.map((finding) => `${finding.limit} ${finding.actual}/${finding.maximum}`).join('; ')}`,
+    `- Human Review Findings: ${report.humanReviewFindings.length === 0 ? 'none' : report.humanReviewFindings.map((finding) => `${finding.filePath} (${finding.category})`).join('; ')}`
   ].join('\n');
 }
 

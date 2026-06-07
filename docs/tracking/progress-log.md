@@ -2,6 +2,28 @@
 
 ## 2026-06-07
 
+Implemented Milestone AP Core Safety Loop v1 review candidate:
+
+- Added deterministic core safety policy evidence with exact `pass`, `needs_human`, and `fail` decisions.
+- Added forbidden-file detection for `.env`, `.env.*`, private keys, credential/secret/token files, and Ewokbot auth/config paths.
+- Added redacted secret-like diff-addition detection that records detector metadata, file paths, and line numbers only, without persisting raw added values.
+- Added changed-file and added-line limits with defaults and a test-overridable run-dev seam.
+- Added human-review escalation for dependency lockfiles, database migrations, auth paths, payment/billing paths, and infrastructure/deployment configuration.
+- Integrated AP into `ewokbot run-dev` after AO meaningful diff passes and before `LOCAL_CHECKS_RUNNING`; AP `fail` marks `FAILED`, AP `needs_human` marks `NEEDS_HUMAN`, both skip local quality and provider handoff files, and AP `pass` continues the existing local quality flow.
+- Persisted `.ewokbot/runs/<ticket-key>/<run-id>/core-safety.json` and surfaced it in CLI output, final reports, and status rendering.
+- Added fake-only unit and run-dev integration coverage for pass, forbidden-file fail, secret-like addition fail with raw-value absence assertions, diff-limit `NEEDS_HUMAN`, and human-review category `NEEDS_HUMAN`.
+- Preserved AP scope only: no AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, AV sandbox, staging verification, production merge/deploy, live provider calls, live MCP/OpenCode/network calls, package-manager tests, or home-directory mutation were added.
+
+Verification commands run for AP:
+
+- `lsp_diagnostics` on modified TypeScript files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm run typecheck`
+- `pnpm test` (`294/294`)
+- `pnpm run build`
+- `git diff --check`
+
+## 2026-06-07 Earlier
+
 Accepted Milestone AO and prepared Milestone AP:
 
 - Accepted AO Meaningful Diff Guard after Codex review of the baseline-vs-after-agent correction.

@@ -4,5 +4,25 @@ export type { PullRequestCheckStatus, PullRequestCheckSummary, PullRequestProvid
 export type { BuiltInQualityGateName, QualityGateDefinition, QualityGateRequirement, QualityGateResult, QualityGateStatus, QualityReport } from './quality.js';
 export type { BranchPolicy, RepositoryConfig, RepositoryMatch, RepositoryProvider, RepositoryRef, RepositoryRole } from './repository.js';
 export { deliveryRunStates } from './run.js';
-export type { BranchRef, DeliveryRunFailure, DeliveryRunState, DeliveryRunStateRecord, HumanActionRequest, MeaningfulDiffDecision, MeaningfulDiffEvidence, MeaningfulDiffSnapshot, RunTimestamps } from './run.js';
+export type {
+  BranchRef,
+  CoreSafetyDecision,
+  CoreSafetyFindingKind,
+  CoreSafetyFindingSeverity,
+  CoreSafetyForbiddenFileFinding,
+  CoreSafetyHumanReviewCategory,
+  CoreSafetyHumanReviewFinding,
+  CoreSafetyLimitFinding,
+  CoreSafetyLimits,
+  CoreSafetyReport,
+  CoreSafetySecretFinding,
+  DeliveryRunFailure,
+  DeliveryRunState,
+  DeliveryRunStateRecord,
+  HumanActionRequest,
+  MeaningfulDiffDecision,
+  MeaningfulDiffEvidence,
+  MeaningfulDiffSnapshot,
+  RunTimestamps
+} from './run.js';
 export type { DeliveryTicket, TicketAnalysis, TicketPriority, TicketProvider, TicketRef } from './ticket.js';
