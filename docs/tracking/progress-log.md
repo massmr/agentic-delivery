@@ -2,7 +2,33 @@
 
 ## 2026-06-07
 
-Implemented Milestone AP Core Safety Loop v1 review candidate:
+Accepted Milestone AQ Agent Completion Contract:
+
+- Added a deterministic agent completion policy with `pass`, `needs_human`, and `fail` decisions from the final structured agent summary plus meaningful-diff evidence.
+- Tightened the OpenCode implementation prompt and `run-dev` definition of done so agents must report status, changed files, tests run, known limits, blockers, and background agents.
+- Integrated AQ into `ewokbot run-dev` after AO meaningful diff and before AP core safety/local quality; AQ persists `.ewokbot/runs/<ticket-key>/<run-id>/agent-completion.json`, `fail` marks `FAILED`, `needs_human` marks `NEEDS_HUMAN`, and only `pass` continues.
+- Surfaced the agent completion report path and decision in CLI output, final reports, status rendering, inspect, and logs.
+- Added fake-only policy, prompt, and run-dev coverage for completed summaries, exploration-only output, pending background agents, incomplete/TODO output, credential blockers, and missing meaningful product diffs.
+- Preserved AQ scope only: no AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, AV sandbox, staging verification, production merge/deploy, live provider calls, live MCP/OpenCode/network calls, package-manager tests, or home-directory mutation were added.
+- Reviewed the staged AQ implementation and accepted it after confirming the `run-dev` ordering is AO meaningful diff -> AQ agent completion -> AP core safety -> local quality, AQ `fail` and `needs_human` block before AP/quality, and CLI/report/status/inspect/log surfaces include `agent-completion.json` evidence.
+
+Verification commands run for AQ:
+
+- `lsp_diagnostics` on modified TypeScript files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm run typecheck`
+- `pnpm test` (`305/305`)
+- `pnpm run build`
+- `git diff --check`
+
+Committed AQ as `37beb11 feat(run-dev): add agent completion contract`.
+
+Next approved implementation milestone:
+
+- AR - Test Relevance Guard.
+
+## 2026-06-07 Earlier
+
+Accepted Milestone AP Core Safety Loop v1:
 
 - Added deterministic core safety policy evidence with exact `pass`, `needs_human`, and `fail` decisions.
 - Added forbidden-file detection for `.env`, `.env.*`, private keys, credential/secret/token files, and Ewokbot auth/config paths.
@@ -18,9 +44,15 @@ Verification commands run for AP:
 
 - `lsp_diagnostics` on modified TypeScript files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
 - `pnpm run typecheck`
-- `pnpm test` (`294/294`)
+- `pnpm test` (`295/295`)
 - `pnpm run build`
 - `git diff --check`
+
+Committed AP as `2d575fb feat(run-dev): add core safety loop`.
+
+Next approved implementation milestone:
+
+- AQ - Agent Completion Contract.
 
 ## 2026-06-07 Earlier
 

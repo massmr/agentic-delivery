@@ -185,6 +185,8 @@ Responsibilities:
 
 OpenCode execution is subprocess-first. The subprocess runner must use an executable plus argument array, validate the working directory against the configured workspace root, pass only allowlisted environment variables resolved from the command environment including `.ewokbot/.env`, enforce timeout and cancellation, capture stdout/stderr into implementation logs, redact secret-like output before persistence, and stop retrying after timeout or cancellation.
 
+For the controlled `run-dev` path, a successful OpenCode subprocess result is not sufficient by itself. Ewokbot parses the final structured agent completion summary from the implementation log, pairs it with meaningful-diff evidence, persists `.ewokbot/runs/<ticket-key>/<run-id>/agent-completion.json`, and blocks core safety and local quality gates when the completion decision is `fail` or `needs_human`.
+
 Required methods:
 
 ```ts

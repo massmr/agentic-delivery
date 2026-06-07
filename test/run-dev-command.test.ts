@@ -106,6 +106,8 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(state.devRuns.length, 1);
   assert.equal(state.qualityReports.length, 1);
   assert.equal(state.meaningfulDiff?.decision, 'passed');
+  assert.equal(state.agentCompletion?.decision, 'pass');
+  assert.equal(state.agentCompletion.statusSignal, 'completed');
   assert.equal(state.coreSafety?.decision, 'pass');
   assert.equal(state.coreSafety.changedFileCount, 1);
   assert.equal(state.coreSafety.addedLineCount, 1);
@@ -115,18 +117,114 @@ test('run-dev command executes one selected repository through local checks only
   assert.deepEqual(state.meaningfulDiff.productFiles, ['src/app.ts']);
   const meaningfulDiff = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'), 'utf8')) as DeliveryRunStateRecord['meaningfulDiff'];
   assert.equal(meaningfulDiff?.decision, 'passed');
+  const agentCompletion = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'agent-completion.json'), 'utf8')) as DeliveryRunStateRecord['agentCompletion'];
+  assert.equal(agentCompletion?.decision, 'pass');
   const coreSafety = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json'), 'utf8')) as DeliveryRunStateRecord['coreSafety'];
   assert.equal(coreSafety?.decision, 'pass');
   const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8');
   assert.match(finalReport, /Development execution remained local-only/u);
   assert.match(finalReport, /Meaningful Diff/u);
+  assert.match(finalReport, /Agent Completion/u);
   assert.match(finalReport, /Core Safety/u);
   assert.match(finalReport, /Decision: PASS/u);
   assert.match(finalReport, /Agent Product Changed Files: src\/app\.ts/u);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'implementation-log.md'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'))).isFile(), true);
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'agent-completion.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md'))).isFile(), true);
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command fails before core safety when agent output is exploration-only', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const gitCalls: GitCommandInput[] = [];
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({ calls: gitCalls }),
+      devRunner: createFakeDevRunner(undefined, completionLog({
+        status: 'completed',
+        preface: 'I looked into the request and recommend changing src/app.ts.',
+        changedFiles: 'src/app.ts',
+        testsRun: 'mock test',
+        knownLimits: 'none',
+        blockers: 'none',
+        backgroundAgents: 'none'
+      })),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: FAILED/u);
+  assert.match(captured.stdout, /Agent Completion: FAIL/u);
+  assert.equal(qualityCalls, 0);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff']);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'FAILED');
+  assert.equal(state.agentCompletion?.decision, 'fail');
+  assert.equal(state.coreSafety, undefined);
+  assert.equal(state.qualityReports.length, 0);
+  const report = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'agent-completion.json'), 'utf8')) as DeliveryRunStateRecord['agentCompletion'];
+  assert.equal(report?.findings.some((finding) => finding.kind === 'exploration_only'), true);
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md')));
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command needs human before core safety when agent reports credential blockers', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner(),
+      devRunner: createFakeDevRunner(undefined, completionLog({
+        status: 'blocked',
+        changedFiles: 'src/app.ts',
+        testsRun: 'not run with reason: provider credentials are required',
+        knownLimits: 'blocked by credentials',
+        blockers: 'credentials required from operator',
+        backgroundAgents: 'none'
+      })),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'));
+      }
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Agent Completion: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Human Action Needed:/u);
+  assert.equal(qualityCalls, 0);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'NEEDS_HUMAN');
+  assert.equal(state.agentCompletion?.decision, 'needs_human');
+  assert.equal(state.humanActionNeeded?.reason, state.agentCompletion.reason);
+  assert.equal(state.coreSafety, undefined);
+  assert.equal(state.qualityReports.length, 0);
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json')));
   await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
 });
 
@@ -718,7 +816,7 @@ function diffPatch(filePath: string, additions: readonly string[]): string {
   ].join('\n');
 }
 
-function createFakeDevRunner(events?: string[]): DevRunner & { readonly calls: readonly DevRunInput[] } {
+function createFakeDevRunner(events?: string[], implementationLog?: string): DevRunner & { readonly calls: readonly DevRunInput[] } {
   const calls: DevRunInput[] = [];
 
   return {
@@ -729,11 +827,44 @@ function createFakeDevRunner(events?: string[]): DevRunner & { readonly calls: r
       events?.push('dev-run');
       calls.push(input);
       await mkdir(dirname(input.implementationLogPath), { recursive: true });
-      await writeFile(input.implementationLogPath, `# Implementation Log\n\n${input.prompt}\n`, 'utf8');
+      await writeFile(input.implementationLogPath, `# Implementation Log\n\n${input.prompt}\n\n${implementationLog ?? defaultCompletionLog()}\n`, 'utf8');
 
       return createPassedDevRun(input);
     }
   };
+}
+
+function defaultCompletionLog(): string {
+  return completionLog({
+    status: 'completed',
+    changedFiles: 'src/app.ts, .env.local, src/config.ts, src/a.ts, src/b.ts, pnpm-lock.yaml',
+    testsRun: 'mock test',
+    knownLimits: 'none',
+    blockers: 'none',
+    backgroundAgents: 'none'
+  });
+}
+
+function completionLog(input: {
+  readonly status: 'completed' | 'blocked' | 'incomplete';
+  readonly preface?: string | undefined;
+  readonly changedFiles: string;
+  readonly testsRun: string;
+  readonly knownLimits: string;
+  readonly blockers: string;
+  readonly backgroundAgents: string;
+}): string {
+  return [
+    '## Required Final Completion Summary',
+    input.preface,
+    `Status: ${input.status}`,
+    `Changed files: ${input.changedFiles}`,
+    `Tests run: ${input.testsRun}`,
+    `Known limits: ${input.knownLimits}`,
+    `Blockers: ${input.blockers}`,
+    `Background agents: ${input.backgroundAgents}`,
+    ''
+  ].filter((line): line is string => line !== undefined).join('\n');
 }
 
 function createPassedDevRun(input: DevRunInput): DevRunResult {

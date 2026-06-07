@@ -142,6 +142,10 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
     '',
     renderMeaningfulDiff(state.meaningfulDiff),
     '',
+    '## Agent Completion',
+    '',
+    renderAgentCompletion(state.agentCompletion),
+    '',
     '## Core Safety',
     '',
     renderCoreSafety(state.coreSafety),
@@ -235,6 +239,23 @@ function renderCoreSafety(report: DeliveryRunStateRecord['coreSafety']): string 
     `- Forbidden Files: ${report.forbiddenFiles.length}`,
     `- Secret-Like Findings: ${report.secretFindings.length}`,
     `- Human Review Findings: ${report.humanReviewFindings.map((finding) => `${finding.category}:${finding.filePath}`).join(', ') || 'none'}`
+  ].join('\n');
+}
+
+function renderAgentCompletion(report: DeliveryRunStateRecord['agentCompletion']): string {
+  if (report === undefined) {
+    return '- None';
+  }
+
+  return [
+    `- Decision: ${report.decision.toUpperCase()}`,
+    `- Reason: ${report.reason}`,
+    `- Status Signal: ${report.statusSignal.toUpperCase()}`,
+    `- Changed Files Mentioned: ${summarizeFiles(report.changedFilesMentioned)}`,
+    `- Tests Mentioned: ${report.testsMentioned ? 'yes' : 'no'}`,
+    `- Known Limits Mentioned: ${report.knownLimitsMentioned ? 'yes' : 'no'}`,
+    `- Blockers: ${report.blockers.length === 0 ? 'none' : report.blockers.join(', ')}`,
+    `- Findings: ${report.findings.length === 0 ? 'none' : report.findings.map((finding) => `${finding.kind}:${finding.severity}`).join(', ')}`
   ].join('\n');
 }
 

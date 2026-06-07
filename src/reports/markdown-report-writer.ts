@@ -13,6 +13,7 @@ export interface FinalReportOptions {
   readonly planReportPath?: string;
   readonly implementationLogPath?: string;
   readonly meaningfulDiffReportPath?: string;
+  readonly agentCompletionReportPath?: string;
   readonly coreSafetyReportPath?: string;
   readonly qualityReportPath?: string;
   readonly stagingReportPath?: string;
@@ -245,6 +246,10 @@ export function renderFinalReportMarkdown(
     '',
     renderMeaningfulDiff(state.meaningfulDiff, options.meaningfulDiffReportPath),
     '',
+    '## Agent Completion',
+    '',
+    renderAgentCompletion(state.agentCompletion, options.agentCompletionReportPath),
+    '',
     '## Core Safety',
     '',
     renderCoreSafety(state.coreSafety, options.coreSafetyReportPath),
@@ -343,6 +348,24 @@ function renderCoreSafety(report: DeliveryRunStateRecord['coreSafety'], reportPa
     `- Secret-Like Findings: ${report.secretFindings.length === 0 ? 'none' : report.secretFindings.map((finding) => `${finding.filePath}${finding.lineNumber === undefined ? '' : `:${finding.lineNumber}`} (${finding.detector})`).join('; ')}`,
     `- Diff Limit Findings: ${report.limitFindings.length === 0 ? 'none' : report.limitFindings.map((finding) => `${finding.limit} ${finding.actual}/${finding.maximum}`).join('; ')}`,
     `- Human Review Findings: ${report.humanReviewFindings.length === 0 ? 'none' : report.humanReviewFindings.map((finding) => `${finding.filePath} (${finding.category})`).join('; ')}`
+  ].join('\n');
+}
+
+function renderAgentCompletion(report: DeliveryRunStateRecord['agentCompletion'], reportPath: string | undefined): string {
+  if (report === undefined) {
+    return '- No agent completion decision recorded.';
+  }
+
+  return [
+    `- Decision: ${report.decision.toUpperCase()}`,
+    `- Reason: ${report.reason}`,
+    `- Evidence: ${reportPath ?? 'not recorded'}`,
+    `- Status Signal: ${report.statusSignal.toUpperCase()}`,
+    `- Changed Files Mentioned: ${renderInlineList(report.changedFilesMentioned)}`,
+    `- Tests Mentioned: ${report.testsMentioned ? 'yes' : 'no'}`,
+    `- Known Limits Mentioned: ${report.knownLimitsMentioned ? 'yes' : 'no'}`,
+    `- Blockers: ${renderInlineList(report.blockers)}`,
+    `- Findings: ${report.findings.length === 0 ? 'none' : report.findings.map((finding) => `${finding.kind} (${finding.severity})`).join('; ')}`
   ].join('\n');
 }
 

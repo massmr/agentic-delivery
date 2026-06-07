@@ -54,6 +54,31 @@ export type MeaningfulDiffDecision = 'passed' | 'failed';
 
 export type CoreSafetyDecision = 'pass' | 'needs_human' | 'fail';
 
+export type AgentCompletionDecision = 'pass' | 'needs_human' | 'fail';
+
+export type AgentCompletionSource = 'implementation_log' | 'dev_run_summary' | 'combined';
+
+export type AgentCompletionStatusSignal = 'completed' | 'blocked' | 'incomplete' | 'missing';
+
+export type AgentCompletionFindingKind =
+  | 'missing_completed_status'
+  | 'blocked_status'
+  | 'incomplete_status'
+  | 'missing_changed_files'
+  | 'missing_tests'
+  | 'missing_known_limits'
+  | 'unresolved_blockers'
+  | 'pending_background_agents'
+  | 'exploration_only'
+  | 'incomplete_language'
+  | 'diff_not_meaningful';
+
+export interface AgentCompletionFinding {
+  readonly kind: AgentCompletionFindingKind;
+  readonly severity: AgentCompletionDecision;
+  readonly message: string;
+}
+
 export type CoreSafetyFindingSeverity = 'fail' | 'needs_human';
 
 export type CoreSafetyFindingKind = 'forbidden_file' | 'secret_like_addition' | 'diff_limit' | 'human_review_category';
@@ -122,6 +147,19 @@ export interface CoreSafetyReport {
   readonly humanReviewFindings: readonly CoreSafetyHumanReviewFinding[];
 }
 
+export interface AgentCompletionReport {
+  readonly decision: AgentCompletionDecision;
+  readonly reason: string;
+  readonly source: AgentCompletionSource;
+  readonly statusSignal: AgentCompletionStatusSignal;
+  readonly summaryText: string;
+  readonly changedFilesMentioned: readonly string[];
+  readonly testsMentioned: boolean;
+  readonly knownLimitsMentioned: boolean;
+  readonly blockers: readonly string[];
+  readonly findings: readonly AgentCompletionFinding[];
+}
+
 export interface DeliveryRunStateRecord {
   readonly runId: string;
   readonly ticket: TicketRef;
@@ -134,6 +172,7 @@ export interface DeliveryRunStateRecord {
   readonly devRuns: readonly DevRunResult[];
   readonly timestamps: RunTimestamps;
   readonly meaningfulDiff?: MeaningfulDiffEvidence;
+  readonly agentCompletion?: AgentCompletionReport;
   readonly coreSafety?: CoreSafetyReport;
   readonly ticketAnalysis?: TicketAnalysis;
   readonly failure?: DeliveryRunFailure;

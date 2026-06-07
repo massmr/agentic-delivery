@@ -39,7 +39,7 @@ export async function runRunDevCommand(ticketKey: string, options: RunDevCommand
   const cwd = options.cwd ?? process.cwd();
   const environment = loadWorkspaceEnvironment(cwd);
   options.io.stdout(`Development execution requested for ${ticketKey}.\n`);
-  options.io.stdout('Scope: one Jira ticket, exactly one selected repository, local branch, OpenCode, local quality gates, and local evidence only.\n');
+  options.io.stdout('Scope: one Jira ticket, exactly one selected repository, local branch, OpenCode, agent completion check, local quality gates, and local evidence only.\n');
   options.io.stdout('Local-only boundary: Ewokbot will not push, open PRs, call Railway/Vercel, verify deployments, merge production, or deploy production.\n');
   options.io.stdout(`Phase 1/3: loading ${ewokbotWorkspaceConfigPath} and creating Jira TicketPort.getTicket runtime path.\n`);
 
@@ -106,7 +106,7 @@ function renderBoundary(io: CliProgramIO, boundary: DevelopmentRunBoundary): voi
 }
 
 function renderRunDevResult(io: CliProgramIO, ticketKey: string, result: DevelopmentRunResult): void {
-  io.stdout('Phase 3/3: local branch, OpenCode, and local quality gates completed.\n');
+  io.stdout('Phase 3/3: local branch, OpenCode, agent completion check, core safety, and local quality gates completed.\n');
   io.stdout(`Development run ${ticketKey} completed as ${result.runId}.\n`);
   io.stdout(`Final State: ${result.state.state}\n`);
   io.stdout(`Run Directory: ${result.runDirectoryPath}\n`);
@@ -115,6 +115,10 @@ function renderRunDevResult(io: CliProgramIO, ticketKey: string, result: Develop
   io.stdout(`Meaningful Diff Report: ${result.meaningfulDiffReportPath ?? 'n/a'}\n`);
   if (result.state.meaningfulDiff !== undefined) {
     io.stdout(`Meaningful Diff: ${result.state.meaningfulDiff.decision.toUpperCase()} - ${result.state.meaningfulDiff.reason}\n`);
+  }
+  io.stdout(`Agent Completion Report: ${result.agentCompletionReportPath ?? 'n/a'}\n`);
+  if (result.state.agentCompletion !== undefined) {
+    io.stdout(`Agent Completion: ${result.state.agentCompletion.decision.toUpperCase()} - ${result.state.agentCompletion.reason}\n`);
   }
   io.stdout(`Core Safety Report: ${result.coreSafetyReportPath ?? 'n/a'}\n`);
   if (result.state.coreSafety !== undefined) {

@@ -114,14 +114,16 @@ Status legend:
 - `[x]` Public CLI real MCP client wiring for smoke/scan/worker
 - `[x]` Real workspace dry run for discovery, Jira MCP intake, and planning without delivery side effects
 - `[x]` Controlled single-repository dev execution
+- `[x]` Meaningful diff guard for local agent runs
+- `[x]` Core safety loop for local agent diffs
 - `[x]` Interactive init wizard and credential setup
 - `[x]` User-level Ewokbot config/data/auth/cache layout
 - `[x]` Dev tool detection adapters, starting with OpenCode
 - `[x]` Inquirer TUI init
 - `[x]` Ewokbot auth commands separated from OpenCode auth
 - `[x]` Meaningful diff guard for post-agent false positives
-- `[~]` Core safety loop for post-agent diff policy
-- `[ ]` Agent completion contract
+- `[x]` Core safety loop for post-agent diff policy
+- `[x]` Agent completion contract
 - `[ ]` Test relevance guard
 - `[ ]` Harness v1 for fixture-based scoring
 - `[ ]` Real provider smoke v1 with Jira MCP and local run-dev

@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, and AO are complete and accepted. Milestone AP: Core Safety Loop v1 is the next approved implementation milestone.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, and AQ are complete and accepted. Milestone AR: Test Relevance Guard is the next approved implementation milestone. Do not implement AS or later work until AR is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -86,28 +86,46 @@ AO added the accepted Meaningful Diff Guard for the controlled `run-dev` path:
 - Ignore agent/runtime artifacts such as `.omo/`, `.ewokbot/`, logs, caches, and run evidence when deciding whether a product diff exists.
 - Stop before quality gates when OpenCode exits `0` but no new meaningful product file changed.
 
-AP must implement Core Safety Loop v1 for non-empty agent diffs.
-
-Build:
+AP added the accepted Core Safety Loop v1 for non-empty agent diffs:
 
 - Add forbidden-file detection for `.env`, `.env.*`, private keys, credential files, and Ewokbot auth/config files that must not be changed by an agent.
 - Add secret-like content detection over changed diff additions without printing matched secret values.
 - Add diff-size limits for changed files and diff lines, with configurable defaults.
 - Detect human-review categories such as dependency lockfile changes, database migrations, auth-related paths, payment-related paths, and infrastructure/deployment config changes.
 - Return deterministic policy decisions: `pass`, `needs_human`, or `fail`.
-- Write a local safety report under `.ewokbot/runs/<ticket-key>/<run-id>/`.
+- Write `.ewokbot/runs/<ticket-key>/<run-id>/core-safety.json` after AO meaningful diff passes.
 - Block later local success or handoff states when the safety policy returns `needs_human` or `fail`.
 
-AP safety constraints:
+AQ added the accepted Agent Completion Contract for `run-dev`:
 
-- Do not implement AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, or AV Operator Agent Action Sandbox.
+- Tighten the OpenCode implementation prompt so agents must end with a structured completion summary: status, changed files, tests run, known limits, blockers, and background agents.
+- Parse the final completion summary from implementation logs and pair it with meaningful-diff evidence.
+- Persist `.ewokbot/runs/<ticket-key>/<run-id>/agent-completion.json`.
+- Reject exploration-only summaries, incomplete/TODO output, pending background-agent endings, no implementation/no changed files, and missing completion signals before core safety or local quality can run.
+- Escalate explicit credential, access, approval, or clarification blockers as `NEEDS_HUMAN`.
+- Surface the agent completion decision in `run-dev` CLI output, final reports, status, inspect, and logs.
+
+AR is the active next implementation milestone: Test Relevance Guard for `run-dev`.
+
+AR planning scope:
+
+- Verify that tests reported by the agent are relevant to the changed product files.
+- Return deterministic test relevance decisions: `pass`, `needs_human`, or `fail`.
+- Persist `.ewokbot/runs/<ticket-key>/<run-id>/test-relevance.json`.
+- Integrate after AQ agent completion and before AP core safety/local quality unless existing architecture or quality-gate docs require a safer order.
+- Surface the test relevance decision in `run-dev` CLI output, final reports, status, inspect, and logs.
+- Keep tests fake-only with fake agent outputs, fake diffs, and deterministic quality evidence.
+
+AR safety constraints:
+
+- Do not implement AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, or AV Operator Agent Action Sandbox until AR is complete and accepted and a later milestone is explicitly approved.
 - Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
 - Do not add live provider calls, live MCP calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
 - Do not delete or revert user changes outside controlled temporary test repositories.
 - Do not print secret values, even when a secret scan fails.
 - Production merge and production deployment remain human-only.
 
-After AP is reviewed and accepted, the planned sequence is AQ Agent Completion Contract, AR Test Relevance Guard, AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, and AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
+After AR is complete and accepted, the planned sequence is AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, and AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
 
 ## Required Reading
 

@@ -122,6 +122,14 @@ test('buildOpenCodeImplementationPrompt renders deterministic ticket, repo, bran
   assert.match(prompt, /REQUIRED typecheck: pnpm typecheck/u);
   assert.match(prompt, /OPTIONAL coverage: missing command/u);
   assert.match(prompt, /Tests pass\./u);
+  assert.match(prompt, /## Required Final Completion Summary/u);
+  assert.match(prompt, /Status: completed \| blocked \| incomplete/u);
+  assert.match(prompt, /Changed files: comma-separated paths changed by this implementation, or none/u);
+  assert.match(prompt, /Tests run: commands run, or not run with reason/u);
+  assert.match(prompt, /Known limits: remaining limits, or none/u);
+  assert.match(prompt, /Blockers: unresolved blockers, or none/u);
+  assert.match(prompt, /Background agents: pending background agents\/tasks, or none/u);
+  assert.match(prompt, /Exploration-only work, unfinished todos, unresolved blockers, or pending background agents must not be reported as completed/u);
   assert.match(prompt, /Do not call real Jira, GitHub, Railway, OpenCode provider APIs/u);
   assert.match(prompt, /Do not read, request, print, or persist credentials or secrets/u);
   assert.match(prompt, /Do not push to production/u);

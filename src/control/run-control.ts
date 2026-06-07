@@ -86,6 +86,7 @@ const runControlFileName = 'control.json';
 const knownReportFiles: readonly RunLogFile[] = [
   { label: 'Plan', path: 'plan.md' },
   { label: 'Implementation Log', path: 'implementation-log.md' },
+  { label: 'Agent Completion', path: 'agent-completion.json' },
   { label: 'Quality Report', path: 'quality-report.md' },
   { label: 'Staging Report', path: 'staging-report.md' },
   { label: 'Final Report', path: 'final-report.md' }

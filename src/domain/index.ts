@@ -5,6 +5,12 @@ export type { BuiltInQualityGateName, QualityGateDefinition, QualityGateRequirem
 export type { BranchPolicy, RepositoryConfig, RepositoryMatch, RepositoryProvider, RepositoryRef, RepositoryRole } from './repository.js';
 export { deliveryRunStates } from './run.js';
 export type {
+  AgentCompletionDecision,
+  AgentCompletionFinding,
+  AgentCompletionFindingKind,
+  AgentCompletionReport,
+  AgentCompletionSource,
+  AgentCompletionStatusSignal,
   BranchRef,
   CoreSafetyDecision,
   CoreSafetyFindingKind,

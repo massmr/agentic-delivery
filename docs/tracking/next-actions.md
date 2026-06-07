@@ -10,8 +10,10 @@
 6. Milestone AM: Inquirer TUI Init is complete and accepted.
 7. Milestone AN: Ewokbot Auth Commands is complete and accepted.
 8. Milestone AO: Meaningful Diff Guard is complete and accepted.
-9. Milestone AP: Core Safety Loop v1 is implemented as a review candidate.
-10. Do not implement AQ or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AP is reviewed and accepted and a new milestone is explicitly proposed and accepted.
+9. Milestone AP: Core Safety Loop v1 is complete and accepted.
+10. Milestone AQ: Agent Completion Contract is complete and accepted.
+11. Milestone AR: Test Relevance Guard is the next approved implementation milestone.
+12. Do not implement AS or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AR is complete and accepted and a later milestone is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -143,7 +145,7 @@ Implemented:
 - Surface the reason in `final-report.md` and status/report output.
 - Add tests for "OpenCode success but only ignored artifacts changed", "pre-existing product diff but no agent product diff", and "safe non-empty product diff can pass".
 
-Milestone AP - Core Safety Loop v1 is implemented as a review candidate.
+Milestone AP - Core Safety Loop v1 is complete and accepted.
 
 AP evaluates whether a non-empty agent diff is allowed, requires human review, or must fail before any later handoff can be considered.
 
@@ -161,15 +163,13 @@ Implemented:
 
 Continue in this order:
 
-1. Review and accept AP - Core Safety Loop v1.
-2. AQ - Agent Completion Contract.
-3. AR - Test Relevance Guard.
-4. AS - Harness v1.
-5. AT - Real Provider Smoke v1.
-6. AU - GitHub PR Handoff v1.
-7. AV - Operator Agent Action Sandbox.
+1. AR - Test Relevance Guard.
+2. AS - Harness v1.
+3. AT - Real Provider Smoke v1.
+4. AU - GitHub PR Handoff v1.
+5. AV - Operator Agent Action Sandbox.
 
-Anything outside AP must wait until AP is reviewed and accepted. Anything outside AQ-AV must be proposed here first and must not be implemented until approved.
+Anything outside AR implementation must wait until AR is complete and accepted. Anything outside AR-AV must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -206,9 +206,9 @@ The next milestones should move in this order:
 13. AM - Inquirer TUI Init. Completed.
 14. AN - Ewokbot Auth Commands. Completed.
 15. AO - Meaningful Diff Guard. Completed.
-16. AP - Core Safety Loop v1. Review candidate.
-17. AQ - Agent Completion Contract. Planned after AP.
-18. AR - Test Relevance Guard. Planned after AQ.
+16. AP - Core Safety Loop v1. Completed.
+17. AQ - Agent Completion Contract. Completed.
+18. AR - Test Relevance Guard. Next approved implementation milestone.
 19. AS - Harness v1. Planned after AR.
 20. AT - Real Provider Smoke v1. Planned after AS.
 21. AU - GitHub PR Handoff v1. Planned after AT.
