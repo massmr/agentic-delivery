@@ -77,6 +77,18 @@ test('evaluateTestRelevance passes realistic suffixed package-manager test scrip
   }
 });
 
+test('evaluateTestRelevance treats node --test as executed test evidence', () => {
+  const report = evaluateTestRelevance({
+    meaningfulDiff: meaningfulDiff(),
+    agentCompletion: agentCompletion({ testsRun: 'node --test' }),
+    qualityReport: qualityReport('node --test')
+  });
+
+  assert.equal(report.decision, 'pass');
+  assert.equal(report.findings.some((finding) => finding.kind === 'explicit_tests_not_run'), false);
+  assert.equal(report.findings.some((finding) => finding.kind === 'realistic_test_command'), true);
+});
+
 function agentCompletion(input: { readonly testsRun: string }): AgentCompletionReport {
   return {
     decision: 'pass',

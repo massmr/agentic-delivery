@@ -2,6 +2,30 @@
 
 ## 2026-06-07
 
+Implemented Milestone AS Harness v1 review candidate:
+
+- Added typed local harness fixtures and parsing for tickets, repositories, fake agent behavior, and expected scoring outcomes.
+- Added deterministic AS fixture assets under `fixtures/harness/`, including an AD-101 minimal Node fixture and a no-meaningful-diff regression fixture that only changes ignored agent artifacts.
+- Added a local-only harness runner that copies fixture repositories into temporary workspaces, injects fake ticket, git, dev-runner, and quality seams, runs the existing `run-dev` execution path, and scores selected repository, meaningful diff, policy decision, quality result, final state, and expected report presence.
+- Added `ewokbot harness run <fixture-id>` and `ewokbot harness run --all` with compact CI-readable output and pass/fail exit codes.
+- Added fake-only schema, runner, CLI, sorted `--all`, source fixture immutability, and no-meaningful-diff false-positive regression tests.
+- Tightened test relevance detection so `Tests run: node --test` is treated as executed test evidence, not as a `no`/`not run` report.
+- Preserved AS scope only: no AT Real Provider Smoke v1, AU GitHub PR Handoff v1, AV sandbox, staging verification changes, production merge/deploy, dashboard, Telegram/WhatsApp, Sentry/PostHog/Notion ingestion, live provider calls, live MCP/OpenCode/network calls, package-manager installs, or user repository mutation were added.
+
+Verification commands run for AS:
+
+- `lsp_diagnostics` on modified TypeScript files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm run typecheck`
+- `pnpm test` (`322/322`)
+- `pnpm run build`
+- `git diff --check`
+- `node dist/src/cli/index.js harness run ad-101-minimal-node`
+- `node dist/src/cli/index.js harness run --all`
+
+AS is ready for review and acceptance. AT remains planned only after AS is accepted.
+
+## 2026-06-07 Earlier
+
 Accepted Milestone AR Test Relevance Guard:
 
 - Added a deterministic test relevance policy with `pass`, `warn`, and `needs_human` decisions from meaningful-diff evidence, the agent completion test claim, and local quality gate command results.

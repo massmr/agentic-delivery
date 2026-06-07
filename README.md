@@ -40,6 +40,7 @@ Current capabilities:
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
 - Direct sibling Git repository discovery for parent workspace dry runs.
 - Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, meaningful diff, agent completion, core safety, test relevance, and local quality evidence only.
+- Local fixture harness with `ewokbot harness run <fixture-id>` and `ewokbot harness run --all` for deterministic scoring of meaningful diff, repository selection, policy decisions, quality results, and report presence.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
@@ -185,6 +186,15 @@ node dist/src/cli/index.js run-dev LK-101 --confirm-dev-execution
 ```
 
 The `run-dev` command reuses the Jira ticket intake and repository planning boundary, refuses to start without `--confirm-dev-execution`, prints the selected ticket, repository, branch, quality gates, evidence path, and local-only stop boundary before creating state or git/OpenCode/quality side effects, then creates a local branch only in the selected repository. It invokes the configured OpenCode runner through the existing execution contract, writes `meaningful-diff.json`, evaluates the agent completion summary into `agent-completion.json`, evaluates core safety into `core-safety.json`, then runs local quality gates only when the diff is meaningful, agent completion is `pass`, and the safety decision is `pass`. Agent completion or safety `fail` stops as `FAILED`; `needs_human` stops as `NEEDS_HUMAN` with a human-action reason. It does not open GitHub pull requests, push branches, call Railway or Vercel, verify deployments, write an operation ledger, merge production, deploy production, or enable autonomous production automation.
+
+Run the deterministic local fixture harness after building:
+
+```bash
+node dist/src/cli/index.js harness run ad-101-minimal-node
+node dist/src/cli/index.js harness run --all
+```
+
+The harness copies fixture repositories into temporary workspaces, injects fake ticket, git, coding-runner, and quality seams, and scores expected outcomes against the persisted run evidence. It is local-only: it does not mutate source fixture repositories or user repositories, start live OpenCode, call Jira, GitHub, Railway, Vercel, MCP, or network services, push branches, open pull requests, merge, or deploy.
 
 Run one mock ticket end to end:
 
@@ -338,7 +348,9 @@ ewokbot smoke LK-101 --confirm-real-provider-smoke
 
 `ewokbot run-dev` persists local guard evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`, including `meaningful-diff.json`, `agent-completion.json`, `core-safety.json`, `test-relevance.json`, `quality-report.md`, and `final-report.md`. Test relevance treats realistic local test commands as passing evidence, surfaces stub/no-op commands as `WARN`, and escalates explicit missing test evidence to `NEEDS_HUMAN` before any later handoff can occur.
 
-`ewokbot scan`, `ewokbot worker start`, `ewokbot run-dev`, and `ewokbot smoke` all receive the public runtime MCP factory. Tests still use fake SDK/client factories or mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
+`ewokbot harness run --all` exercises local AS fixtures, including a regression fixture that fails when ignored agent artifacts are mistaken for a meaningful product diff. Harness output is a compact CI-readable table with fixture id, pass/fail status, score, final state, and evidence path.
+
+`ewokbot scan`, `ewokbot worker start`, `ewokbot run-dev`, `ewokbot harness`, and `ewokbot smoke` all receive local fake or public runtime seams as appropriate. Tests still use fake SDK/client factories or mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
 
 See:
 
@@ -399,7 +411,7 @@ Requires a human:
 
 Never commit `.env` files or provider credentials. Use generated `.ewokbot/.env` for local workspace secrets, keep `.ewokbot/.env.example` placeholder-only, and use the wizard or Ewokbot-owned files when intentionally changing workspace-local runtime environment values.
 
-The next safety milestone is the core post-agent diff loop. Ewokbot should inspect the changes produced by the coding runner, fail forbidden file or secret-like changes, escalate large or sensitive diffs to `NEEDS_HUMAN`, and write a local safety report before any later PR, staging, or production handoff can be considered.
+The core post-agent diff loop already inspects coding-runner changes, fails forbidden file or secret-like changes, escalates large or sensitive diffs to `NEEDS_HUMAN`, and writes local safety evidence before any later PR, staging, or production handoff can be considered. The next planned work is governed by [Next actions](docs/tracking/next-actions.md).
 
 ## Development
 
@@ -426,7 +438,7 @@ Near-term direction:
 - completed CLI control commands for status, runs, pause/resume, and approval,
 - one explicit real-provider smoke command with operator confirmation,
 - meaningful diff guard so an agent success with only ignored artifacts cannot pass as implemented work,
-- core safety loop for post-agent diff policy after the meaningful-diff guard,
+- completed core safety loop for post-agent diff policy after the meaningful-diff guard,
 - richer GitHub, Jira, Railway, and Vercel integrations after safety controls are stronger.
 
 Track detailed planning in:

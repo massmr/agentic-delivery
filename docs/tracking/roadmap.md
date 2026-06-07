@@ -125,7 +125,7 @@ Status legend:
 - `[x]` Core safety loop for post-agent diff policy
 - `[x]` Agent completion contract
 - `[x]` Test relevance guard
-- `[ ]` Harness v1 for fixture-based scoring
+- `[~]` Harness v1 for fixture-based scoring, implemented and pending acceptance
 - `[ ]` Real provider smoke v1 with Jira MCP and local run-dev
 - `[ ]` GitHub draft PR handoff after validated local evidence
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access

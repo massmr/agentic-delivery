@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "ad-101-no-meaningful-diff",
+  "description": "AD-101 style fixture where the agent reports completion but only ignored files changed.",
+  "ticket": {
+    "key": "AD-101",
+    "summary": "Improve minimal Node message",
+    "description": "Update the minimal Node package to return the expected AD-101 message.",
+    "labels": ["node", "minimal-node"]
+  },
+  "repositories": [
+    {
+      "name": "minimal-node",
+      "sourcePath": "repos/minimal-node",
+      "hints": ["node", "minimal-node"],
+      "qualityProfile": "node"
+    }
+  ],
+  "agent": {
+    "status": "completed",
+    "changedFiles": [".omo/session.json"],
+    "fileWrites": [],
+    "testsRun": "node --test",
+    "knownLimits": "none",
+    "blockers": "none",
+    "backgroundAgents": "none",
+    "gitAfterStatus": "?? .omo/session.json\n",
+    "gitPathspecStatus": "?? .omo/session.json\n",
+    "gitAfterDiffStat": " .omo/session.json | 1 +\n",
+    "gitTrackedDiff": ""
+  },
+  "expected": {
+    "selectedRepository": "minimal-node",
+    "meaningfulDiff": "failed",
+    "policyDecision": "missing",
+    "qualityResult": "not_run",
+    "finalState": "FAILED",
+    "reports": [
+      "plan.md",
+      "implementation-log.md",
+      "meaningful-diff.json"
+    ]
+  }
+}

@@ -13,6 +13,7 @@ import {
 import { runAuthCommand } from './commands/auth.js';
 import { runInitCommand } from './commands/init.js';
 import { runDoctorCommand } from './commands/doctor.js';
+import { runHarnessCommand } from './commands/harness.js';
 import { runPlanCommand } from './commands/plan.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
 import { parseRunDevCommandOptions, runRunDevCommand } from './commands/run-dev.js';
@@ -58,6 +59,8 @@ const HELP_TEXT = [
   '  ewokbot worker [--concurrency <n>] [--max-cycles <n>] [--max-attempts <n>] [--poll-interval-ms <ms>] (legacy)',
   '  ewokbot status <ticket-key> [--run-id <run-id>]',
   '  ewokbot quality <repo-path> --ticket-key <ticket-key> [--run-id <run-id>]',
+  '  ewokbot harness run <fixture-id>',
+  '  ewokbot harness run --all',
   '',
   'Commands:',
   `  init        Create ${ewokbotWorkspaceConfigPath}, .ewokbot/.env, and .ewokbot/.env.example for local onboarding.`,
@@ -78,6 +81,7 @@ const HELP_TEXT = [
   '  worker      Run the foreground worker runtime; start mode adds locking, dry-run, and graceful shutdown.',
   '  status      Inspect existing local run state and next action.',
   '  quality     Run local repository quality gates and write a quality report.',
+  '  harness     Run local deterministic fixture scoring; never contacts live providers.',
   '',
   'Options:',
   '  -h, --help  Show this help message.',
@@ -107,6 +111,7 @@ export interface CliProgramOptions {
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
   readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
   readonly runDevDelivery?: RunDevCommandDeliveryOptions | undefined;
+  readonly harnessFixturesRoot?: string | undefined;
 }
 
 export interface CliProgram {
@@ -356,6 +361,10 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
         }
 
         return runQualityCommand(parsed.repositoryPath, { cwd: options.cwd, io, runId: parsed.runId, ticketKey: parsed.ticketKey });
+      }
+
+      if (args[0] === 'harness') {
+        return runHarnessCommand({ cwd: options.cwd, io, args: args.slice(1), fixturesRoot: options.harnessFixturesRoot });
       }
 
       io.stderr(`Unknown command: ${args[0]}\n\n`);

@@ -59,6 +59,8 @@ test('ewokbot --help prints the mock planning help output', async () => {
   assert.match(captured.stdout, /ewokbot worker \[--concurrency <n>\].*\(legacy\)/u);
   assert.match(captured.stdout, /ewokbot status <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
+  assert.match(captured.stdout, /ewokbot harness run <fixture-id>/u);
+  assert.match(captured.stdout, /ewokbot harness run --all/u);
   assert.match(
     captured.stdout,
     /Create \.ewokbot\/workspace\.yml, \.ewokbot\/\.env, and \.ewokbot\/\.env\.example/u
@@ -125,6 +127,7 @@ test('built ewokbot bin prints help when invoked through a package-manager symli
   assert.match(result.stdout, /ewokbot worker/u);
   assert.match(result.stdout, /ewokbot status <ticket-key>/u);
   assert.match(result.stdout, /ewokbot quality <repo-path> --ticket-key <ticket-key>/u);
+  assert.match(result.stdout, /ewokbot harness run <fixture-id>/u);
   assert.match(result.stdout, /Mock mode remains the default/u);
 });
 

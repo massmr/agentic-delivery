@@ -1,0 +1,4 @@
+commands:
+  test: node --test
+required:
+  - test

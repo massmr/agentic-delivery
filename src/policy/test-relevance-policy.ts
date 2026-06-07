@@ -157,7 +157,7 @@ function hasExplicitNoTests(agentCompletion: AgentCompletionReport | undefined):
   }
 
   const text = agentCompletion.summaryText.toLowerCase();
-  return /tests?\s+run\s*:\s*(?:not\s+run|none|n\/a|no|skipped)/u.test(text) || /(?:no tests? (?:run|were run)|tests? (?:not run|skipped))/u.test(text);
+  return /tests?\s+run\s*:\s*(?:not\s+run|none|n\/a|no|skipped)(?:\s|$|[.,;])/u.test(text) || /(?:no tests? (?:run|were run)|tests? (?:not run|skipped))/u.test(text);
 }
 
 function collectQualityCommands(report: QualityReport): readonly TestRelevanceQualityCommand[] {

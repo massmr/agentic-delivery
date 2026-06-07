@@ -192,6 +192,7 @@ export {
   withMcpTimeout
 } from './mcp/index.js';
 export { analyzeTicket, createTicketPlan, resolveRepositoriesForTicket, toRepositoryRef } from './planning/index.js';
+export { HarnessFixtureError, listHarnessFixtureIds, loadHarnessFixture, parseHarnessFixture, runHarness } from './harness/index.js';
 export {
   NativeFallbackContractNotFoundError,
   NativeFallbackContractViolationError,
@@ -418,6 +419,16 @@ export type {
   RuntimeMcpStdioTransportParameters
 } from './mcp/index.js';
 export type { TicketPlan } from './planning/index.js';
+export type {
+  HarnessCheckResult,
+  HarnessFixture,
+  HarnessFixtureAgent,
+  HarnessFixtureExpected,
+  HarnessFixtureRepository,
+  HarnessFixtureResult,
+  HarnessRunResult,
+  RunHarnessInput
+} from './harness/index.js';
 export type { AdapterKind, CoreSafetyDiffAddition, EvaluateCoreSafetyInput, EvaluateTestRelevanceInput, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
 export type {

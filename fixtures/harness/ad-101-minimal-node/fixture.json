@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "ad-101-minimal-node",
+  "description": "AD-101 style fixture where a local Node repository receives a meaningful product change.",
+  "ticket": {
+    "key": "AD-101",
+    "summary": "Improve minimal Node message",
+    "description": "Update the minimal Node package to return the expected AD-101 message.",
+    "labels": ["node", "minimal-node"]
+  },
+  "repositories": [
+    {
+      "name": "minimal-node",
+      "sourcePath": "repos/minimal-node",
+      "hints": ["node", "minimal-node"],
+      "qualityProfile": "node"
+    }
+  ],
+  "agent": {
+    "status": "completed",
+    "changedFiles": ["src/message.js"],
+    "fileWrites": [
+      {
+        "path": "src/message.js",
+        "content": "export function message() {\n  return 'hello from AD-101';\n}\n"
+      }
+    ],
+    "testsRun": "node --test",
+    "knownLimits": "none",
+    "blockers": "none",
+    "backgroundAgents": "none",
+    "gitAfterStatus": " M src/message.js\n",
+    "gitPathspecStatus": " M src/message.js\n",
+    "gitAfterDiffStat": " src/message.js | 2 +-\n",
+    "gitTrackedDiff": "diff --git a/src/message.js b/src/message.js\n--- a/src/message.js\n+++ b/src/message.js\n@@ -2 +2 @@\n-  return 'hello from fixture';\n+  return 'hello from AD-101';\n"
+  },
+  "expected": {
+    "selectedRepository": "minimal-node",
+    "meaningfulDiff": "passed",
+    "policyDecision": "pass",
+    "qualityResult": "passed",
+    "finalState": "LOCAL_CHECKS_PASSED",
+    "reports": [
+      "plan.md",
+      "implementation-log.md",
+      "meaningful-diff.json",
+      "agent-completion.json",
+      "core-safety.json",
+      "test-relevance.json",
+      "quality-report.md",
+      "final-report.md"
+    ]
+  }
+}
