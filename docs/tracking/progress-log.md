@@ -2,6 +2,13 @@
 
 ## 2026-06-07
 
+Accepted Milestone AS Harness v1:
+
+- Accepted the local fixture harness after review fixes for realistic pathspec status and tracked-file unified diff evidence.
+- Confirmed `core-safety.json` for the tracked product-change fixture records added-line evidence instead of a zero-addition false positive.
+- Committed AS as `d46a756 feat(harness): add local fixture scoring`.
+- AT - Real Provider Smoke v1 is now the next approved implementation milestone.
+
 Implemented Milestone AS Harness v1 review candidate:
 
 - Added typed local harness fixtures and parsing for tickets, repositories, fake agent behavior, and expected scoring outcomes.
@@ -22,7 +29,7 @@ Verification commands run for AS:
 - `node dist/src/cli/index.js harness run ad-101-minimal-node`
 - `node dist/src/cli/index.js harness run --all`
 
-AS is ready for review and acceptance. AT remains planned only after AS is accepted.
+AS was reviewed, corrected, accepted, and committed. AT is now the next approved implementation milestone.
 
 ## 2026-06-07 Earlier
 

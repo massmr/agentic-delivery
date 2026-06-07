@@ -13,8 +13,9 @@
 9. Milestone AP: Core Safety Loop v1 is complete and accepted.
 10. Milestone AQ: Agent Completion Contract is complete and accepted.
 11. Milestone AR: Test Relevance Guard is complete and accepted.
-12. Milestone AS: Harness v1 has an implementation candidate ready for review and acceptance.
-13. Do not implement AT or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AS is accepted and a later milestone is explicitly approved.
+12. Milestone AS: Harness v1 is complete and accepted.
+13. Milestone AT: Real Provider Smoke v1 is the next approved implementation milestone.
+14. Do not implement AU or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AT is complete and accepted and a later milestone is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -164,12 +165,11 @@ Implemented:
 
 Continue in this order:
 
-1. AS - Harness v1. Implementation candidate ready for review and acceptance.
-2. AT - Real Provider Smoke v1. Planned after AS acceptance only.
-3. AU - GitHub PR Handoff v1.
-4. AV - Operator Agent Action Sandbox.
+1. AT - Real Provider Smoke v1. Next approved implementation milestone.
+2. AU - GitHub PR Handoff v1. Planned after AT acceptance only.
+3. AV - Operator Agent Action Sandbox. Planned after AU acceptance only.
 
-Anything outside AS acceptance follow-up must wait until AS is accepted and a later milestone is explicitly approved. Anything outside AS-AV must be proposed here first and must not be implemented until approved.
+Anything outside AT implementation must wait until AT is complete and accepted and a later milestone is explicitly approved. Anything outside AT-AV must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -209,8 +209,8 @@ The next milestones should move in this order:
 16. AP - Core Safety Loop v1. Completed.
 17. AQ - Agent Completion Contract. Completed.
 18. AR - Test Relevance Guard. Completed.
-19. AS - Harness v1. Implementation candidate ready for review and acceptance.
-20. AT - Real Provider Smoke v1. Planned after AS acceptance only.
+19. AS - Harness v1. Completed.
+20. AT - Real Provider Smoke v1. Next approved implementation milestone.
 21. AU - GitHub PR Handoff v1. Planned after AT.
 22. AV - Operator Agent Action Sandbox. Planned after AU.
 
