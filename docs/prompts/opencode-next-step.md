@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, and AQ are complete and accepted. Milestone AR: Test Relevance Guard is the next approved implementation milestone. Do not implement AS or later work until AR is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, AQ, and AR are complete and accepted. Milestone AS: Harness v1 is the next approved implementation milestone. Do not implement AT or later work until AS is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -105,27 +105,29 @@ AQ added the accepted Agent Completion Contract for `run-dev`:
 - Escalate explicit credential, access, approval, or clarification blockers as `NEEDS_HUMAN`.
 - Surface the agent completion decision in `run-dev` CLI output, final reports, status, inspect, and logs.
 
-AR is the active next implementation milestone: Test Relevance Guard for `run-dev`.
+AR Test Relevance Guard for `run-dev` is complete and accepted.
 
 AR planning scope:
 
 - Verify that tests reported by the agent are relevant to the changed product files.
-- Return deterministic test relevance decisions: `pass`, `needs_human`, or `fail`.
+- Return deterministic test relevance decisions: `pass`, `warn`, or `needs_human`.
 - Persist `.ewokbot/runs/<ticket-key>/<run-id>/test-relevance.json`.
-- Integrate after AQ agent completion and before AP core safety/local quality unless existing architecture or quality-gate docs require a safer order.
+- Integrate after local quality evidence exists, so the guard can inspect reported tests and actual quality commands/results.
 - Surface the test relevance decision in `run-dev` CLI output, final reports, status, inspect, and logs.
 - Keep tests fake-only with fake agent outputs, fake diffs, and deterministic quality evidence.
 
+AS is the active next implementation milestone: Harness v1. Use `docs/tracking/next-actions.md` for the exact approved scope before editing.
+
 AR safety constraints:
 
-- Do not implement AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, or AV Operator Agent Action Sandbox until AR is complete and accepted and a later milestone is explicitly approved.
+- Do not implement AT Real Provider Smoke v1, AU GitHub PR Handoff v1, or AV Operator Agent Action Sandbox until AS is complete and accepted and a later milestone is explicitly approved.
 - Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
 - Do not add live provider calls, live MCP calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
 - Do not delete or revert user changes outside controlled temporary test repositories.
 - Do not print secret values, even when a secret scan fails.
 - Production merge and production deployment remain human-only.
 
-After AR is complete and accepted, the planned sequence is AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, and AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
+After AS is complete and accepted, the planned sequence is AT Real Provider Smoke v1, AU GitHub PR Handoff v1, and AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
 
 ## Required Reading
 

@@ -160,6 +160,10 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
           `- Optional: ${summarizeQualityGates(latestQuality.optional)}`
         ].join('\n'),
     '',
+    '## Test Relevance',
+    '',
+    renderTestRelevance(state.testRelevance ?? latestQuality?.testRelevance),
+    '',
     '## Staging',
     '',
     latestDeployment === undefined
@@ -255,6 +259,21 @@ function renderAgentCompletion(report: DeliveryRunStateRecord['agentCompletion']
     `- Tests Mentioned: ${report.testsMentioned ? 'yes' : 'no'}`,
     `- Known Limits Mentioned: ${report.knownLimitsMentioned ? 'yes' : 'no'}`,
     `- Blockers: ${report.blockers.length === 0 ? 'none' : report.blockers.join(', ')}`,
+    `- Findings: ${report.findings.length === 0 ? 'none' : report.findings.map((finding) => `${finding.kind}:${finding.severity}`).join(', ')}`
+  ].join('\n');
+}
+
+function renderTestRelevance(report: DeliveryRunStateRecord['testRelevance']): string {
+  if (report === undefined) {
+    return '- None';
+  }
+
+  return [
+    `- Decision: ${report.decision.toUpperCase()}`,
+    `- Reason: ${report.reason}`,
+    `- Changed Files: ${summarizeFiles(report.changedFiles)}`,
+    `- Tests Reported: ${summarizeFiles(report.testsReported)}`,
+    `- Quality Commands: ${report.qualityCommands.length === 0 ? 'none' : report.qualityCommands.map((command) => `${command.name} ${command.status.toUpperCase()} (${command.command})`).join(', ')}`,
     `- Findings: ${report.findings.length === 0 ? 'none' : report.findings.map((finding) => `${finding.kind}:${finding.severity}`).join(', ')}`
   ].join('\n');
 }

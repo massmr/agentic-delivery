@@ -3,11 +3,11 @@ import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 
 import type { WorkspaceConfig, WorkspaceRepositoryConfig } from '../config/index.js';
-import type { AgentCompletionReport, CoreSafetyLimits, CoreSafetyReport, DeliveryRunStateRecord, DeliveryTicket, DevRunner, MeaningfulDiffEvidence, MeaningfulDiffSnapshot, QualityGateDefinition, QualityReport, RepositoryConfig, RepositoryRef } from '../domain/index.js';
+import type { AgentCompletionReport, CoreSafetyLimits, CoreSafetyReport, DeliveryRunStateRecord, DeliveryTicket, DevRunner, MeaningfulDiffEvidence, MeaningfulDiffSnapshot, QualityGateDefinition, QualityReport, RepositoryConfig, RepositoryRef, TestRelevanceReport } from '../domain/index.js';
 import { LocalGitAdapter, buildWorkingBranchName, captureDiffAdditions, captureMeaningfulDiffSnapshot, inspectMeaningfulDiff } from '../git/index.js';
 import type { GitCommandRunner } from '../git/index.js';
 import { createTicketPlan, toRepositoryRef } from '../planning/index.js';
-import { evaluateAgentCompletion, evaluateCoreSafety } from '../policy/index.js';
+import { evaluateAgentCompletion, evaluateCoreSafety, evaluateTestRelevance } from '../policy/index.js';
 import type { TicketPort } from '../ports/index.js';
 import { buildQualityGateDefinitions, loadRepositoryQualityConfig, QualityRunner } from '../quality/index.js';
 import { MarkdownReportWriter } from '../reports/index.js';
@@ -44,6 +44,7 @@ export interface DevelopmentRunResult {
   readonly agentCompletionReportPath?: string | undefined;
   readonly coreSafetyReportPath?: string | undefined;
   readonly qualityReportPath?: string | undefined;
+  readonly testRelevanceReportPath?: string | undefined;
   readonly finalReportPath?: string | undefined;
 }
 
@@ -384,11 +385,25 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, agentCompletionReportPath, coreSafetyReportPath, finalReportPath });
   }
 
+  const testRelevance = evaluateTestRelevance({
+    meaningfulDiff: localChecksRunningState.meaningfulDiff,
+    agentCompletion: localChecksRunningState.agentCompletion,
+    qualityReport,
+    qualityGates
+  });
+  const testRelevanceReportPath = join(getRunDirectoryPath(ticket.ref.key, runId), 'test-relevance.json');
+  qualityReport = {
+    ...qualityReport,
+    testRelevance
+  };
+  await writeJsonEvidence(rootPath, testRelevanceReportPath, testRelevance);
   const qualityReportPath = await reportWriter.writeQuality(ticket.ref.key, runId, qualityReport);
   const stateWithQuality: DeliveryRunStateRecord = {
     ...localChecksRunningState,
-    qualityReports: [...localChecksRunningState.qualityReports, qualityReport]
+    qualityReports: [...localChecksRunningState.qualityReports, qualityReport],
+    testRelevance
   };
+  await stateStore.write(stateWithQuality);
 
   if (qualityReport.status !== 'passed') {
     const failedState = markFailed(stateWithQuality, 'LOCAL_CHECKS_RUNNING', summarizeQualityFailure(qualityReport), now().toISOString());
@@ -400,9 +415,26 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
       agentCompletionReportPath,
       coreSafetyReportPath,
       qualityReportPath,
+      testRelevanceReportPath,
       mockOnlyNote: localOnlyNote
     });
-    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, agentCompletionReportPath, coreSafetyReportPath, qualityReportPath, finalReportPath });
+    return buildResult(failedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, agentCompletionReportPath, coreSafetyReportPath, qualityReportPath, testRelevanceReportPath, finalReportPath });
+  }
+
+  if (testRelevance.decision === 'needs_human') {
+    const needsHumanState = markNeedsHuman(stateWithQuality, testRelevance.reason, now().toISOString());
+    await stateStore.write(needsHumanState);
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, needsHumanState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      agentCompletionReportPath,
+      coreSafetyReportPath,
+      qualityReportPath,
+      testRelevanceReportPath,
+      mockOnlyNote: localOnlyNote
+    });
+    return buildResult(needsHumanState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, agentCompletionReportPath, coreSafetyReportPath, qualityReportPath, testRelevanceReportPath, finalReportPath });
   }
 
   const localChecksPassedState = transitionDeliveryRunState(stateWithQuality, 'LOCAL_CHECKS_PASSED', now().toISOString());
@@ -414,10 +446,11 @@ export async function runDevelopmentExecution(input: RunDevelopmentExecutionInpu
     agentCompletionReportPath,
     coreSafetyReportPath,
     qualityReportPath,
+    testRelevanceReportPath,
     mockOnlyNote: localOnlyNote
   });
 
-  return buildResult(localChecksPassedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, agentCompletionReportPath, coreSafetyReportPath, qualityReportPath, finalReportPath });
+  return buildResult(localChecksPassedState, runId, planReportPath, { implementationLogPath, meaningfulDiffReportPath, agentCompletionReportPath, coreSafetyReportPath, qualityReportPath, testRelevanceReportPath, finalReportPath });
 }
 
 export async function assertDevelopmentRunDoesNotExist(rootPath: string, ticketKey: string, runId: string): Promise<void> {
@@ -530,6 +563,7 @@ function buildResult(
     readonly agentCompletionReportPath?: string | undefined;
     readonly coreSafetyReportPath?: string | undefined;
     readonly qualityReportPath?: string | undefined;
+    readonly testRelevanceReportPath?: string | undefined;
     readonly finalReportPath?: string | undefined;
   }
 ): DevelopmentRunResult {
@@ -542,7 +576,7 @@ function buildResult(
   };
 }
 
-async function writeJsonEvidence(rootPath: string, relativePath: string, evidence: MeaningfulDiffEvidence | AgentCompletionReport | CoreSafetyReport): Promise<void> {
+async function writeJsonEvidence(rootPath: string, relativePath: string, evidence: MeaningfulDiffEvidence | AgentCompletionReport | CoreSafetyReport | TestRelevanceReport): Promise<void> {
   const outputPath = join(rootPath, relativePath);
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');

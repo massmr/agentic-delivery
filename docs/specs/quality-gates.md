@@ -86,7 +86,7 @@ The orchestrator must not push code or open a PR if any required quality gate fa
 
 OpenCode may be retried after failed gates. The default retry limit is 2 attempts.
 
-OpenCode execution itself is a guarded subprocess contract. Normal non-zero OpenCode exits may retry within the configured attempt limit, but timeouts and cancellations stop further OpenCode attempts safely and persist failed run state for operator review. A successful OpenCode run still must produce meaningful product diff evidence, pass the agent completion contract, pass the core safety policy, and then pass required quality gates before any local git push or GitHub handoff can occur.
+OpenCode execution itself is a guarded subprocess contract. Normal non-zero OpenCode exits may retry within the configured attempt limit, but timeouts and cancellations stop further OpenCode attempts safely and persist failed run state for operator review. A successful OpenCode run still must produce meaningful product diff evidence, pass the agent completion contract, pass the core safety policy, pass required quality gates, and produce usable test relevance evidence before any local git push or GitHub handoff can occur. Stub-only test commands are surfaced as weak evidence with `warn`; explicit missing or unusable test evidence escalates to `needs_human`.
 
 Quality gates are a subprocess/native boundary, not an MCP provider boundary. The `QualityGateRunner.runRequiredGates` fallback contract allows local subprocess execution and deterministic mock tests only. Required gates must complete and write local reports before any local git push or GitHub PR handoff can proceed.
 
@@ -95,6 +95,7 @@ Quality gates are a subprocess/native boundary, not an MCP provider boundary. Th
 - Meaningful diff guard so an agent success with only ignored artifacts cannot pass as implemented work.
 - Agent completion contract that rejects exploration-only, incomplete, blocked, or pending-background-agent output before local quality can count as success.
 - Core safety loop for post-agent diffs.
+- Test relevance guard that persists `test-relevance.json`, accepts realistic local test evidence, warns on stub/no-op test commands, and escalates missing usable test evidence to human review.
 - Forbidden file checks for environment files, credentials, private keys, and Ewokbot-owned auth/config.
 - Secret-like diff scanning with redacted output.
 - Diff size limits.
@@ -104,7 +105,6 @@ Quality gates are a subprocess/native boundary, not an MCP provider boundary. Th
 
 ## Future Guards
 
-- Test relevance guard.
 - Coverage threshold.
 - Browser smoke tests.
 - API contract tests.

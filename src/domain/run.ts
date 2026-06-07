@@ -56,6 +56,8 @@ export type CoreSafetyDecision = 'pass' | 'needs_human' | 'fail';
 
 export type AgentCompletionDecision = 'pass' | 'needs_human' | 'fail';
 
+export type TestRelevanceDecision = 'pass' | 'warn' | 'needs_human';
+
 export type AgentCompletionSource = 'implementation_log' | 'dev_run_summary' | 'combined';
 
 export type AgentCompletionStatusSignal = 'completed' | 'blocked' | 'incomplete' | 'missing';
@@ -160,6 +162,41 @@ export interface AgentCompletionReport {
   readonly findings: readonly AgentCompletionFinding[];
 }
 
+export type TestRelevanceFindingSeverity = 'info' | 'warn' | 'needs_human';
+
+export type TestRelevanceFindingKind =
+  | 'realistic_test_command'
+  | 'trivial_test_command'
+  | 'missing_test_command'
+  | 'missing_test_claim'
+  | 'explicit_tests_not_run'
+  | 'non_product_change';
+
+export interface TestRelevanceQualityCommand {
+  readonly name: string;
+  readonly command: string;
+  readonly requirement: 'required' | 'optional';
+  readonly status: string;
+  readonly relevant: boolean;
+  readonly trivial: boolean;
+}
+
+export interface TestRelevanceFinding {
+  readonly kind: TestRelevanceFindingKind;
+  readonly severity: TestRelevanceFindingSeverity;
+  readonly message: string;
+}
+
+export interface TestRelevanceReport {
+  readonly decision: TestRelevanceDecision;
+  readonly reason: string;
+  readonly changedFiles: readonly string[];
+  readonly testsReported: readonly string[];
+  readonly qualityCommands: readonly TestRelevanceQualityCommand[];
+  readonly findings: readonly TestRelevanceFinding[];
+  readonly trivialCommandPatterns: readonly string[];
+}
+
 export interface DeliveryRunStateRecord {
   readonly runId: string;
   readonly ticket: TicketRef;
@@ -174,6 +211,7 @@ export interface DeliveryRunStateRecord {
   readonly meaningfulDiff?: MeaningfulDiffEvidence;
   readonly agentCompletion?: AgentCompletionReport;
   readonly coreSafety?: CoreSafetyReport;
+  readonly testRelevance?: TestRelevanceReport;
   readonly ticketAnalysis?: TicketAnalysis;
   readonly failure?: DeliveryRunFailure;
   readonly humanActionNeeded?: HumanActionRequest;

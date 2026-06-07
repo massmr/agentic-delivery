@@ -124,7 +124,7 @@ Status legend:
 - `[x]` Meaningful diff guard for post-agent false positives
 - `[x]` Core safety loop for post-agent diff policy
 - `[x]` Agent completion contract
-- `[ ]` Test relevance guard
+- `[x]` Test relevance guard
 - `[ ]` Harness v1 for fixture-based scoring
 - `[ ]` Real provider smoke v1 with Jira MCP and local run-dev
 - `[ ]` GitHub draft PR handoff after validated local evidence

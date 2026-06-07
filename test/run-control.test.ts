@@ -19,6 +19,7 @@ import {
   type DeliveryRunStateRecord,
   type QualityReport,
   type RepositoryRef,
+  type TestRelevanceReport,
   type TicketRef
 } from '../src/index.js';
 
@@ -55,6 +56,31 @@ const qualityReport = {
   ],
   optional: []
 } satisfies QualityReport;
+
+const testRelevanceReport = {
+  decision: 'pass',
+  reason: 'Realistic local test evidence was reported and passed for product changes.',
+  changedFiles: ['src/control.ts'],
+  testsReported: ['Tests run: pnpm test'],
+  qualityCommands: [
+    {
+      name: 'test',
+      command: 'pnpm test',
+      requirement: 'required',
+      status: 'passed',
+      relevant: true,
+      trivial: false
+    }
+  ],
+  findings: [
+    {
+      kind: 'realistic_test_command',
+      severity: 'info',
+      message: 'Realistic test command evidence found: pnpm test.'
+    }
+  ],
+  trivialCommandPatterns: ['mock test']
+} satisfies TestRelevanceReport;
 
 test('JsonRunControlStore persists workspace pause, resume intent, and decision sidecars', async () => {
   const rootPath = createTempRoot();
@@ -116,6 +142,7 @@ test('control renderers produce SSH-readable run lists, inspection, and logs', a
   await runStore.write(state);
   await store.writeResumeIntent(await store.resolveRun('run-a'), new Date('2026-06-04T10:05:00.000Z'));
   writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'run-a', 'plan.md'), 'Plan contents\n', 'utf8');
+  writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'run-a', 'test-relevance.json'), JSON.stringify(testRelevanceReport, null, 2), 'utf8');
   writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'run-a', 'quality-report.md'), 'Quality report\n', 'utf8');
   mkdirSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'run-a', 'quality-logs'), { recursive: true });
   writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'run-a', 'quality-logs', 'test.stdout.log'), 'stdout log\n', 'utf8');
@@ -126,12 +153,15 @@ test('control renderers produce SSH-readable run lists, inspection, and logs', a
 
   const inspection = await renderRunInspection(store, await store.resolveRun('run-a'));
   assert.match(inspection, /Run Directory: .ewokbot\/runs\/AD-201\/run-a/u);
+  assert.match(inspection, /test-relevance\.json/u);
   assert.match(inspection, /Resume Requested At: 2026-06-04T10:05:00.000Z/u);
   assert.match(inspection, /Human-only Production Note/u);
 
   const logs = renderRunLogs(await store.readRunLogs('run-a'));
   assert.match(logs, /## Plan/u);
   assert.match(logs, /Plan contents/u);
+  assert.match(logs, /## Test Relevance/u);
+  assert.match(logs, /Realistic local test evidence/u);
   assert.match(logs, /## Implementation Log/u);
   assert.match(logs, /not found/u);
   assert.match(logs, /Quality Stdout .ewokbot\/runs\/AD-201\/run-a\/quality-logs\/test.stdout.log/u);
@@ -206,7 +236,8 @@ function createState(state: DeliveryRunState, runId: string, ticketKey: string):
 
   return {
     ...transitionDeliveryRunState(initial, state, timestamp),
-    qualityReports: runId === 'run-a' ? [qualityReport] : [],
+    qualityReports: runId === 'run-a' ? [{ ...qualityReport, testRelevance: testRelevanceReport }] : [],
+    testRelevance: runId === 'run-a' ? testRelevanceReport : undefined,
     devRuns:
       runId === 'run-a'
         ? [

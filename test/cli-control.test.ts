@@ -17,6 +17,7 @@ import {
   type DeliveryRunStateRecord,
   type QualityReport,
   type RepositoryRef,
+  type TestRelevanceReport,
   type TicketRef
 } from '../src/index.js';
 
@@ -53,6 +54,31 @@ const qualityReport = {
   ],
   optional: []
 } satisfies QualityReport;
+
+const testRelevanceReport = {
+  decision: 'needs_human',
+  reason: 'No usable local test evidence was available for product changes.',
+  changedFiles: ['src/cli.ts'],
+  testsReported: ['Tests run: pnpm typecheck'],
+  qualityCommands: [
+    {
+      name: 'typecheck',
+      command: 'pnpm typecheck',
+      requirement: 'required',
+      status: 'passed',
+      relevant: false,
+      trivial: false
+    }
+  ],
+  findings: [
+    {
+      kind: 'missing_test_command',
+      severity: 'needs_human',
+      message: 'No passed test, e2e, or coverage quality command was available for product changes.'
+    }
+  ],
+  trivialCommandPatterns: ['mock test']
+} satisfies TestRelevanceReport;
 
 test('ewokbot runs and inspect read persisted local state only', async () => {
   const rootPath = createTempRoot();
@@ -147,6 +173,7 @@ test('ewokbot logs prints known reports, missing markers, and quality stdout std
 
   await store.write(createState('LOCAL_CHECKS_PASSED', 'resume-run'));
   writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'plan.md'), 'Plan body\n', 'utf8');
+  writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'test-relevance.json'), JSON.stringify(testRelevanceReport, null, 2), 'utf8');
   writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-report.md'), 'Quality body\n', 'utf8');
   mkdirSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-logs'), { recursive: true });
   writeFileSync(join(rootPath, '.ewokbot', 'runs', ticket.key, 'resume-run', 'quality-logs', 'typecheck.stdout.log'), 'typecheck stdout\n', 'utf8');
@@ -157,6 +184,8 @@ test('ewokbot logs prints known reports, missing markers, and quality stdout std
   assert.equal(exitCode, 0);
   assert.match(captured.stdout, /# Run Logs resume-run/u);
   assert.match(captured.stdout, /Plan body/u);
+  assert.match(captured.stdout, /## Test Relevance/u);
+  assert.match(captured.stdout, /No usable local test evidence/u);
   assert.match(captured.stdout, /## Implementation Log/u);
   assert.match(captured.stdout, /not found/u);
   assert.match(captured.stdout, /typecheck stdout/u);
@@ -199,6 +228,7 @@ function createState(state: DeliveryRunState, runId: string): DeliveryRunStateRe
 
   return {
     ...transitionDeliveryRunState(initial, state, timestamp),
-    qualityReports: runId === 'resume-run' ? [qualityReport] : []
+    qualityReports: runId === 'resume-run' ? [{ ...qualityReport, testRelevance: testRelevanceReport }] : [],
+    testRelevance: runId === 'resume-run' ? testRelevanceReport : undefined
   };
 }

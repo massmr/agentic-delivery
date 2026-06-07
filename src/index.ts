@@ -199,6 +199,7 @@ export {
   defaultCoreSafetyLimits,
   evaluateAgentCompletion,
   evaluateCoreSafety,
+  evaluateTestRelevance,
   getNativeFallbackContract,
   isAdapterAllowed,
   isAdapterAllowedForAction,
@@ -330,6 +331,12 @@ export type {
   RepositoryRole,
   RunTimestamps,
   SmokeCheckResult,
+  TestRelevanceDecision,
+  TestRelevanceFinding,
+  TestRelevanceFindingKind,
+  TestRelevanceFindingSeverity,
+  TestRelevanceQualityCommand,
+  TestRelevanceReport,
   TicketAnalysis,
   TicketPriority,
   TicketProvider,
@@ -411,7 +418,7 @@ export type {
   RuntimeMcpStdioTransportParameters
 } from './mcp/index.js';
 export type { TicketPlan } from './planning/index.js';
-export type { AdapterKind, CoreSafetyDiffAddition, EvaluateCoreSafetyInput, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
+export type { AdapterKind, CoreSafetyDiffAddition, EvaluateCoreSafetyInput, EvaluateTestRelevanceInput, NativeFallbackContract, NativeFallbackPort, NativeFallbackRule } from './policy/index.js';
 export type { QualityRunnerOptions, RepositoryQualityConfig } from './quality/index.js';
 export type {
   ProviderFactoryEnvironment,

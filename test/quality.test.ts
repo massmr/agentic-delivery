@@ -160,6 +160,8 @@ test('MarkdownReportWriter writes deterministic quality reports to the run direc
   assert.equal(markdown, renderQualityReportMarkdown('AD-123', 'run-1', report));
   assert.match(markdown, /# Quality Report AD-123/u);
   assert.match(markdown, /Status: PASSED/u);
+  assert.match(markdown, /## Test Relevance/u);
+  assert.match(markdown, /Not evaluated/u);
   assert.match(markdown, /lint: SKIPPED/u);
   assert.match(markdown, /optional gate has no command/u);
 });

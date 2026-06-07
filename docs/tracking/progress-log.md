@@ -2,6 +2,28 @@
 
 ## 2026-06-07
 
+Accepted Milestone AR Test Relevance Guard:
+
+- Added a deterministic test relevance policy with `pass`, `warn`, and `needs_human` decisions from meaningful-diff evidence, the agent completion test claim, and local quality gate command results.
+- Integrated AR into `ewokbot run-dev` after local quality evidence exists; it persists `.ewokbot/runs/<ticket-key>/<run-id>/test-relevance.json`, embeds the decision in quality evidence, lets `pass` and `warn` reach `LOCAL_CHECKS_PASSED`, and marks `NEEDS_HUMAN` when usable test evidence is missing for product changes.
+- Surfaced test relevance in `run-dev` CLI output, `quality-report.md`, `final-report.md`, status rendering, inspect, and logs.
+- Added fake-only policy and run-dev/control coverage for realistic test commands, stub/no-op weak evidence, explicit tests-not-run escalation, persisted JSON evidence, report visibility, and no provider handoff files.
+- Preserved AR scope only: no AS Harness v1, AT Real Provider Smoke v1, AU GitHub PR Handoff v1, AV sandbox, staging verification, production merge/deploy, dashboard, Telegram/WhatsApp, Sentry/PostHog/Notion ingestion, live provider calls, live MCP/OpenCode/network calls, package-manager installs, or home-directory mutation were added.
+
+Verification commands run for AR:
+
+- `lsp_diagnostics` on modified TypeScript files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm run typecheck`
+- `pnpm test` (`312/312`)
+- `pnpm run build`
+- `git diff --check`
+
+Next approved implementation milestone:
+
+- AS - Harness v1.
+
+## 2026-06-07 Earlier
+
 Accepted Milestone AQ Agent Completion Contract:
 
 - Added a deterministic agent completion policy with `pass`, `needs_human`, and `fail` decisions from the final structured agent summary plus meaningful-diff evidence.

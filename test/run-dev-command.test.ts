@@ -78,6 +78,7 @@ test('run-dev command executes one selected repository through local checks only
   assert.match(captured.stdout, /Repository: agentic\/frontend/u);
   assert.match(captured.stdout, /Branch: agent\/AI-101-dev-frontend-local-path/u);
   assert.match(captured.stdout, /Final State: LOCAL_CHECKS_PASSED/u);
+  assert.match(captured.stdout, /Test Relevance: WARN/u);
   assert.match(captured.stdout, /Local-only boundary preserved/u);
   assert.equal(captured.stderr, '');
 
@@ -109,6 +110,7 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(state.agentCompletion?.decision, 'pass');
   assert.equal(state.agentCompletion.statusSignal, 'completed');
   assert.equal(state.coreSafety?.decision, 'pass');
+  assert.equal(state.testRelevance?.decision, 'warn');
   assert.equal(state.coreSafety.changedFileCount, 1);
   assert.equal(state.coreSafety.addedLineCount, 1);
   assert.deepEqual(state.meaningfulDiff.baselineChangedFiles, []);
@@ -121,17 +123,103 @@ test('run-dev command executes one selected repository through local checks only
   assert.equal(agentCompletion?.decision, 'pass');
   const coreSafety = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json'), 'utf8')) as DeliveryRunStateRecord['coreSafety'];
   assert.equal(coreSafety?.decision, 'pass');
+  const testRelevance = JSON.parse(await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'test-relevance.json'), 'utf8')) as DeliveryRunStateRecord['testRelevance'];
+  assert.equal(testRelevance?.decision, 'warn');
+  assert.equal(testRelevance?.qualityCommands[0]?.command, 'mock test');
+  assert.equal(testRelevance?.qualityCommands[0]?.trivial, true);
+  const qualityReportMarkdown = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md'), 'utf8');
+  assert.match(qualityReportMarkdown, /Test Relevance/u);
+  assert.match(qualityReportMarkdown, /Decision: WARN/u);
   const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'final-report.md'), 'utf8');
   assert.match(finalReport, /Development execution remained local-only/u);
   assert.match(finalReport, /Meaningful Diff/u);
   assert.match(finalReport, /Agent Completion/u);
   assert.match(finalReport, /Core Safety/u);
+  assert.match(finalReport, /Test Relevance/u);
   assert.match(finalReport, /Decision: PASS/u);
+  assert.match(finalReport, /Decision: WARN/u);
   assert.match(finalReport, /Agent Product Changed Files: src\/app\.ts/u);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'implementation-log.md'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'meaningful-diff.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'agent-completion.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'core-safety.json'))).isFile(), true);
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'test-relevance.json'))).isFile(), true);
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md'))).isFile(), true);
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command passes test relevance for realistic test evidence', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const qualityReport = createPassedQualityReport(join(rootPath, 'frontend'), 'pnpm test');
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner(),
+      devRunner: createFakeDevRunner(undefined, completionLog({
+        status: 'completed',
+        changedFiles: 'src/app.ts',
+        testsRun: 'pnpm test',
+        knownLimits: 'none',
+        blockers: 'none',
+        backgroundAgents: 'none'
+      })),
+      qualityRunner: async () => qualityReport
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /Final State: LOCAL_CHECKS_PASSED/u);
+  assert.match(captured.stdout, /Test Relevance: PASS/u);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'LOCAL_CHECKS_PASSED');
+  assert.equal(state.testRelevance?.decision, 'pass');
+  assert.equal(state.testRelevance?.qualityCommands[0]?.command, 'pnpm test');
+  assert.equal(state.testRelevance?.qualityCommands[0]?.trivial, false);
+  await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
+});
+
+test('run-dev command needs human after quality when tests were explicitly not run', async (t) => {
+  const rootPath = await createRunDevWorkspace(t, runDevWorkspaceYaml('single'));
+  const captured = createCapturedIO();
+  const clients = createRunDevMcpClients('single');
+  const qualityReport = createPassedQualityReport(join(rootPath, 'frontend'), 'pnpm typecheck', 'typecheck');
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    runtimeMcp: { mcpClients: clients },
+    runDevDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner(),
+      devRunner: createFakeDevRunner(undefined, completionLog({
+        status: 'completed',
+        changedFiles: 'src/app.ts',
+        testsRun: 'not run',
+        knownLimits: 'none',
+        blockers: 'none',
+        backgroundAgents: 'none'
+      })),
+      qualityRunner: async () => qualityReport
+    }
+  }).run(['node', 'ewokbot', 'run-dev', 'AI-101', '--confirm-dev-execution', '--run-id', 'dev-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Test Relevance: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Human Action Needed:/u);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AI-101', 'dev-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'NEEDS_HUMAN');
+  assert.equal(state.testRelevance?.decision, 'needs_human');
+  assert.equal(state.qualityReports.length, 1);
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'test-relevance.json'))).isFile(), true);
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AI-101', 'dev-run-1', 'quality-report.md'))).isFile(), true);
   await assertNoProviderHandoffFiles(rootPath, 'AI-101', 'dev-run-1');
 });
@@ -899,13 +987,13 @@ function createPassedDevRun(input: DevRunInput): DevRunResult {
   };
 }
 
-function createPassedQualityReport(repositoryPath: string): QualityReport {
+function createPassedQualityReport(repositoryPath: string, command = 'mock test', name = 'test'): QualityReport {
   return {
     status: 'passed',
     required: [
       {
-        name: 'test',
-        command: 'mock test',
+        name,
+        command,
         workingDirectory: repositoryPath,
         startedAt: '2026-06-05T00:00:00.000Z',
         finishedAt: '2026-06-05T00:00:01.000Z',

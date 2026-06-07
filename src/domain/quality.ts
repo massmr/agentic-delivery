@@ -1,3 +1,5 @@
+import type { TestRelevanceReport } from './run.js';
+
 export type BuiltInQualityGateName =
   | 'install'
   | 'lint'
@@ -39,4 +41,5 @@ export interface QualityReport {
   readonly status: 'passed' | 'failed' | 'skipped';
   readonly required: readonly QualityGateResult[];
   readonly optional: readonly QualityGateResult[];
+  readonly testRelevance?: TestRelevanceReport;
 }

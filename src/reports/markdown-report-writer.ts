@@ -5,7 +5,7 @@ import type { DeploymentResult } from '../domain/deployment.js';
 import type { DevRunResult } from '../domain/dev-runner.js';
 import type { PullRequestRef } from '../domain/pull-request.js';
 import type { QualityGateResult, QualityReport } from '../domain/quality.js';
-import type { BranchRef, DeliveryRunFailure, DeliveryRunStateRecord } from '../domain/run.js';
+import type { BranchRef, DeliveryRunFailure, DeliveryRunStateRecord, TestRelevanceReport } from '../domain/run.js';
 import type { TicketPlan } from '../planning/repository-resolver.js';
 import { getRunDirectoryPath } from '../state/run-state-store.js';
 
@@ -16,6 +16,7 @@ export interface FinalReportOptions {
   readonly agentCompletionReportPath?: string;
   readonly coreSafetyReportPath?: string;
   readonly qualityReportPath?: string;
+  readonly testRelevanceReportPath?: string;
   readonly stagingReportPath?: string;
   readonly mockOnlyNote?: string;
 }
@@ -138,6 +139,10 @@ export function renderQualityReportMarkdown(ticketKey: string, runId: string, re
     '## Optional Gates',
     '',
     renderGateResults(report.optional),
+    '',
+    '## Test Relevance',
+    '',
+    renderTestRelevance(report.testRelevance, undefined),
     ''
   ].join('\n');
 }
@@ -257,6 +262,10 @@ export function renderFinalReportMarkdown(
     '## Quality Summary',
     '',
     renderQualitySummary(latestQualityReport, options.qualityReportPath),
+    '',
+    '## Test Relevance',
+    '',
+    renderTestRelevance(state.testRelevance ?? latestQualityReport?.testRelevance, options.testRelevanceReportPath),
     '',
     '## Develop Pull Request',
     '',
@@ -379,6 +388,23 @@ function renderQualitySummary(report: QualityReport | undefined, reportPath: str
     `- Quality Report: ${reportPath ?? 'not recorded'}`,
     `- Required Gates: ${report.required.map((result) => `${result.name} ${result.status.toUpperCase()}`).join(', ') || 'none'}`,
     `- Optional Gates: ${report.optional.map((result) => `${result.name} ${result.status.toUpperCase()}`).join(', ') || 'none'}`
+  ].join('\n');
+}
+
+function renderTestRelevance(report: TestRelevanceReport | undefined, reportPath: string | undefined): string {
+  if (report === undefined) {
+    return '- Not evaluated';
+  }
+
+  return [
+    `- Decision: ${report.decision.toUpperCase()}`,
+    `- Reason: ${report.reason}`,
+    `- Evidence: ${reportPath ?? 'embedded in quality report'}`,
+    `- Changed Files: ${renderInlineList(report.changedFiles)}`,
+    `- Tests Reported: ${renderInlineList(report.testsReported)}`,
+    `- Quality Commands: ${report.qualityCommands.length === 0 ? 'none' : report.qualityCommands.map((command) => `${command.name} ${command.status.toUpperCase()} (${command.command})`).join('; ')}`,
+    `- Findings: ${report.findings.length === 0 ? 'none' : report.findings.map((finding) => `${finding.kind} (${finding.severity})`).join('; ')}`,
+    `- Trivial Command Patterns: ${renderInlineList(report.trivialCommandPatterns)}`
   ].join('\n');
 }
 

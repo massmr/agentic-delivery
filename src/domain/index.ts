@@ -29,6 +29,12 @@ export type {
   MeaningfulDiffDecision,
   MeaningfulDiffEvidence,
   MeaningfulDiffSnapshot,
-  RunTimestamps
+  RunTimestamps,
+  TestRelevanceDecision,
+  TestRelevanceFinding,
+  TestRelevanceFindingKind,
+  TestRelevanceFindingSeverity,
+  TestRelevanceQualityCommand,
+  TestRelevanceReport
 } from './run.js';
 export type { DeliveryTicket, TicketAnalysis, TicketPriority, TicketProvider, TicketRef } from './ticket.js';

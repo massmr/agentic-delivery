@@ -106,7 +106,7 @@ function renderBoundary(io: CliProgramIO, boundary: DevelopmentRunBoundary): voi
 }
 
 function renderRunDevResult(io: CliProgramIO, ticketKey: string, result: DevelopmentRunResult): void {
-  io.stdout('Phase 3/3: local branch, OpenCode, agent completion check, core safety, and local quality gates completed.\n');
+  io.stdout('Phase 3/3: local branch, OpenCode, agent completion check, core safety, test relevance, and local quality gates completed.\n');
   io.stdout(`Development run ${ticketKey} completed as ${result.runId}.\n`);
   io.stdout(`Final State: ${result.state.state}\n`);
   io.stdout(`Run Directory: ${result.runDirectoryPath}\n`);
@@ -125,6 +125,10 @@ function renderRunDevResult(io: CliProgramIO, ticketKey: string, result: Develop
     io.stdout(`Core Safety: ${result.state.coreSafety.decision.toUpperCase()} - ${result.state.coreSafety.reason}\n`);
   }
   io.stdout(`Quality Report: ${result.qualityReportPath ?? 'n/a'}\n`);
+  io.stdout(`Test Relevance Report: ${result.testRelevanceReportPath ?? 'n/a'}\n`);
+  if (result.state.testRelevance !== undefined) {
+    io.stdout(`Test Relevance: ${result.state.testRelevance.decision.toUpperCase()} - ${result.state.testRelevance.reason}\n`);
+  }
   if (result.state.failure !== undefined) {
     io.stdout(`Failure Reason: ${result.state.failure.reason}\n`);
   }

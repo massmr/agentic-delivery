@@ -39,7 +39,7 @@ Current capabilities:
 - Deterministic mock end-to-end ticket runs.
 - Persistent run state and Markdown reports under `.ewokbot/runs/`.
 - Direct sibling Git repository discovery for parent workspace dry runs.
-- Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, post-agent diff safety, and local quality evidence only.
+- Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, meaningful diff, agent completion, core safety, test relevance, and local quality evidence only.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Jira ticket intake boundary with MCP-backed adapter support.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
@@ -335,6 +335,8 @@ ewokbot scan
 ewokbot run-dev LK-101 --confirm-dev-execution
 ewokbot smoke LK-101 --confirm-real-provider-smoke
 ```
+
+`ewokbot run-dev` persists local guard evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`, including `meaningful-diff.json`, `agent-completion.json`, `core-safety.json`, `test-relevance.json`, `quality-report.md`, and `final-report.md`. Test relevance treats realistic local test commands as passing evidence, surfaces stub/no-op commands as `WARN`, and escalates explicit missing test evidence to `NEEDS_HUMAN` before any later handoff can occur.
 
 `ewokbot scan`, `ewokbot worker start`, `ewokbot run-dev`, and `ewokbot smoke` all receive the public runtime MCP factory. Tests still use fake SDK/client factories or mock MCP clients only; no live MCP sessions, provider services, OpenCode subprocesses, package managers, remote git endpoints, provider CLIs, production merge, or production deployment are exercised in tests.
 
