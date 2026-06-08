@@ -134,7 +134,7 @@ Status legend:
 - `[x]` Atlassian/Jira project-key constraint made optional
 - `[x]` Atlassian naming and init realignment
 - `[x]` Atlassian MCP real mapping for Jira intake/comment tools
-- `[ ]` Railway MCP real mapping for read-only staging evidence
+- `[x]` Railway MCP real mapping for read-only staging evidence
 - `[ ]` GitHub MCP real mapping for PR handoff tools
 - `[ ]` GitHub draft PR handoff after validated local evidence and accepted MCP policy
 - `[ ]` Real staging verification through policy-approved Railway read-only evidence

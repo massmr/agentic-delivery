@@ -24,7 +24,8 @@
 20. The previous GitHub PR handoff milestone is intentionally deferred until after MCP schema inspection, tool registry, policy modes, Atlassian mapping, Railway mapping, and GitHub mapping are accepted.
 21. Milestone AX0 - Atlassian Naming And Init Realignment is complete as the prerequisite setup/naming pass.
 22. Milestone AX - Atlassian MCP Real Mapping is implemented in this pass and awaiting acceptance. Jira `TicketPort` now maps to the documented Atlassian MCP tools from `docs/reference/atlassian-mcp-tools.md`: `search_jira_issues`, `read_jira_issue`, and `add_jira_comment` with the documented argument schemas.
-23. AY - Railway MCP Real Mapping is planned after AX acceptance only. Use `docs/reference/railway-mcp-tools.md` as the authoritative inspected Railway MCP tool reference. Do not implement AY or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AY is explicitly approved.
+23. Milestone AY - Railway MCP Real Mapping is implemented in this pass and awaiting acceptance. Railway `DeploymentPort` now maps to inspected read-only Railway MCP deployment evidence tools from `docs/reference/railway-mcp-tools.md`: `environment_status` and `list_deployments`. Optional inspected read tools such as `get_service_config`, `list_projects`, `list_services`, `get_logs`, and `service_metrics` remain parsed/classified for future typed use but are not globally required for current `DeploymentPort` readiness. Custom `railway.mcp_tools` overrides remain supported; service URLs must come from deployment evidence or explicit safe URL configuration. `list_variables` is secret-sensitive/redacted/denied, source/link mutation tools are denied by default, and `whoami` plus Railway HTTP observability tools remain unmapped and denied by default.
+24. AZ - GitHub MCP Real Mapping is planned after AY acceptance only. Use `docs/reference/github-mcp-tools.md` as the authoritative inspected GitHub MCP tool reference. Do not implement AZ or later GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AZ is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -181,7 +182,7 @@ Continue in this order:
 5. Atlassian setup realignment unblocker. Completed after AW: project keys are optional constraints, empty constraints mean all visible Jira projects, and docs now describe Jira under an Atlassian-first direction.
 6. AX0 - Atlassian Naming And Init Realignment. Completed.
 7. AX - Atlassian MCP Real Mapping. Implemented in this pass; awaiting acceptance.
-8. AY - Railway MCP Real Mapping. Planned after AX acceptance only. Use `docs/reference/railway-mcp-tools.md`; do not guess tool names.
+8. AY - Railway MCP Real Mapping. Implemented in this pass; awaiting acceptance.
 9. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
 10. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
 11. BB - Real Staging Verification v1. Planned after BA acceptance only.
@@ -236,8 +237,8 @@ The next milestones should move in this order:
 25. Atlassian setup realignment unblocker. Completed after AW.
 26. AX0 - Atlassian Naming And Init Realignment. Completed.
 27. AX - Atlassian MCP Real Mapping. Implemented; awaiting acceptance.
-28. AY - Railway MCP Real Mapping. Planned after AX acceptance. Use `docs/reference/railway-mcp-tools.md`; do not guess tool names.
-29. AZ - GitHub MCP Real Mapping. Planned after AY. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
+28. AY - Railway MCP Real Mapping. Implemented; awaiting acceptance.
+29. AZ - GitHub MCP Real Mapping. Planned after AY acceptance. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
 30. BA - GitHub PR Handoff v1. Planned after AZ.
 31. BB - Real Staging Verification v1. Planned after BA.
 32. BC - Operator Agent Action Sandbox. Planned after BB.

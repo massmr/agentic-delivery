@@ -2,6 +2,22 @@
 
 ## 2026-06-08
 
+Implemented Milestone AY Railway MCP Real Mapping:
+
+- Replaced guessed Railway MCP defaults with inspected Railway MCP deployment evidence tools from `docs/reference/railway-mcp-tools.md`: `environment_status` and `list_deployments`.
+- Updated Railway `DeploymentPort` reads to use safe read-only evidence: environment status plus recent deployments for wait/read flows. Service URLs now come from deployment evidence or explicitly configured safe URL tools; `get_service_config` is not assumed to return service URLs by default.
+- Preserved `railway.mcp_tools` custom overrides while adding parsed override keys for the inspected Railway read tools.
+- Classified `list_variables`, `set_variables`, and `add_reference_variable` as secret-sensitive; schema defaults for Railway variable values are redacted in registry snapshots.
+- Kept `whoami`, `http_error_rate`, `http_requests`, and `http_response_time` unmapped/unknown/denied by default, classified Railway source/link mutation tools as denied by default, and kept deploy, domain generation, scaling, create/update/remove, variable mutation, staging mutation, GitHub handoff, production merge, and production deployment outside AY scope.
+- Added fake-only coverage for default mappings, list-deployment array parsing, explicit custom URL tool behavior, custom overrides, missing tools, Railway registry classifications, policy denial, and no Railway variable-value leakage.
+
+Verification commands run for AY:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm test` (`366/366`)
+- `git diff --check`
+
 Implemented Milestone AX Atlassian MCP Real Mapping:
 
 - Replaced the Jira `TicketPort` default MCP tool names with the documented Atlassian MCP tools: `search_jira_issues`, `read_jira_issue`, and `add_jira_comment`.

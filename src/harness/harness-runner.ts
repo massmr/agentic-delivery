@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 import type { WorkspaceConfig } from '../config/index.js';
+import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
 import { runDevelopmentExecution } from '../delivery/index.js';
 import type { DevelopmentRunResult } from '../delivery/index.js';
 import type { DeliveryTicket, DevRunInput, DevRunResult, DevRunner, QualityReport } from '../domain/index.js';
@@ -175,6 +176,7 @@ function buildWorkspaceConfig(fixture: HarnessFixture): WorkspaceConfig {
       stagingBranch: 'develop',
       productionBranch: 'main',
       mcpToolNames: {
+        ...defaultRailwayMcpToolNames,
         waitForDeployment: 'mockWaitForDeployment',
         readDeployment: 'mockReadDeployment',
         getServiceUrl: 'mockGetServiceUrl'

@@ -99,6 +99,13 @@ export interface RailwayMcpToolNameConfig {
   readonly waitForDeployment: string;
   readonly readDeployment: string;
   readonly getServiceUrl: string;
+  readonly environmentStatus: string;
+  readonly listDeployments: string;
+  readonly listProjects: string;
+  readonly listServices: string;
+  readonly getServiceConfig: string;
+  readonly getLogs: string;
+  readonly serviceMetrics: string;
 }
 
 export interface DevRunnerWorkspaceConfig {
@@ -411,7 +418,7 @@ function parseRailwayMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[]
     issues.push({
       path: 'railway.mcp_tools',
       message: 'railway.mcp_tools must be a YAML mapping when provided.',
-      action: 'Set railway.mcp_tools.wait_for_deployment, read_deployment, and get_service_url to MCP tool names, or remove railway.mcp_tools to use defaults.'
+      action: 'Set railway.mcp_tools entries to inspected Railway MCP tool names, or remove railway.mcp_tools to use defaults.'
     });
     return defaultRailwayMcpToolNames;
   }
@@ -419,7 +426,14 @@ function parseRailwayMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[]
   return {
     waitForDeployment: readOptionalNonEmptyString(value.wait_for_deployment, 'railway.mcp_tools.wait_for_deployment', 'Set railway.mcp_tools.wait_for_deployment to the Railway MCP deployment polling tool name.', issues) ?? defaultRailwayMcpToolNames.waitForDeployment,
     readDeployment: readOptionalNonEmptyString(value.read_deployment, 'railway.mcp_tools.read_deployment', 'Set railway.mcp_tools.read_deployment to the Railway MCP deployment lookup tool name.', issues) ?? defaultRailwayMcpToolNames.readDeployment,
-    getServiceUrl: readOptionalNonEmptyString(value.get_service_url, 'railway.mcp_tools.get_service_url', 'Set railway.mcp_tools.get_service_url to the Railway MCP service URL tool name.', issues) ?? defaultRailwayMcpToolNames.getServiceUrl
+    getServiceUrl: readOptionalNonEmptyString(value.get_service_url, 'railway.mcp_tools.get_service_url', 'Set railway.mcp_tools.get_service_url to the Railway MCP service URL tool name.', issues) ?? defaultRailwayMcpToolNames.getServiceUrl,
+    environmentStatus: readOptionalNonEmptyString(value.environment_status, 'railway.mcp_tools.environment_status', 'Set railway.mcp_tools.environment_status to the Railway MCP environment status tool name.', issues) ?? defaultRailwayMcpToolNames.environmentStatus,
+    listDeployments: readOptionalNonEmptyString(value.list_deployments, 'railway.mcp_tools.list_deployments', 'Set railway.mcp_tools.list_deployments to the Railway MCP deployment listing tool name.', issues) ?? defaultRailwayMcpToolNames.listDeployments,
+    listProjects: readOptionalNonEmptyString(value.list_projects, 'railway.mcp_tools.list_projects', 'Set railway.mcp_tools.list_projects to the Railway MCP project listing tool name.', issues) ?? defaultRailwayMcpToolNames.listProjects,
+    listServices: readOptionalNonEmptyString(value.list_services, 'railway.mcp_tools.list_services', 'Set railway.mcp_tools.list_services to the Railway MCP service listing tool name.', issues) ?? defaultRailwayMcpToolNames.listServices,
+    getServiceConfig: readOptionalNonEmptyString(value.get_service_config, 'railway.mcp_tools.get_service_config', 'Set railway.mcp_tools.get_service_config to the Railway MCP service config tool name.', issues) ?? defaultRailwayMcpToolNames.getServiceConfig,
+    getLogs: readOptionalNonEmptyString(value.get_logs, 'railway.mcp_tools.get_logs', 'Set railway.mcp_tools.get_logs to the Railway MCP logs tool name.', issues) ?? defaultRailwayMcpToolNames.getLogs,
+    serviceMetrics: readOptionalNonEmptyString(value.service_metrics, 'railway.mcp_tools.service_metrics', 'Set railway.mcp_tools.service_metrics to the Railway MCP metrics tool name.', issues) ?? defaultRailwayMcpToolNames.serviceMetrics
   };
 }
 

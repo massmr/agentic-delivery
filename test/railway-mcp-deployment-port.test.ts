@@ -15,53 +15,83 @@ import {
 
 const serverId = 'railway';
 
-test('Railway MCP DeploymentPort reads deployment state and service URL through default tool names', async () => {
+test('Railway MCP default tool names use inspected read-only railway mcp tools', () => {
+  assert.deepEqual(defaultRailwayMcpToolNames, {
+    waitForDeployment: 'list_deployments',
+    readDeployment: 'list_deployments',
+    getServiceUrl: '',
+    environmentStatus: 'environment_status',
+    listDeployments: 'list_deployments',
+    listProjects: 'list_projects',
+    listServices: 'list_services',
+    getServiceConfig: 'get_service_config',
+    getLogs: 'get_logs',
+    serviceMetrics: 'service_metrics'
+  });
+});
+
+test('Railway MCP DeploymentPort reads deployment state through default tool names', async () => {
   const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
     createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
       content: {
         deployment: railwayDeployment('wait-for-deployment')
       },
       isError: false
     })),
-    createMockMcpTool(serverId, defaultRailwayMcpToolNames.readDeployment, () => ({
-      content: {
-        deployment: railwayDeployment('read-deployment')
-      },
-      isError: false
-    })),
-    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceUrl, () => ({
-      content: {
-        deployment: {
-          serviceUrl: 'https://delivery-cli-staging.mock-railway.local'
-        }
-      },
-      isError: false
-    }))
   ]);
   const adapter = new RailwayMcpDeploymentPort({ client, serverId });
   const repository = railwayRepository();
 
   const waited = await adapter.waitForDeployment({ repository, branch: 'develop', commitSha: 'abc123', environment: 'staging' });
   const read = await adapter.readDeployment({ ref: waited.ref });
-  const serviceUrl = await adapter.getServiceUrl({ ref: read.ref });
 
   assert.equal(waited.status, 'success');
   assert.equal(read.ref.deploymentId, 'mock-agentic-delivery-cli-staging-develop-abc123');
-  assert.equal(serviceUrl, 'https://delivery-cli-staging.mock-railway.local');
+  assert.equal(read.serviceUrl, 'https://delivery-cli-staging.mock-railway.local');
   assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [
+    defaultRailwayMcpToolNames.environmentStatus,
     defaultRailwayMcpToolNames.waitForDeployment,
-    defaultRailwayMcpToolNames.readDeployment,
-    defaultRailwayMcpToolNames.getServiceUrl
+    defaultRailwayMcpToolNames.readDeployment
   ]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.arguments), [
+    {},
+    { limit: 25 },
+    { project_id: 'mock-project-agentic', service_id: 'mock-service-delivery-cli', limit: 25 }
+  ]);
+});
+
+test('Railway MCP DeploymentPort does not assume get_service_config returns service URLs by default', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceConfig, () => ({
+      content: { service: { variableCount: 3 } },
+      isError: false
+    }))
+  ]);
+  const adapter = new RailwayMcpDeploymentPort({ client, serverId });
+
+  await assert.rejects(
+    () => adapter.getServiceUrl({ ref: railwayDeploymentRef() as unknown as DeploymentRef }),
+    /Railway MCP service URL lookup is not configured/u
+  );
+  assert.deepEqual(client.toolCallRequests, []);
 });
 
 test('Railway MCP DeploymentPort supports custom configured MCP tool names', async () => {
   const toolNames = {
     waitForDeployment: 'customRailwayWait',
     readDeployment: 'customRailwayRead',
-    getServiceUrl: 'customRailwayServiceUrl'
+    getServiceUrl: 'customRailwayServiceUrl',
+    environmentStatus: 'customRailwayEnvironmentStatus'
   };
   const client = new MockMcpClient([
+    createMockMcpTool(serverId, toolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
     createMockMcpTool(serverId, toolNames.waitForDeployment, () => ({
       content: { deployment: railwayDeployment('wait-for-deployment') },
       isError: false
@@ -84,12 +114,16 @@ test('Railway MCP DeploymentPort supports custom configured MCP tool names', asy
   const serviceUrl = await adapter.getServiceUrl({ ref: deploymentRef });
 
   assert.equal(serviceUrl, 'https://custom.mock-railway.local');
-  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [toolNames.waitForDeployment, toolNames.readDeployment, toolNames.getServiceUrl]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [toolNames.environmentStatus, toolNames.waitForDeployment, toolNames.readDeployment, toolNames.getServiceUrl]);
 });
 
 test('Railway MCP DeploymentPort emits audit records for successful MCP operations', async () => {
   const auditRecords: McpToolCallAuditRecord[] = [];
   const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
     createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
       content: { deployment: railwayDeployment('wait-for-deployment') },
       isError: false
@@ -101,6 +135,8 @@ test('Railway MCP DeploymentPort emits audit records for successful MCP operatio
 
   assert.deepEqual(auditRecords.map((record) => `${record.action}:${record.status}`), [
     'waitForDeployment:started',
+    'waitForDeployment:succeeded',
+    'waitForDeployment:started',
     'waitForDeployment:succeeded'
   ]);
 });
@@ -108,12 +144,12 @@ test('Railway MCP DeploymentPort emits audit records for successful MCP operatio
 test('Railway MCP DeploymentPort emits failed audit records before rethrowing failed calls', async () => {
   const auditRecords: McpToolCallAuditRecord[] = [];
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceUrl, () => ({
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceConfig, () => ({
       content: { message: 'remote Railway lookup failed' },
       isError: true
     }))
   ]);
-  const adapter = new RailwayMcpDeploymentPort({ client, serverId, auditSink: (records) => auditRecords.push(...records) });
+  const adapter = new RailwayMcpDeploymentPort({ client, serverId, toolNames: { getServiceUrl: defaultRailwayMcpToolNames.getServiceConfig }, auditSink: (records) => auditRecords.push(...records) });
 
   await assert.rejects(() => adapter.getServiceUrl({ ref: railwayDeploymentRef() as unknown as DeploymentRef }), /returned an error result/u);
 
@@ -127,7 +163,9 @@ test('Railway MCP DeploymentPort emits failed audit records before rethrowing fa
 
 test('Railway MCP DeploymentPort missing tools fail with actionable MCP tool errors', async () => {
   const adapter = new RailwayMcpDeploymentPort({
-    client: new MockMcpClient([createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceUrl, () => ({ content: { deployment: { serviceUrl: 'https://delivery-cli-staging.mock-railway.local' } }, isError: false }))]),
+    client: new MockMcpClient([
+      createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({ content: { environment: { status: 'ready' } }, isError: false }))
+    ]),
     serverId
   });
 
@@ -142,6 +180,10 @@ test('Railway MCP DeploymentPort missing tools fail with actionable MCP tool err
 
 test('Railway MCP DeploymentPort accepts wait results without service URL', async () => {
   const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
     createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
       content: { deployment: railwayDeploymentWithoutServiceUrl('wait-for-deployment') },
       isError: false
@@ -153,7 +195,7 @@ test('Railway MCP DeploymentPort accepts wait results without service URL', asyn
 
   assert.equal(deployment.status, 'success');
   assert.equal(deployment.serviceUrl, 'unavailable');
-  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultRailwayMcpToolNames.waitForDeployment]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultRailwayMcpToolNames.environmentStatus, defaultRailwayMcpToolNames.waitForDeployment]);
 });
 
 test('Railway MCP DeploymentPort accepts read results without service URL', async () => {
@@ -172,8 +214,62 @@ test('Railway MCP DeploymentPort accepts read results without service URL', asyn
   assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultRailwayMcpToolNames.readDeployment]);
 });
 
+test('Railway MCP DeploymentPort selects requested deployments from list_deployments arrays', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
+      content: {
+        deployments: [
+          {
+            ...railwayDeployment('wrong-branch'),
+            branch: 'main',
+            commitSha: 'different-sha',
+            ref: {
+              ...railwayDeploymentRef(),
+              deploymentId: 'mock-main-deployment'
+            }
+          },
+          railwayDeployment('wait-for-deployment')
+        ]
+      },
+      isError: false
+    }))
+  ]);
+  const adapter = new RailwayMcpDeploymentPort({ client, serverId });
+
+  const deployment = await adapter.waitForDeployment({ repository: railwayRepository(), branch: 'develop', commitSha: 'abc123', environment: 'staging' });
+
+  assert.equal(deployment.ref.deploymentId, 'mock-agentic-delivery-cli-staging-develop-abc123');
+  assert.equal(deployment.branch, 'develop');
+});
+
+test('Railway MCP DeploymentPort reads service URLs only from explicitly configured URL tools', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceConfig, () => ({
+      content: {
+        service_config: {
+          service_url: 'https://service-config.mock-railway.local'
+        }
+      },
+      isError: false
+    }))
+  ]);
+  const adapter = new RailwayMcpDeploymentPort({ client, serverId, toolNames: { getServiceUrl: defaultRailwayMcpToolNames.getServiceConfig } });
+
+  const serviceUrl = await adapter.getServiceUrl({ ref: railwayDeploymentRef() as unknown as DeploymentRef });
+
+  assert.equal(serviceUrl, 'https://service-config.mock-railway.local');
+});
+
 test('Railway MCP DeploymentPort rejects wait results that do not match requested deployment identity', async () => {
   const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
     createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
       content: {
         deployment: {
@@ -222,12 +318,12 @@ test('Railway MCP DeploymentPort rejects read results whose deployment ref does 
 
 test('Railway MCP DeploymentPort rejects non-http staging service URLs', async () => {
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceUrl, () => ({
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceConfig, () => ({
       content: { deployment: { serviceUrl: 'ftp://delivery-cli-staging.mock-railway.local' } },
       isError: false
     }))
   ]);
-  const adapter = new RailwayMcpDeploymentPort({ client, serverId });
+  const adapter = new RailwayMcpDeploymentPort({ client, serverId, toolNames: { getServiceUrl: defaultRailwayMcpToolNames.getServiceConfig } });
 
   await assert.rejects(
     () => adapter.getServiceUrl({ ref: railwayDeploymentRef() as unknown as DeploymentRef }),
@@ -237,16 +333,16 @@ test('Railway MCP DeploymentPort rejects non-http staging service URLs', async (
 
 test('Railway MCP DeploymentPort rejects missing staging service URLs in getServiceUrl', async () => {
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceUrl, () => ({
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.getServiceConfig, () => ({
       content: { deployment: {} },
       isError: false
     }))
   ]);
-  const adapter = new RailwayMcpDeploymentPort({ client, serverId });
+  const adapter = new RailwayMcpDeploymentPort({ client, serverId, toolNames: { getServiceUrl: defaultRailwayMcpToolNames.getServiceConfig } });
 
   await assert.rejects(
     () => adapter.getServiceUrl({ ref: railwayDeploymentRef() as unknown as DeploymentRef }),
-    /content\.deployment\.serviceUrl must be a non-empty string/u
+    /content\.serviceUrl must be a non-empty string/u
   );
 });
 

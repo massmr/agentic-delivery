@@ -396,6 +396,8 @@ mcp_servers:
 
 Railway MCP uses the Railway CLI session owned by Railway. Install the Railway CLI and run `railway login` outside Ewokbot before enabling this path; `ewokbot init` does not collect `RAILWAY_TOKEN` for the default Railway MCP preset.
 
+Railway MCP runtime mapping uses the inspected tools documented in `docs/reference/railway-mcp-tools.md`. The default Railway `DeploymentPort` mapping calls only the read-only deployment evidence tools it currently uses: `environment_status` and `list_deployments`. Service URLs must come from deployment evidence or from an explicitly configured safe URL tool; `get_service_config` is parsed and classified for future safe reads but is not treated as a default service URL lookup. Custom `railway.mcp_tools.get_service_url` overrides remain supported when an operator has a safe read-only URL tool. Ewokbot does not call Railway deploy, source/link mutation, variable mutation, variable-value reads, domain generation, scaling/removal, staging mutation, or production deployment tools by default; `list_variables` is treated as secret-sensitive/redacted/denied, and `whoami`, `http_error_rate`, `http_requests`, and `http_response_time` remain unmapped and denied until a later classifier explicitly approves them.
+
 First real smoke launch sequence after configuring local MCP/OAuth sessions:
 
 ```bash

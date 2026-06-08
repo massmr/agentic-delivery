@@ -199,13 +199,13 @@ function createWorkerMcpClients(options: { readonly omitGitHubCreateBranch?: boo
     createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false }))
   ];
   const github = new MockMcpClient(githubTools);
-  const railway = new MockMcpClient([
-    createMockMcpTool('railway', defaultRailwayMcpToolNames.waitForDeployment, () => ({ content: { deployment: { status: 'success' } }, isError: false })),
-    createMockMcpTool('railway', defaultRailwayMcpToolNames.readDeployment, () => ({ content: { deployment: { status: 'success' } }, isError: false })),
-    createMockMcpTool('railway', defaultRailwayMcpToolNames.getServiceUrl, () => ({ content: { url: 'https://railway.example.test/frontend' }, isError: false }))
-  ]);
+  const railway = new MockMcpClient(uniqueRailwayToolNames().map((toolName) => createMockMcpTool('railway', toolName, () => ({ content: { ok: true }, isError: false }))));
 
   return { atlassian, github, railway };
+}
+
+function uniqueRailwayToolNames(): readonly string[] {
+  return Array.from(new Set(Object.values(defaultRailwayMcpToolNames).filter((toolName) => toolName.trim().length > 0)));
 }
 
 function jiraIssue(key: string, summary: string): JsonObject {

@@ -1,4 +1,4 @@
-import type { DeploymentEnvironment, DeploymentRef, DeploymentResult, DeploymentStatus, RepositoryRef, SmokeCheckResult } from '../../domain/index.js';
+import type { DeploymentEnvironment, DeploymentRef, DeploymentResult, DeploymentStatus, SmokeCheckResult } from '../../domain/index.js';
 import type { JsonObject, JsonValue, McpClient, McpToolAllowlistRule, McpToolCallAuditRecord, McpToolCallExecutionResult } from '../../mcp/index.js';
 import { callAllowedMcpTool, discoverMcpTools, isJsonObject, requireDiscoveredMcpTool } from '../../mcp/index.js';
 import type { DeploymentPort, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from '../../ports/index.js';
@@ -10,14 +10,28 @@ export interface RailwayMcpToolNames {
   readonly waitForDeployment: string;
   readonly readDeployment: string;
   readonly getServiceUrl: string;
+  readonly environmentStatus: string;
+  readonly listDeployments: string;
+  readonly listProjects: string;
+  readonly listServices: string;
+  readonly getServiceConfig: string;
+  readonly getLogs: string;
+  readonly serviceMetrics: string;
 }
 
 export type RailwayMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
 
 export const defaultRailwayMcpToolNames: RailwayMcpToolNames = {
-  waitForDeployment: 'waitForRailwayDeployment',
-  readDeployment: 'getRailwayDeployment',
-  getServiceUrl: 'getRailwayServiceUrl'
+  waitForDeployment: 'list_deployments',
+  readDeployment: 'list_deployments',
+  getServiceUrl: '',
+  environmentStatus: 'environment_status',
+  listDeployments: 'list_deployments',
+  listProjects: 'list_projects',
+  listServices: 'list_services',
+  getServiceConfig: 'get_service_config',
+  getLogs: 'get_logs',
+  serviceMetrics: 'service_metrics'
 } as const;
 
 export interface RailwayMcpDeploymentPortOptions {
@@ -46,31 +60,41 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
   }
 
   async waitForDeployment(input: WaitForDeploymentInput): Promise<DeploymentResult> {
+    await this.callRailwayTool(this.toolNames.environmentStatus, 'waitForDeployment', {});
+
     const execution = await this.callRailwayTool(this.toolNames.waitForDeployment, 'waitForDeployment', {
-      repository: toRepositoryJson(input.repository),
+      limit: 25
+    });
+
+    const deployment = readDeploymentResult(execution.result.content, {
       branch: input.branch,
       commitSha: input.commitSha,
       environment: input.environment
     });
-
-    const deployment = readDeploymentResult(execution.result.content);
     assertMatchingDeploymentWaitResult(deployment, input);
     return deployment;
   }
 
   async readDeployment(input: ReadDeploymentInput): Promise<DeploymentResult> {
     const execution = await this.callRailwayTool(this.toolNames.readDeployment, 'readDeployment', {
-      ref: toDeploymentRefJson(input.ref)
+      project_id: input.ref.projectId,
+      service_id: input.ref.serviceId,
+      limit: 25
     });
 
-    const deployment = readDeploymentResult(execution.result.content);
+    const deployment = readDeploymentResult(execution.result.content, input.ref);
     assertMatchingDeploymentRef(deployment.ref, input.ref);
     return deployment;
   }
 
   async getServiceUrl(input: ServiceUrlInput): Promise<string> {
+    if (this.toolNames.getServiceUrl.trim().length === 0) {
+      throw new Error('Railway MCP service URL lookup is not configured. Configure repository staging service URLs or set railway.mcp_tools.get_service_url to a safe read-only tool that returns a service URL.');
+    }
+
     const execution = await this.callRailwayTool(this.toolNames.getServiceUrl, 'getServiceUrl', {
-      ref: toDeploymentRefJson(input.ref)
+      project_id: input.ref.projectId,
+      service_id: input.ref.serviceId
     });
 
     return assertHttpServiceUrl(readServiceUrl(execution.result.content));
@@ -114,16 +138,27 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
 
 export function createRailwayMcpToolRequirements(serverId: string, toolNames: Partial<RailwayMcpToolNames> = {}): readonly McpToolAllowlistRule[] {
   const resolvedToolNames: RailwayMcpToolNames = { ...defaultRailwayMcpToolNames, ...toolNames };
-
-  return [
+  const requirements: McpToolAllowlistRule[] = [
+    { serverId, toolName: resolvedToolNames.environmentStatus, port: portName, action: 'waitForDeployment', safety: 'read' },
     { serverId, toolName: resolvedToolNames.waitForDeployment, port: portName, action: 'waitForDeployment', safety: 'read' },
-    { serverId, toolName: resolvedToolNames.readDeployment, port: portName, action: 'readDeployment', safety: 'read' },
-    { serverId, toolName: resolvedToolNames.getServiceUrl, port: portName, action: 'getServiceUrl', safety: 'read' }
+    { serverId, toolName: resolvedToolNames.readDeployment, port: portName, action: 'readDeployment', safety: 'read' }
   ];
+
+  if (resolvedToolNames.getServiceUrl.trim().length !== 0) {
+    requirements.push({ serverId, toolName: resolvedToolNames.getServiceUrl, port: portName, action: 'getServiceUrl', safety: 'read' });
+  }
+
+  return requirements;
 }
 
-function readDeploymentResult(content: JsonValue | undefined): DeploymentResult {
-  const deployment = unwrapObject(content, 'content', 'deployment');
+type DeploymentResultSelector = DeploymentRef | {
+  readonly branch: string;
+  readonly commitSha: string;
+  readonly environment: DeploymentEnvironment;
+};
+
+function readDeploymentResult(content: JsonValue | undefined, selector?: DeploymentResultSelector): DeploymentResult {
+  const deployment = readDeploymentObject(content, selector);
   const refSource = deployment.ref ?? deployment.deploymentRef ?? deployment;
 
   return {
@@ -137,6 +172,41 @@ function readDeploymentResult(content: JsonValue | undefined): DeploymentResult 
     ...(deployment.finishedAt === undefined && deployment.finished_at === undefined ? {} : { finishedAt: readString(deployment.finishedAt ?? deployment.finished_at, 'content.deployment.finishedAt') }),
     summary: readString(deployment.summary, 'content.deployment.summary')
   };
+}
+
+function readDeploymentObject(content: JsonValue | undefined, selector: DeploymentResultSelector | undefined): JsonObject {
+  const root = readObject(content, 'content');
+
+  if (root.deployment !== undefined) {
+    return readObject(root.deployment, 'content.deployment');
+  }
+
+  if (Array.isArray(root.deployments)) {
+    const deployments = root.deployments.map((entry, index) => readObject(entry, `content.deployments[${index}]`));
+    const selected = selector === undefined ? deployments[0] : deployments.find((deployment) => deploymentMatchesSelector(deployment, selector));
+
+    if (selected !== undefined) {
+      return selected;
+    }
+
+    throw new Error('content.deployments must include the requested Railway deployment.');
+  }
+
+  throw new Error('content.deployment must be an object, or content.deployments must be an array.');
+}
+
+function deploymentMatchesSelector(deployment: JsonObject, selector: DeploymentResultSelector): boolean {
+  const refSource = deployment.ref ?? deployment.deploymentRef ?? deployment;
+  const branch = readOptionalString(deployment.branch ?? deployment.branchName, 'content.deployments[].branch');
+  const commitSha = readOptionalString(deployment.commitSha ?? deployment.commit_sha, 'content.deployments[].commitSha');
+
+  if ('deploymentId' in selector) {
+    const ref = readDeploymentRef(refSource);
+    return ref.projectId === selector.projectId && ref.serviceId === selector.serviceId && ref.deploymentId === selector.deploymentId && ref.environment === selector.environment;
+  }
+
+  const environment = readDeploymentRef(refSource).environment;
+  return branch === selector.branch && commitSha === selector.commitSha && environment === selector.environment;
 }
 
 function readDeploymentRef(value: JsonValue | undefined): DeploymentRef {
@@ -173,10 +243,23 @@ function readSmokeChecks(value: JsonValue | undefined): readonly SmokeCheckResul
 }
 
 function readServiceUrl(content: JsonValue | undefined): string {
-  const deployment = unwrapObject(content, 'content', 'deployment');
-  const value = deployment.serviceUrl ?? deployment.service_url;
+  const root = readObject(content, 'content');
+  const source = readServiceUrlSource(root);
+  const value = source.serviceUrl ?? source.service_url ?? source.url;
 
-  return readString(value, 'content.deployment.serviceUrl');
+  return readString(value, 'content.serviceUrl');
+}
+
+function readServiceUrlSource(root: JsonObject): JsonObject {
+  for (const key of ['deployment', 'service', 'config', 'serviceConfig', 'service_config']) {
+    const value = root[key];
+
+    if (value !== undefined) {
+      return readObject(value, `content.${key}`);
+    }
+  }
+
+  return root;
 }
 
 function assertMatchingDeploymentWaitResult(deployment: DeploymentResult, input: WaitForDeploymentInput): void {
@@ -280,12 +363,6 @@ function isAuditRecord(value: unknown): value is McpToolCallAuditRecord {
     && (record.status === 'started' || record.status === 'succeeded' || record.status === 'failed');
 }
 
-function unwrapObject(content: JsonValue | undefined, path: string, nestedKey: string): JsonObject {
-  const root = readObject(content, path);
-  const nested = root[nestedKey];
-  return nested !== undefined && isJsonObject(nested) ? nested : root;
-}
-
 function readObject(value: JsonValue | undefined, path: string): JsonObject {
   if (value === undefined || !isJsonObject(value)) {
     throw new Error(`${path} must be an object.`);
@@ -316,24 +393,4 @@ function readPositiveInteger(value: JsonValue | undefined, path: string): number
   }
 
   throw new Error(`${path} must be a non-negative integer.`);
-}
-
-function toRepositoryJson(repository: RepositoryRef): JsonObject {
-  return {
-    provider: repository.provider,
-    owner: repository.owner,
-    name: repository.name,
-    defaultBranch: repository.defaultBranch,
-    url: repository.url
-  };
-}
-
-function toDeploymentRefJson(ref: DeploymentRef): JsonObject {
-  return {
-    provider: ref.provider,
-    projectId: ref.projectId,
-    serviceId: ref.serviceId,
-    deploymentId: ref.deploymentId,
-    environment: ref.environment
-  };
 }

@@ -243,12 +243,12 @@ function createRuntimeMcpClients(): Record<string, MockMcpClient> {
         defaultGitHubMcpToolNames.commentOnPullRequest
       ])
     ]),
-    railway: new MockMcpClient(createTools('railway', [
-      defaultRailwayMcpToolNames.waitForDeployment,
-      defaultRailwayMcpToolNames.readDeployment,
-      defaultRailwayMcpToolNames.getServiceUrl
-    ]))
+    railway: new MockMcpClient(createTools('railway', uniqueRailwayToolNames()))
   };
+}
+
+function uniqueRailwayToolNames(): readonly string[] {
+  return Array.from(new Set(Object.values(defaultRailwayMcpToolNames).filter((toolName) => toolName.trim().length > 0)));
 }
 
 function createTools(serverId: string, toolNames: readonly string[]): ReturnType<typeof createMockMcpTool>[] {

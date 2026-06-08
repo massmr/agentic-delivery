@@ -61,24 +61,71 @@ test('MCP tool registry classifies Railway inspection data without provider exec
   assertEntry(registry.entries[3], 'set-environment-variable', 'secret_sensitive', 'deployment');
 });
 
-test('MCP tool registry classifies real Railway variable and mutation tools safely', () => {
+test('MCP tool registry classifies inspected Railway read tools from railway mcp safely', () => {
+  const readTools = [
+    'environment_status',
+    'list_deployments',
+    'list_projects',
+    'list_services',
+    'get_service_config',
+    'get_logs',
+    'service_metrics'
+  ];
+  const registry = createRailwayMcpToolRegistry('railway', readTools.map((toolName) => tool(toolName)));
+
+  for (const [index, toolName] of readTools.entries()) {
+    assertEntry(registry.entries[index], toolName, 'read', 'deployment');
+  }
+});
+
+test('MCP tool registry classifies real Railway variables observability and mutation tools safely', () => {
   const registry = createRailwayMcpToolRegistry('railway', [
-    tool('list_variables'),
+    tool('list_variables', {
+      type: 'object',
+      properties: {
+        cachedVariableValue: { type: 'string', default: 'railway-secret-value' }
+      }
+    }),
     tool('set_variables'),
+    tool('add_reference_variable'),
     tool('environment_status'),
+    tool('whoami'),
+    tool('http_error_rate'),
+    tool('http_requests'),
+    tool('http_response_time'),
     tool('generate_domain'),
     tool('deploy'),
     tool('remove_service'),
-    tool('scale_service')
+    tool('scale_service'),
+    tool('connect_service_source'),
+    tool('disconnect_service_source'),
+    tool('link_service'),
+    tool('link_environment')
   ]);
 
   assertEntry(registry.entries[0], 'list_variables', 'secret_sensitive', 'deployment');
+  assert.equal(JSON.stringify(registry).includes('railway-secret-value'), false);
+  assert.deepEqual(registry.entries[0]?.inputSchema, {
+    type: 'object',
+    properties: {
+      cachedVariableValue: { type: 'string', default: '[redacted]' }
+    }
+  });
   assertEntry(registry.entries[1], 'set_variables', 'secret_sensitive', 'deployment');
-  assertEntry(registry.entries[2], 'environment_status', 'read', 'deployment');
-  assertEntry(registry.entries[3], 'generate_domain', 'destructive', 'deployment');
-  assertEntry(registry.entries[4], 'deploy', 'destructive', 'deployment');
-  assertEntry(registry.entries[5], 'remove_service', 'destructive', 'deployment');
-  assertEntry(registry.entries[6], 'scale_service', 'destructive', 'deployment');
+  assertEntry(registry.entries[2], 'add_reference_variable', 'secret_sensitive', 'deployment');
+  assertEntry(registry.entries[3], 'environment_status', 'read', 'deployment');
+  assertEntry(registry.entries[4], 'whoami', 'unknown', 'unknown');
+  assertEntry(registry.entries[5], 'http_error_rate', 'unknown', 'unknown');
+  assertEntry(registry.entries[6], 'http_requests', 'unknown', 'unknown');
+  assertEntry(registry.entries[7], 'http_response_time', 'unknown', 'unknown');
+  assertEntry(registry.entries[8], 'generate_domain', 'destructive', 'deployment');
+  assertEntry(registry.entries[9], 'deploy', 'destructive', 'deployment');
+  assertEntry(registry.entries[10], 'remove_service', 'destructive', 'deployment');
+  assertEntry(registry.entries[11], 'scale_service', 'destructive', 'deployment');
+  assertEntry(registry.entries[12], 'connect_service_source', 'destructive', 'deployment');
+  assertEntry(registry.entries[13], 'disconnect_service_source', 'destructive', 'deployment');
+  assertEntry(registry.entries[14], 'link_service', 'destructive', 'deployment');
+  assertEntry(registry.entries[15], 'link_environment', 'destructive', 'deployment');
 });
 
 test('MCP tool registry classifies GitHub inspection data and preserves output metadata', () => {

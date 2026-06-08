@@ -40,12 +40,31 @@ test('supervised mode requires human approval for GitHub writes unless explicitl
 });
 
 test('trusted mode allows Railway read/status tools but denies secret-sensitive tools by default', () => {
-  const readEvaluation = evaluateMcpToolPolicy({ entry: railwayEntry('readDeployment'), policy: policy('trusted') });
-  const secretEvaluation = evaluateMcpToolPolicy({ entry: railwayEntry('set_variables'), policy: policy('trusted') });
+  const readEvaluation = evaluateMcpToolPolicy({ entry: railwayEntry('list_deployments'), policy: policy('trusted') });
+  const secretEvaluation = evaluateMcpToolPolicy({ entry: railwayEntry('list_variables'), policy: policy('trusted') });
 
   assert.equal(readEvaluation.decision, 'allow');
   assert.equal(secretEvaluation.decision, 'deny');
   assert.match(secretEvaluation.reason, /Secret-sensitive tools are denied/u);
+});
+
+test('read_only denies Railway HTTP observability and auth probes until explicitly classified', () => {
+  for (const toolName of ['whoami', 'http_error_rate', 'http_requests', 'http_response_time']) {
+    const evaluation = evaluateMcpToolPolicy({ entry: railwayEntry(toolName) });
+
+    assert.equal(evaluation.decision, 'deny');
+    assert.match(evaluation.reason, /no built-in AV classification/u);
+  }
+});
+
+test('read_only denies Railway source and link mutation tools by default', () => {
+  for (const toolName of ['connect_service_source', 'disconnect_service_source', 'link_service', 'link_environment']) {
+    const evaluation = evaluateMcpToolPolicy({ entry: railwayEntry(toolName) });
+
+    assert.equal(evaluation.decision, 'deny');
+    assert.match(evaluation.reason, /Destructive tools are denied by default/u);
+    assert.equal(evaluation.blocked, true);
+  }
 });
 
 test('secret-sensitive tools can only be reported through allow_redacted overrides', () => {

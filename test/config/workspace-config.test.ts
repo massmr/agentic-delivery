@@ -261,6 +261,24 @@ test('workspace config accepts Railway MCP settings', () => {
   assert.equal(config.mcpServers[0]?.id, 'railway');
 });
 
+test('workspace config preserves partial Railway MCP tool overrides for inspected tools', () => {
+  const config = parseWorkspaceConfig(workspaceWithRailwayMcp().replace('  mcp_server: railway\n', `  mcp_server: railway
+  mcp_tools:
+    wait_for_deployment: custom_list_deployments
+    environment_status: custom_environment_status
+    get_service_config: custom_get_service_config
+    get_logs: custom_get_logs
+`));
+
+  assert.deepEqual(config.railway.mcpToolNames, {
+    ...defaultRailwayMcpToolNames,
+    waitForDeployment: 'custom_list_deployments',
+    environmentStatus: 'custom_environment_status',
+    getServiceConfig: 'custom_get_service_config',
+    getLogs: 'custom_get_logs'
+  });
+});
+
 test('workspace config uses default Railway MCP tool names when mcp_tools is omitted', () => {
   const config = parseWorkspaceConfig(workspaceWithRailwayMcpDefaults());
 

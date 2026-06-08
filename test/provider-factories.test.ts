@@ -144,6 +144,10 @@ test('Railway factory keeps mock default and selects the injected MCP adapter in
   });
 
   const client = new MockMcpClient([
+    createMockMcpTool('railway', defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
     createMockMcpTool('railway', defaultRailwayMcpToolNames.waitForDeployment, () => ({
       content: {
         deployment: {
@@ -166,14 +170,9 @@ test('Railway factory keeps mock default and selects the injected MCP adapter in
       },
       isError: false
     })),
-    createMockMcpTool('railway', defaultRailwayMcpToolNames.getServiceUrl, () => ({
-      content: {
-        deployment: {
-          serviceUrl: 'https://delivery-cli-staging.mock-railway.local'
-        }
-      },
-      isError: false
-    }))
+    ...uniqueRailwayToolNames()
+      .filter((toolName) => toolName !== defaultRailwayMcpToolNames.environmentStatus && toolName !== defaultRailwayMcpToolNames.waitForDeployment)
+      .map((toolName) => createMockMcpTool('railway', toolName, () => ({ content: { ok: true }, isError: false })))
   ]);
 
   const adapter = createRailwayConnector({
@@ -192,15 +191,17 @@ test('Railway factory keeps mock default and selects the injected MCP adapter in
   } as const;
 
   const deployment = await adapter.waitForDeployment({ repository, branch: 'develop', commitSha: 'abc123', environment: 'staging' });
-  const serviceUrl = await adapter.getServiceUrl({ ref: deployment.ref });
 
   assert.equal(deployment.serviceUrl, 'https://delivery-cli-staging.mock-railway.local');
-  assert.equal(serviceUrl, 'https://delivery-cli-staging.mock-railway.local');
   assert.deepEqual(client.toolCallRequests.map((call: { readonly toolName: string }) => call.toolName), [
-    defaultRailwayMcpToolNames.waitForDeployment,
-    defaultRailwayMcpToolNames.getServiceUrl
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment
   ]);
 });
+
+function uniqueRailwayToolNames(): readonly string[] {
+  return Array.from(new Set(Object.values(defaultRailwayMcpToolNames).filter((toolName) => toolName.trim().length > 0)));
+}
 
 test('real OpenCode factory returns subprocess runner without executing a command', async () => {
   const config = parseWorkspaceConfig(

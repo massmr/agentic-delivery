@@ -56,7 +56,8 @@ function isSensitiveName(value: string): boolean {
     || normalized.includes('apikey')
     || normalized.includes('clientsecret')
     || normalized.includes('accesstoken')
-    || normalized.includes('refreshtoken');
+    || normalized.includes('refreshtoken')
+    || normalized.includes('variablevalue');
 }
 
 function isSecretValueName(value: string): boolean {

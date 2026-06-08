@@ -120,6 +120,13 @@ function createMcpToolRegistryEntry(provider: McpToolRegistryProvider, serverId:
 function classifyTool(toolName: string, provider: McpToolRegistryProvider): McpToolRegistryClassification {
   const normalized = normalizeToolName(toolName);
 
+  if (provider === 'railway') {
+    const railwayClassification = classifyRailwayTool(normalized);
+    if (railwayClassification !== undefined) {
+      return railwayClassification;
+    }
+  }
+
   if (hasSecretSensitiveName(toolName, normalized)) {
     return 'secret_sensitive';
   }
@@ -145,6 +152,26 @@ function classifyTool(toolName: string, provider: McpToolRegistryProvider): McpT
   }
 
   return 'unknown';
+}
+
+function classifyRailwayTool(normalized: string): McpToolRegistryClassification | undefined {
+  if (/^(environmentstatus|listdeployments|listprojects|listservices|getserviceconfig|getlogs|servicemetrics)$/u.test(normalized)) {
+    return 'read';
+  }
+
+  if (/^(listvariables|setvariables|addreferencevariable)$/u.test(normalized)) {
+    return 'secret_sensitive';
+  }
+
+  if (/^(whoami|httperrorrate|httprequests|httpresponsetime)$/u.test(normalized)) {
+    return 'unknown';
+  }
+
+  if (/^(deploy|deploytemplate|generatedomain|connectservicesource|disconnectservicesource|linkservice|linkenvironment)$/u.test(normalized) || /^(create|remove|update)/u.test(normalized) || /(removeservice|scaleservice|scaledeployment)/u.test(normalized)) {
+    return 'destructive';
+  }
+
+  return undefined;
 }
 
 function categorizeProvider(provider: McpToolRegistryProvider, classification: McpToolRegistryClassification): McpToolRegistryCategory {

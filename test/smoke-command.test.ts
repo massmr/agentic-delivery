@@ -444,15 +444,26 @@ function createSmokeMcpClients(): Record<string, MockMcpClient> {
       createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: { checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } }, isError: false })),
       createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false }))
     ]),
-    railway: new MockMcpClient([
-      createMockMcpTool('railway', defaultRailwayMcpToolNames.waitForDeployment, (input) => ({
-        content: { deployment: railwayDeployment(String(input.arguments.branch), String(input.arguments.commitSha)) },
-        isError: false
-      })),
-      createMockMcpTool('railway', defaultRailwayMcpToolNames.readDeployment, () => ({ content: { deployment: railwayDeployment('develop', 'local-head') }, isError: false })),
-      createMockMcpTool('railway', defaultRailwayMcpToolNames.getServiceUrl, () => ({ content: { deployment: { serviceUrl: 'https://frontend.example.test' } }, isError: false }))
-    ])
+    railway: new MockMcpClient(createRailwayTools())
   };
+}
+
+function createRailwayTools(): ReturnType<typeof createMockMcpTool>[] {
+  return uniqueRailwayToolNames().map((toolName) => createMockMcpTool('railway', toolName, () => {
+    if (toolName === defaultRailwayMcpToolNames.environmentStatus) {
+      return { content: { environment: { status: 'ready' } }, isError: false };
+    }
+
+    if (toolName === defaultRailwayMcpToolNames.waitForDeployment) {
+      return { content: { deployment: railwayDeployment('develop', 'local-head') }, isError: false };
+    }
+
+    return { content: { ok: true }, isError: false };
+  }));
+}
+
+function uniqueRailwayToolNames(): readonly string[] {
+  return Array.from(new Set(Object.values(defaultRailwayMcpToolNames).filter((toolName) => toolName.trim().length > 0)));
 }
 
 function jiraIssue(): JsonObject {

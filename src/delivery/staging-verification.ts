@@ -40,7 +40,7 @@ export async function runStagingVerification(input: RunStagingVerificationInput)
       verifiedDeployment = normalizeUnavailableServiceUrl(deployment);
       failureReason = buildStagingFailureReason(verifiedDeployment);
     } else {
-      const serviceUrl = assertValidStagingServiceUrl(await input.railway.getServiceUrl({ ref: deployment.ref }));
+      const serviceUrl = assertValidStagingServiceUrl(hasUsableServiceUrl(deployment) ? deployment.serviceUrl : await input.railway.getServiceUrl({ ref: deployment.ref }));
       const smokeChecks = await input.smokeVerifier.verify({ serviceUrl, urls: input.repository.stagingSmokeUrls });
 
       verifiedDeployment = {
@@ -65,6 +65,10 @@ export async function runStagingVerification(input: RunStagingVerificationInput)
   await input.reportWriter.writeStaging(finalState.ticket.key, finalState.runId, verifiedDeployment, finalState.failure);
 
   return finalState;
+}
+
+function hasUsableServiceUrl(deployment: DeploymentResult): boolean {
+  return typeof deployment.serviceUrl === 'string' && deployment.serviceUrl.trim().length > 0 && deployment.serviceUrl !== 'unavailable';
 }
 
 function buildStagingFailureReason(deployment: DeploymentResult): string {
