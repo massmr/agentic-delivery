@@ -50,7 +50,7 @@ Current capabilities:
 - Foreground `ewokbot worker start` runtime with bounded or continuous operation, dry-run preview, workspace locking, graceful shutdown, and restart-safe state reuse.
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
-- Read-only MCP schema inspection with human-readable and JSON output for configured provider servers.
+- Read-only MCP schema inspection with human-readable and JSON output, plus policy-gated tool registry metadata for configured provider servers.
 - Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Jira MCP ticket read followed by local run-dev evidence only.
 
 Default behavior is safe:
@@ -277,9 +277,12 @@ Inspect a configured MCP server before mapping provider tools:
 node dist/src/cli/index.js mcp inspect atlassian
 node dist/src/cli/index.js mcp inspect atlassian --schema
 node dist/src/cli/index.js mcp inspect railway --json
+node dist/src/cli/index.js mcp inspect railway --cache-registry
 ```
 
-The default inspect output stays compact and human-readable. `--schema` adds sanitized input schemas plus any output schema or output metadata exposed by MCP discovery, and `--json` emits the same inspected server/tool data as parseable JSON with safety metadata. Inspect mode is read-only: it may call MCP tool discovery (`listTools`) for the configured server, but it does not call provider tools, deploy Railway services, mutate Jira/GitHub, cache schemas outside Ewokbot-owned paths, or print credential-like defaults/examples.
+The default inspect output stays compact and human-readable. `--schema` adds sanitized input schemas plus any output schema or output metadata exposed by MCP discovery, and `--json` emits the same inspected server/tool data as parseable JSON with safety metadata and an internal tool registry. Registry entries record provider, server id, tool name, sanitized schemas, output metadata when present, category, classification, source, and default-deny policy metadata. Known registry classifications are `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`; unknown tools are represented explicitly and remain denied by default until a later policy milestone allows them.
+
+`--cache-registry` is the explicit operator opt-in for writing an inspection snapshot to `.ewokbot/cache/mcp-tools/<server-id>.json`. Snapshots are sanitized, live separately from provider credentials and run evidence, and are intended to support full mapping with policy-gated execution in later milestones. Inspect mode remains read-only: it may call MCP tool discovery (`listTools`) for the configured server, but it does not call provider tools, deploy Railway services, mutate Jira/GitHub, execute registry entries, cache schemas outside Ewokbot-owned paths, or print credential-like defaults/examples.
 
 ## Configuration
 

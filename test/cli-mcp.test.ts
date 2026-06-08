@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -10,6 +10,7 @@ import {
   createMockMcpTool,
   type CliProgramIO,
   type JsonObject,
+  type McpToolRegistry,
   type MockMcpToolRegistration
 } from '../src/index.js';
 
@@ -145,6 +146,7 @@ test('ewokbot mcp inspect --json emits sanitized schemas and output metadata', a
       readonly outputSchema?: JsonObject;
       readonly outputMetadata?: JsonObject;
     }[];
+    readonly registry: McpToolRegistry;
     readonly safety: { readonly inspectOnly: boolean; readonly mcpMethodsCalled: readonly string[]; readonly toolCallsPerformed: number };
   };
 
@@ -159,9 +161,74 @@ test('ewokbot mcp inspect --json emits sanitized schemas and output metadata', a
   });
   assert.deepEqual(payload.tools[0]?.outputSchema, { type: 'object', properties: { services: { type: 'array' } } });
   assert.deepEqual(payload.tools[0]?.outputMetadata, { contentType: 'application/json', example: { services: [] } });
+  assert.equal(payload.registry.provider, 'railway');
+  assert.equal(payload.registry.serverId, 'railway');
+  assert.equal(payload.registry.entries[0]?.toolName, 'list-services');
+  assert.equal(payload.registry.entries[0]?.classification, 'read');
+  assert.equal(payload.registry.entries[0]?.defaultAuthorization, 'deny');
+  assert.equal(payload.registry.entries[0]?.policyRequired, true);
+  assert.deepEqual(payload.registry.safety, {
+    source: 'inspection',
+    defaultAuthorization: 'deny',
+    unknownToolsDeniedByDefault: true,
+    mcpMethodsCalled: ['listTools'],
+    toolCallsPerformed: 0
+  });
   assert.deepEqual(payload.safety, { inspectOnly: true, mcpMethodsCalled: ['listTools'], toolCallsPerformed: 0 });
   assert.deepEqual(railway.listToolRequests, [{ serverId: 'railway' }]);
   assert.deepEqual(railway.toolCallRequests, []);
+});
+
+test('ewokbot mcp inspect writes registry snapshots only when explicitly requested', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithRailwayMcp());
+  const capturedDefault = createCapturedIO();
+  const railway = new MockMcpClient([
+    createMockMcpTool('railway', 'list-services', () => ({ content: { services: [] }, isError: false }), {
+      type: 'object',
+      properties: {
+        serviceId: { type: 'string' },
+        deployToken: { type: 'string', example: 'sk-1234567890abcdefghijklmnopqrstuvwxyz' }
+      }
+    })
+  ]);
+
+  const defaultExitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: capturedDefault.io,
+    runtimeMcp: { mcpClients: { railway } }
+  }).run(['node', 'ewokbot', 'mcp', 'inspect', 'railway']);
+
+  assert.equal(defaultExitCode, 0);
+  assert.equal(existsSync(join(rootPath, '.ewokbot', 'cache', 'mcp-tools', 'railway.json')), false);
+
+  const capturedCached = createCapturedIO();
+  const cachedExitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: capturedCached.io,
+    runtimeMcp: { mcpClients: { railway } }
+  }).run(['node', 'ewokbot', 'mcp', 'inspect', 'railway', '--cache-registry']);
+
+  assert.equal(cachedExitCode, 0);
+  assert.match(capturedCached.stdout, /Registry cache snapshot: \.ewokbot\/cache\/mcp-tools\/railway\.json/u);
+  assert.deepEqual(railway.listToolRequests, [{ serverId: 'railway' }, { serverId: 'railway' }]);
+  assert.deepEqual(railway.toolCallRequests, []);
+
+  const snapshotPath = join(rootPath, '.ewokbot', 'cache', 'mcp-tools', 'railway.json');
+  const snapshotText = readFileSync(snapshotPath, 'utf8');
+  assert.doesNotMatch(snapshotText, /sk-1234567890abcdefghijklmnopqrstuvwxyz/u);
+
+  const snapshot = JSON.parse(snapshotText) as { readonly registry: McpToolRegistry; readonly safety: { readonly mcpMethodsCalled: readonly string[]; readonly toolCallsPerformed: number } };
+  assert.equal(snapshot.registry.entries[0]?.toolName, 'list-services');
+  assert.deepEqual(snapshot.registry.entries[0]?.inputSchema, {
+    type: 'object',
+    properties: {
+      serviceId: { type: 'string' },
+      deployToken: { type: 'string', example: '[redacted]' }
+    }
+  });
+  assert.deepEqual(snapshot.safety, { inspectOnly: true, mcpMethodsCalled: ['listTools'], toolCallsPerformed: 0 });
 });
 
 test('ewokbot mcp inspect reports missing configured servers', async () => {
@@ -194,7 +261,7 @@ test('ewokbot mcp rejects unknown subcommands and missing server ids', async () 
   const unsupportedExitCode = await createCliProgram({ io: capturedUnsupported.io }).run(['node', 'ewokbot', 'mcp', 'inspect', 'railway', '--call']);
   assert.equal(unsupportedExitCode, 1);
   assert.match(capturedUnsupported.stderr, /Unsupported MCP inspect option '--call'/u);
-  assert.match(capturedUnsupported.stderr, /Supported options: --schema, --json/u);
+  assert.match(capturedUnsupported.stderr, /Supported options: --schema, --json, --cache-registry/u);
 });
 
 function createWorkspaceRoot(configYaml: string): string {

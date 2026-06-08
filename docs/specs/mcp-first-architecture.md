@@ -83,11 +83,14 @@ Responsibilities:
 - MCP server registry.
 - Server process/session lifecycle.
 - Tool discovery.
+- Tool registry metadata from inspected provider contracts.
 - Tool allowlist.
 - Tool schema mapping.
 - Tool call timeout handling.
 - Auth/session error handling.
 - Audit log entries for every external operation.
+
+The tool registry is built from inspection data, not from guessed provider names. Registry entries record the provider, server id, raw tool name, description, sanitized input schema, optional output schema and output metadata, category, classification, source, and default-deny authorization metadata. Operators may explicitly cache sanitized inspection snapshots under `.ewokbot/cache/mcp-tools/`; these snapshots are separate from provider credentials, run evidence, and operation ledgers. Registry data supports full mapping with policy-gated execution, but it does not by itself authorize MCP tool calls.
 
 ## Provider Strategy
 
@@ -160,6 +163,8 @@ read      -> allowed during planning and verification
 write     -> allowed only through a typed port and state transition
 danger    -> human approval or explicit policy required
 ```
+
+Inspection registry classifications are more detailed than the current runtime allowlist labels: `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`. Unknown or unclassified registry entries are explicit and denied by default. Later policy-mode milestones must decide when, if ever, a classified entry can be executed through a typed business port; AV registry metadata does not add autonomous provider execution.
 
 Examples:
 

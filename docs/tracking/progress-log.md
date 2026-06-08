@@ -2,6 +2,27 @@
 
 ## 2026-06-08
 
+Implemented Milestone AV MCP Tool Registry review candidate:
+
+- Added typed MCP tool registry entries for inspected Atlassian, Railway, GitHub, and custom servers, including provider, server id, tool name, description, sanitized schemas, optional output metadata, category, classification, source, and default-deny policy metadata.
+- Added registry classifications `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`; unknown or unclassified tools are represented explicitly and remain denied by default until a later policy milestone allows them.
+- Extended `ewokbot mcp inspect <server-id>` so JSON output includes registry metadata while preserving inspect-only behavior and the existing human/schema output surfaces.
+- Added explicit `--cache-registry` snapshot writing under `.ewokbot/cache/mcp-tools/<server-id>.json`; snapshots are sanitized and remain separate from credentials, run evidence, operation ledgers, and provider execution records.
+- Added fake-only tests for Atlassian, Railway, GitHub, and custom registry data plus CLI snapshot behavior. The targeted tests initially caught a `get_deployment_status` classifier bug where the embedded `deployment` term was treated as a destructive `deploy` action; the classifier now treats explicit read prefixes as read before destructive verb matching.
+- Documented the registry as support for full MCP mapping with policy-gated execution, without adding the later AW policy modes.
+- Preserved AV scope only: no AW policy modes, AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC operator-agent sandbox, provider tool execution or mutation, production merge/deploy, live provider/MCP/OAuth/network calls in tests, worker daemon, dashboard, Telegram, Sentry/PostHog/Notion ingestion, or autonomous production automation were added.
+
+Verification commands run for AV:
+
+- `lsp_diagnostics` on `src/mcp/schema-sanitizer.ts`, `src/mcp/tool-registry.ts`, `src/cli/commands/mcp.ts`, `src/index.ts`, `test/cli-mcp.test.ts`, and `test/mcp-tool-registry.test.ts` was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm build`
+- Initial `node --test dist/test/mcp-tool-registry.test.js dist/test/cli-mcp.test.js` surfaced the `get_deployment_status` classifier issue described above; the classifier was corrected.
+- `node --test dist/test/mcp-tool-registry.test.js dist/test/cli-mcp.test.js` (`10/10`)
+- `pnpm test` (`335/335`)
+- `node dist/src/cli/index.js mcp`
+- `git diff --check`
+
 Implemented Milestone AU MCP Inspect Schemas review candidate:
 
 - Extended `ewokbot mcp inspect <server-id>` with `--schema` and `--json` while preserving the existing default human-readable output.

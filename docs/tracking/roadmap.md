@@ -127,8 +127,8 @@ Status legend:
 - `[x]` Test relevance guard
 - `[x]` Harness v1 for fixture-based scoring
 - `[x]` Real provider smoke v1 with Jira MCP and local run-dev
-- `[x]` MCP inspect schemas for real provider tool contracts, implemented review candidate pending acceptance
-- `[ ]` MCP tool registry for Atlassian, Railway, GitHub, and custom servers, planned after AU acceptance
+- `[x]` MCP inspect schemas for real provider tool contracts
+- `[x]` MCP tool registry for Atlassian, Railway, GitHub, and custom servers, implemented review candidate pending acceptance
 - `[ ]` MCP policy modes: read-only, supervised, trusted, and custom
 - `[ ]` Atlassian MCP real mapping for Jira intake/comment tools
 - `[ ]` Railway MCP real mapping for read-only staging evidence
