@@ -1151,6 +1151,10 @@ Goal:
 
 Align Jira/Atlassian runtime mapping with the real tools exposed by the maintained local `mcp-atlassian` server.
 
+Authoritative inspected reference:
+
+- `docs/reference/atlassian-mcp-tools.md`
+
 Known real tool names from local inspection:
 
 - `search_jira_issues`
@@ -1160,7 +1164,10 @@ Known real tool names from local inspection:
 
 Build:
 
-- Update Jira MCP defaults from guessed names to the real `mcp-atlassian` names after AU schema inspection confirms argument shapes.
+- Update Jira MCP defaults from guessed names to the real `mcp-atlassian` names recorded in `docs/reference/atlassian-mcp-tools.md`.
+- Map `TicketPort.listBacklog` to `search_jira_issues`.
+- Map `TicketPort.getTicket` to `read_jira_issue`.
+- Map `TicketPort.comment` to `add_jira_comment`, keeping comments policy-gated because `read_only` denies the tool.
 - Adapt `JiraMcpTicketPort` argument mapping to the real input schemas.
 - Preserve `jira.mcp_tools` overrides for custom Atlassian MCP servers.
 - Classify all discovered Atlassian tools into read, write, destructive, secret-sensitive, or unknown categories.
@@ -1187,6 +1194,10 @@ Goal:
 
 Align Railway runtime mapping with the real tools exposed by `railway mcp`, starting with read-only staging verification capabilities.
 
+Authoritative inspected reference:
+
+- `docs/reference/railway-mcp-tools.md`
+
 Known real tool names from local inspection include:
 
 - `whoami`
@@ -1205,9 +1216,10 @@ Known real tool names from local inspection include:
 Build:
 
 - Map Railway read-only tools to staging inspection and observability intents.
+- Use `docs/reference/railway-mcp-tools.md` as the inspected Railway MCP tool-name and input-schema source.
 - Avoid using mutating tools for default staging verification.
 - Treat `list_variables` as denied or redacted-only by default because it can expose secrets.
-- Replace guessed Railway default tool names with real schema-driven mapping after AU confirms input shapes.
+- Replace guessed Railway default tool names with real schema-driven mappings from the Railway reference.
 - Add policy classifications for all discovered Railway tools.
 - Keep service URLs/smoke URLs configured by workspace/repo config unless a safe read-only tool reliably exposes them.
 
@@ -1230,11 +1242,20 @@ Goal:
 
 Integrate GitHub MCP through the same inspection, registry, and policy model used for Atlassian and Railway.
 
+Authoritative inspected reference:
+
+- `docs/reference/github-mcp-tools.md`
+
 Build:
 
 - Add/confirm a maintained GitHub MCP connector preset.
-- Use AU schema inspection to discover the real GitHub MCP tool names and input schemas.
+- Use `docs/reference/github-mcp-tools.md` as the inspected GitHub MCP tool-name and input-schema source.
 - Map GitHub business intents: repository discovery where needed, branch/refs readiness, draft PR creation, PR comments, and checks/status reading.
+- Map PR creation to `create_pull_request`.
+- Map PR status/check/file/diff reads to `pull_request_read`.
+- Map duplicate PR checks to `list_pull_requests`.
+- Map PR comments to `add_issue_comment`, with the PR number passed as `issue_number`.
+- Map branch readiness to `list_branches`; only use `create_branch` if the milestone explicitly needs remote branch creation.
 - Classify GitHub tools such as issue reads, PR creation, comments, checks, workflow operations, branch deletion, repository writes, secrets, and merges.
 - Preserve custom `github.mcp_tools` overrides.
 - Deny merge, branch deletion, secret management, and workflow mutation by default.
