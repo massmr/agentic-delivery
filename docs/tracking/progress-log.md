@@ -2,6 +2,22 @@
 
 ## 2026-06-08
 
+Accepted Milestone AW MCP Policy Modes:
+
+- Marked AW as complete and accepted after review.
+- Current MCP policy state is safe by default: `read_only` allows read-classified tools, non-read tools remain denied unless a later policy explicitly allows or requires human approval, and production merge/deployment remains human-only.
+- No AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC operator-agent sandbox, worker daemon, Telegram/dashboard, Sentry/PostHog/Notion ingestion, or autonomous production automation has been started as part of acceptance.
+
+Completed GitHub MCP Docker preset unblocker:
+
+- Updated the maintained GitHub MCP setup path so onboarding no longer asks for a global GitHub organization.
+- GitHub MCP now uses the official Docker-based local server preset: `docker run -i --rm -e GITHUB_PERSONAL_ACCESS_TOKEN ghcr.io/github/github-mcp-server`.
+- `ewokbot init` asks only for `GITHUB_PERSONAL_ACCESS_TOKEN` for GitHub MCP.
+- Ewokbot derives repository owners from local git remotes, with the optional `github.organization` value acting only as a fallback.
+- `ewokbot doctor` verifies the configured MCP server commands locally.
+- A local playground smoke confirmed `ewokbot mcp inspect github` can start the GitHub MCP server, list 43 tools, and apply the default `read_only` policy without calling provider tools.
+- This was an unblocker for real setup confidence, not AZ or BA implementation. GitHub real mapping and PR handoff remain future milestones.
+
 Implemented Milestone AW MCP Policy Modes review candidate:
 
 - Added typed MCP policy modes `read_only`, `supervised`, `trusted`, and `custom`, plus policy decisions `allow`, `allow_redacted`, `require_human`, and `deny`.

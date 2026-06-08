@@ -423,6 +423,7 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message.includes('oh-my-openagent')), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('ATLASSIAN_EMAIL value')), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('ATLASSIAN_API_TOKEN value')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message === 'Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)'), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP server id')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP command')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP env_var_names')), false);
@@ -469,6 +470,41 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.match(envExample, /^GITHUB_PERSONAL_ACCESS_TOKEN=$/mu);
   assert.doesNotMatch(envExample, /^RAILWAY_TOKEN=/mu);
   assert.match(envExample, /^VERCEL_TOKEN=$/mu);
+});
+
+test('ewokbot init allows an empty Jira project-key constraint for all visible projects', async () => {
+  const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-empty-jira-project-filter-'));
+  const captured = createCapturedIO();
+  const opencodeHomeDirectory = prepareReadyOpenCodeHome(workspaceDir);
+  const prompts = createFakePromptAdapter([
+    'opencode',
+    false,
+    'jira-mcp',
+    'https://jira.company.test',
+    '',
+    'agent@example.test',
+    'jira-secret-value',
+    'mock',
+    []
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: workspaceDir,
+    io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
+    initOpenCodeHomeDirectory: opencodeHomeDirectory,
+    initCommandExists: (command) => command === 'opencode',
+    initRunCommand: (_command, args) => args[0] === '--version' ? { exitCode: 0, stdout: 'opencode 1.0.0', stderr: '' } : { exitCode: 0, stdout: 'authenticated', stderr: '' },
+    initPrompter: async (defaults, context) => promptForSelectionsWithPromptAdapter({ ...defaults, deploymentMonitor: 'none' }, prompts, context)
+  }).run(['node', 'ewokbot', 'init']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(captured.stderr, '');
+
+  const configYaml = readFileSync(join(workspaceDir, '.ewokbot', 'workspace.yml'), 'utf8');
+  const config = parseWorkspaceConfig(configYaml);
+  assert.deepEqual(config.jira.projectKeys, []);
+  assert.match(configYaml, /project_keys: \[\]/u);
 });
 
 test('ewokbot init interactive-style mock wizard skips provider credential and MCP prompts', async () => {

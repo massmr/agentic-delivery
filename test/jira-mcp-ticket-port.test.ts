@@ -136,6 +136,30 @@ test('Jira MCP TicketPort builds safe JQL from multiple valid project keys', asy
   ]);
 });
 
+test('Jira MCP TicketPort leaves backlog unconstrained when project keys are empty', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, toolNames.search, () => ({
+      content: { issues: [] },
+      isError: false
+    }))
+  ]);
+  const port: TicketPort = new JiraMcpTicketPort({
+    client,
+    serverId,
+    baseUrl: 'https://jira.example.test',
+    projectKeys: []
+  });
+
+  await port.listBacklog();
+
+  assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
+    {
+      toolName: toolNames.search,
+      arguments: { jql: 'ORDER BY updated DESC' }
+    }
+  ]);
+});
+
 test('Jira MCP TicketPort constructor rejects invalid project keys before any MCP calls', () => {
   assert.throws(
     () => new JiraMcpTicketPort({
@@ -303,10 +327,16 @@ test('workspace config rejects invalid Jira project keys when Jira uses MCP mode
       assert.ok(error instanceof WorkspaceConfigError);
       assert.equal(error.issues[0]?.path, 'jira.project_keys[0]');
       assert.match(error.message, /must be a non-empty string/u);
-      assert.match(error.message, /Add at least one Jira project key/u);
+      assert.match(error.message, /Set jira.project_keys to an array of Jira project key filters/u);
       return true;
     }
   );
+});
+
+test('workspace config accepts empty Jira project keys as all visible projects', () => {
+  const config = parseWorkspaceConfig(workspaceWithJiraMcp().replace('  project_keys:\n    - LK', '  project_keys: []'));
+
+  assert.deepEqual(config.jira.projectKeys, []);
 });
 
 test('workspace config rejects jira.mode mcp when jira.mcp_server is not configured', () => {

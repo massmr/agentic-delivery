@@ -317,7 +317,7 @@ function parseWorkspaceSettings(section: WorkspaceConfigInput, issues: Workspace
 function parseJiraConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): JiraWorkspaceConfig | undefined {
   const mode = readJiraProviderMode(section, issues);
   const baseUrl = readNonEmptyString(section, 'jira.base_url', 'Set jira.base_url to the Jira workspace URL.', issues);
-  const projectKeys = readNonEmptyStringArray(section.project_keys, 'jira.project_keys', 'Add at least one Jira project key.', issues);
+  const projectKeys = readStringArray(section.project_keys, 'jira.project_keys', 'Set jira.project_keys to an array of Jira project key filters, or [] to include all visible projects.', issues);
   const mcpServerId = mode === 'mcp'
     ? readNonEmptyString(section, 'jira.mcp_server', 'Set jira.mcp_server to the id of a configured top-level mcp_servers entry.', issues)
     : readOptionalNonEmptyString(section.mcp_server, 'jira.mcp_server', 'Remove jira.mcp_server unless jira.mode is mcp, or set it to a non-empty MCP server id.', issues);

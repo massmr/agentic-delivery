@@ -108,6 +108,10 @@ export class JiraMcpTicketPort implements JiraConnector {
   }
 
   private buildBacklogJql(): string {
+    if (this.projectKeys.length === 0) {
+      return 'ORDER BY updated DESC';
+    }
+
     return `project in (${this.projectKeys.join(', ')}) ORDER BY updated DESC`;
   }
 

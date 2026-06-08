@@ -101,7 +101,7 @@ Status legend:
 - `[x]` Provider capability setup model
 - `[x]` OpenCode setup detection
 - `[x]` oh-my-openagent optional setup detection
-- `[~]` GitHub setup prompts
+- `[x]` GitHub setup prompts and official Docker MCP preset
 - `[~]` Jira setup prompts
 - `[x]` Railway setup prompts
 - `[x]` Vercel setup prompts
@@ -128,8 +128,9 @@ Status legend:
 - `[x]` Harness v1 for fixture-based scoring
 - `[x]` Real provider smoke v1 with Jira MCP and local run-dev
 - `[x]` MCP inspect schemas for real provider tool contracts
-- `[x]` MCP tool registry for Atlassian, Railway, GitHub, and custom servers, implemented review candidate pending acceptance
-- `[x]` MCP policy modes: read-only, supervised, trusted, and custom, implemented review candidate pending acceptance
+- `[x]` MCP tool registry for Atlassian, Railway, GitHub, and custom servers
+- `[x]` MCP policy modes: read-only, supervised, trusted, and custom
+- `[x]` GitHub MCP Docker preset and local inspect smoke
 - `[ ]` Atlassian MCP real mapping for Jira intake/comment tools
 - `[ ]` Railway MCP real mapping for read-only staging evidence
 - `[ ]` GitHub MCP real mapping for PR handoff tools

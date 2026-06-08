@@ -83,7 +83,7 @@ export const defaultSetupSelections: SetupSelections = {
   modelProviderEnvVarNames: [],
   ticketProvider: 'mock',
   jiraBaseUrl: 'https://jira.example.test',
-  jiraProjectKeys: ['AD'],
+  jiraProjectKeys: [],
   codeHostProvider: 'mock',
   railwayProvider: 'mock',
   envValues: {}
@@ -195,7 +195,7 @@ const jiraCapability = createCapability({
   category: 'ticket-provider',
   order: 40,
   installSteps: ['Install mcp-atlassian and create an Atlassian API token before leaving mock mode.'],
-  nonSecretConfigKeys: ['jira.base_url', 'jira.project_keys'],
+  nonSecretConfigKeys: ['jira.base_url', 'jira.project_keys optional filter'],
   requiredSecretEnvVars: ['ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'],
   detectExistingSetup(input) {
     return allEnvPresent(input, ['ATLASSIAN_BASE_URL', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN']);
@@ -203,8 +203,7 @@ const jiraCapability = createCapability({
   validateGeneratedConfig(config) {
     return validationResult([
       config.jira.mode === undefined ? 'jira.mode must exist.' : undefined,
-      config.jira.baseUrl.trim().length > 0 ? undefined : 'jira.base_url must be non-empty.',
-      config.jira.projectKeys.length > 0 ? undefined : 'jira.project_keys must be non-empty.'
+      config.jira.baseUrl.trim().length > 0 ? undefined : 'jira.base_url must be non-empty.'
     ].filter((issue): issue is string => issue !== undefined));
   }
 });

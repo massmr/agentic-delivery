@@ -304,7 +304,10 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
 
   if (ticketProvider === 'jira-mcp') {
     jiraBaseUrl = nonEmptyPromptValue(await prompts.input({ message: 'Jira base URL', defaultValue: defaults.jiraBaseUrl ?? 'https://jira.example.test' }), defaults.jiraBaseUrl);
-    jiraProjectKeys = withDefaultList(parseCsv(await prompts.input({ message: 'Jira project keys, comma-separated', defaultValue: (defaults.jiraProjectKeys ?? ['AD']).join(',') })), defaults.jiraProjectKeys);
+    jiraProjectKeys = parseCsv(await prompts.input({
+      message: 'Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)',
+      defaultValue: defaults.jiraProjectKeys?.join(',') ?? ''
+    }));
     envValues.ATLASSIAN_EMAIL = await askSecret(prompts, 'ATLASSIAN_EMAIL value');
     envValues.ATLASSIAN_API_TOKEN = await askSecret(prompts, 'ATLASSIAN_API_TOKEN value');
     jiraMcpServer = defaults.jiraMcpServer ?? atlassianJiraMcpPreset.server;

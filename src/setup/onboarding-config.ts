@@ -131,7 +131,7 @@ function normalizeSelections(selections: SetupSelections): NormalizedSetupSelect
     modelProviderEnvVarNames: uniqueNames(selections.modelProviderEnvVarNames ?? []),
     ticketProvider: selections.ticketProvider ?? defaultSetupSelections.ticketProvider ?? 'mock',
     jiraBaseUrl: nonEmpty(selections.jiraBaseUrl, defaultSetupSelections.jiraBaseUrl ?? 'https://jira.example.test'),
-    jiraProjectKeys: nonEmptyList(selections.jiraProjectKeys, defaultSetupSelections.jiraProjectKeys ?? ['AD']),
+    jiraProjectKeys: normalizedList(selections.jiraProjectKeys ?? defaultSetupSelections.jiraProjectKeys ?? []),
     jiraMcpServer: selections.jiraMcpServer ?? atlassianJiraMcpPreset.server,
     codeHostProvider: selections.codeHostProvider ?? defaultSetupSelections.codeHostProvider ?? 'mock',
     githubOrganization: optionalNonEmpty(selections.githubOrganization),
@@ -208,6 +208,10 @@ function optionalNonEmpty(value: string | undefined): string | undefined {
 function nonEmptyList(values: readonly string[] | undefined, fallback: readonly string[]): readonly string[] {
   const normalized = values?.map((value) => value.trim()).filter((value) => value.length > 0) ?? [];
   return normalized.length === 0 ? fallback : normalized;
+}
+
+function normalizedList(values: readonly string[]): readonly string[] {
+  return values.map((value) => value.trim()).filter((value) => value.length > 0);
 }
 
 function uniqueNames(values: readonly string[]): readonly string[] {

@@ -17,9 +17,10 @@
 13. Milestone AT: Real Provider Smoke v1 is complete and accepted.
 14. Milestone AU: MCP Inspect Schemas is complete and accepted.
 15. Milestone AV: MCP Tool Registry is complete and accepted.
-16. Milestone AW: MCP Policy Modes is implemented as a review candidate and pending acceptance.
-17. The previous GitHub PR handoff milestone is intentionally deferred until after MCP schema inspection, tool registry, policy modes, Atlassian mapping, Railway mapping, and GitHub mapping are accepted.
-18. Do not implement AX or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AW is accepted and AX is explicitly approved.
+16. Milestone AW: MCP Policy Modes is complete and accepted.
+17. GitHub MCP setup was unblocked after AW by switching the maintained GitHub preset to the official Docker server (`ghcr.io/github/github-mcp-server`) with `GITHUB_PERSONAL_ACCESS_TOKEN`, removing the global organization prompt, deriving owners from local git remotes, and proving `ewokbot mcp inspect github` can list the real GitHub tools under the default `read_only` policy.
+18. The previous GitHub PR handoff milestone is intentionally deferred until after MCP schema inspection, tool registry, policy modes, Atlassian mapping, Railway mapping, and GitHub mapping are accepted.
+19. The next planned milestone is AX - Atlassian MCP Real Mapping, but AX is not started yet. Do not implement AX or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AX is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -171,15 +172,16 @@ Continue in this order:
 
 1. AU - MCP Inspect Schemas. Completed and accepted.
 2. AV - MCP Tool Registry. Completed and accepted.
-3. AW - MCP Policy Modes. Implemented review candidate, pending acceptance.
-4. AX - Atlassian MCP Real Mapping. Planned after AW acceptance only.
-5. AY - Railway MCP Real Mapping. Planned after AX acceptance only.
-6. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only.
-7. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
-8. BB - Real Staging Verification v1. Planned after BA acceptance only.
-9. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
+3. AW - MCP Policy Modes. Completed and accepted.
+4. GitHub MCP Docker preset unblocker. Completed after AW: maintained onboarding now uses the official Docker-based GitHub MCP server, asks only for `GITHUB_PERSONAL_ACCESS_TOKEN`, derives repo owners from local git remotes, and `ewokbot mcp inspect github` has been live-smoke verified to list the GitHub tools without calling them.
+5. AX - Atlassian MCP Real Mapping. Planned next, not started.
+6. AY - Railway MCP Real Mapping. Planned after AX acceptance only.
+7. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only.
+8. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
+9. BB - Real Staging Verification v1. Planned after BA acceptance only.
+10. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
 
-Anything outside AW implementation must wait until AW is complete and accepted and a later milestone is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
+Anything outside AX planning must wait until AX is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -223,13 +225,14 @@ The next milestones should move in this order:
 20. AT - Real Provider Smoke v1. Completed.
 21. AU - MCP Inspect Schemas. Completed and accepted.
 22. AV - MCP Tool Registry. Completed and accepted.
-23. AW - MCP Policy Modes. Implemented review candidate, pending acceptance.
-24. AX - Atlassian MCP Real Mapping. Planned after AW acceptance.
-25. AY - Railway MCP Real Mapping. Planned after AX.
-26. AZ - GitHub MCP Real Mapping. Planned after AY.
-27. BA - GitHub PR Handoff v1. Planned after AZ.
-28. BB - Real Staging Verification v1. Planned after BA.
-29. BC - Operator Agent Action Sandbox. Planned after BB.
+23. AW - MCP Policy Modes. Completed and accepted.
+24. GitHub MCP Docker preset unblocker. Completed after AW.
+25. AX - Atlassian MCP Real Mapping. Planned next, not started.
+26. AY - Railway MCP Real Mapping. Planned after AX.
+27. AZ - GitHub MCP Real Mapping. Planned after AY.
+28. BA - GitHub PR Handoff v1. Planned after AZ.
+29. BB - Real Staging Verification v1. Planned after BA.
+30. BC - Operator Agent Action Sandbox. Planned after BB.
 
 Non-goals for the immediate next milestone:
 

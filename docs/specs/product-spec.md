@@ -22,7 +22,7 @@ Secondary users:
 
 ## Inputs
 
-- Jira workspace and project keys.
+- Jira/Atlassian workspace and optional Jira project-key constraints.
 - GitHub repositories discovered from local workspace git remotes.
 - Railway and/or Vercel projects mapped to repositories and branches.
 - OpenCode command or API runner configuration.
