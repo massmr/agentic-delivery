@@ -20,10 +20,11 @@
 16. Milestone AW: MCP Policy Modes is complete and accepted.
 17. GitHub MCP setup was unblocked after AW by switching the maintained GitHub preset to the official Docker server (`ghcr.io/github/github-mcp-server`) with `GITHUB_PERSONAL_ACCESS_TOKEN`, removing the global organization prompt, deriving owners from local git remotes, and proving `ewokbot mcp inspect github` can list the real GitHub tools under the default `read_only` policy.
 18. Atlassian setup was partially realigned after AW by making Jira project keys an optional backlog constraint, not credentials: the init prompt now says `Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)`, empty input writes `project_keys: []`, and Jira MCP backlog JQL becomes unconstrained across all visible projects.
-19. The product direction is now Atlassian-first rather than Jira-only. Jira remains the first work-item surface, but AX should prepare the provider boundary for the Atlassian suite so Confluence documentation can be added later under explicit policy.
+19. The product direction is now Atlassian-first rather than Jira-only. Jira remains the first implemented work-item surface; Confluence documentation remains future policy-gated work and is not part of AX.
 20. The previous GitHub PR handoff milestone is intentionally deferred until after MCP schema inspection, tool registry, policy modes, Atlassian mapping, Railway mapping, and GitHub mapping are accepted.
-21. Milestone AX0 - Atlassian Naming And Init Realignment is implemented in this pass and awaiting acceptance.
-22. AX - Atlassian MCP Real Mapping is planned after AX0 acceptance, but AX is not started yet. Use `docs/reference/atlassian-mcp-tools.md` as the authoritative inspected `mcp-atlassian` tool reference. Do not implement AX or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AX is explicitly approved.
+21. Milestone AX0 - Atlassian Naming And Init Realignment is complete as the prerequisite setup/naming pass.
+22. Milestone AX - Atlassian MCP Real Mapping is implemented in this pass and awaiting acceptance. Jira `TicketPort` now maps to the documented Atlassian MCP tools from `docs/reference/atlassian-mcp-tools.md`: `search_jira_issues`, `read_jira_issue`, and `add_jira_comment` with the documented argument schemas.
+23. AY - Railway MCP Real Mapping is planned after AX acceptance only. Use `docs/reference/railway-mcp-tools.md` as the authoritative inspected Railway MCP tool reference. Do not implement AY or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AY is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -178,15 +179,15 @@ Continue in this order:
 3. AW - MCP Policy Modes. Completed and accepted.
 4. GitHub MCP Docker preset unblocker. Completed after AW: maintained onboarding now uses the official Docker-based GitHub MCP server, asks only for `GITHUB_PERSONAL_ACCESS_TOKEN`, derives repo owners from local git remotes, and `ewokbot mcp inspect github` has been live-smoke verified to list the GitHub tools without calling them.
 5. Atlassian setup realignment unblocker. Completed after AW: project keys are optional constraints, empty constraints mean all visible Jira projects, and docs now describe Jira under an Atlassian-first direction.
-6. AX0 - Atlassian Naming And Init Realignment. Implemented in this pass; awaiting acceptance.
-7. AX - Atlassian MCP Real Mapping. Planned after AX0 acceptance only. Use `docs/reference/atlassian-mcp-tools.md`; do not guess tool names.
+6. AX0 - Atlassian Naming And Init Realignment. Completed.
+7. AX - Atlassian MCP Real Mapping. Implemented in this pass; awaiting acceptance.
 8. AY - Railway MCP Real Mapping. Planned after AX acceptance only. Use `docs/reference/railway-mcp-tools.md`; do not guess tool names.
 9. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
 10. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
 11. BB - Real Staging Verification v1. Planned after BA acceptance only.
 12. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
 
-Anything outside AX0 must wait until the later milestone is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
+Anything outside AX must wait until the later milestone is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -233,9 +234,9 @@ The next milestones should move in this order:
 23. AW - MCP Policy Modes. Completed and accepted.
 24. GitHub MCP Docker preset unblocker. Completed after AW.
 25. Atlassian setup realignment unblocker. Completed after AW.
-26. AX0 - Atlassian Naming And Init Realignment. Implemented; awaiting acceptance.
-27. AX - Atlassian MCP Real Mapping. Planned after AX0. Use `docs/reference/atlassian-mcp-tools.md`; do not guess tool names.
-28. AY - Railway MCP Real Mapping. Planned after AX. Use `docs/reference/railway-mcp-tools.md`; do not guess tool names.
+26. AX0 - Atlassian Naming And Init Realignment. Completed.
+27. AX - Atlassian MCP Real Mapping. Implemented; awaiting acceptance.
+28. AY - Railway MCP Real Mapping. Planned after AX acceptance. Use `docs/reference/railway-mcp-tools.md`; do not guess tool names.
 29. AZ - GitHub MCP Real Mapping. Planned after AY. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
 30. BA - GitHub PR Handoff v1. Planned after AZ.
 31. BB - Real Staging Verification v1. Planned after BA.

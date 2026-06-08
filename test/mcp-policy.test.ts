@@ -22,6 +22,7 @@ test('read_only allows Atlassian read tools and denies writes by default', () =>
   assert.equal(readEvaluation.blocked, false);
   assert.equal(writeEvaluation.decision, 'deny');
   assert.match(writeEvaluation.reason, /Read-only mode denies non-read/u);
+  assert.equal(writeEvaluation.blocked, true);
 });
 
 test('supervised mode requires human approval for GitHub writes unless explicitly overridden', () => {

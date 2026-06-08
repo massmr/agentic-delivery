@@ -115,6 +115,31 @@ test('runtime TicketPort wiring validates only Jira intake and captures typed co
   ]);
 });
 
+test('runtime TicketPort wiring blocks read_only Jira comments before provider tool calls', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['jira'], `mcp_policy:
+  mode: read_only
+`));
+  const clients = createRuntimeMcpClients();
+
+  await assert.rejects(
+    () => createRuntimeTicketPort({
+      config,
+      createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+      requiredJiraMcpActions: ['comment']
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.provider, 'Jira');
+      assert.equal(error.serverId, 'atlassian');
+      assert.equal(error.toolName, defaultJiraMcpToolNames.comment);
+      assert.equal(error.decision, 'deny');
+      return true;
+    }
+  );
+
+  assert.deepEqual(clients.atlassian.toolCallRequests, []);
+});
+
 test('runtime MCP wiring fails before delivery side effects when an MCP client cannot be resolved', async () => {
   const config = parseWorkspaceConfig(workspaceWithGitHubMcpOnly());
 

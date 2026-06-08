@@ -2,6 +2,21 @@
 
 ## 2026-06-08
 
+Implemented Milestone AX Atlassian MCP Real Mapping:
+
+- Replaced the Jira `TicketPort` default MCP tool names with the documented Atlassian MCP tools: `search_jira_issues`, `read_jira_issue`, and `add_jira_comment`.
+- Updated `TicketPort.comment` to call the Atlassian comment tool with `{ issueKey, body }` while preserving `jira.mcp_tools` custom overrides and existing `jira:` workspace config compatibility.
+- Preserved empty `jira.project_keys: []` behavior as an unconstrained Jira backlog JQL query across all visible projects.
+- Added fake-only coverage for default mappings, list/get/comment argument schemas, missing configured tools, custom overrides, empty project keys, and `read_only` policy denial for Jira comments before provider tool calls.
+- Preserved AX scope only: no Confluence workflows, Railway mapping, GitHub mapping, PR handoff, staging verification, worker daemon, Telegram/dashboard/Sentry/PostHog/Notion ingestion, production merge, or production deployment work was added.
+
+Verification commands run for AX:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm test` (`358/358`)
+- `git diff --check`
+
 Implemented Milestone AX0 Atlassian Naming And Init Realignment:
 
 - Renamed interactive init setup wording from Jira-only provider language to Atlassian-first language: the provider prompt now offers `Atlassian MCP`, and the URL prompt now asks for the `Atlassian site URL`.

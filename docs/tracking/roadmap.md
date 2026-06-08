@@ -133,7 +133,7 @@ Status legend:
 - `[x]` GitHub MCP Docker preset and local inspect smoke
 - `[x]` Atlassian/Jira project-key constraint made optional
 - `[x]` Atlassian naming and init realignment
-- `[ ]` Atlassian MCP real mapping for Jira intake/comment tools
+- `[x]` Atlassian MCP real mapping for Jira intake/comment tools
 - `[ ]` Railway MCP real mapping for read-only staging evidence
 - `[ ]` GitHub MCP real mapping for PR handoff tools
 - `[ ]` GitHub draft PR handoff after validated local evidence and accepted MCP policy

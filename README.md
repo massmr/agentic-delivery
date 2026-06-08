@@ -359,9 +359,9 @@ jira:
     - LK
   mcp_server: atlassian
   mcp_tools:
-    list_backlog: searchJiraIssuesUsingJql
-    get_ticket: getJiraIssue
-    comment: addCommentToJiraIssue
+    list_backlog: search_jira_issues
+    get_ticket: read_jira_issue
+    comment: add_jira_comment
 
 mcp_servers:
   atlassian:

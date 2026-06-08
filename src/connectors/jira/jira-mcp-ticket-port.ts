@@ -24,9 +24,9 @@ export interface JiraMcpToolNames {
 export type JiraMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
 
 export const defaultJiraMcpToolNames: JiraMcpToolNames = {
-  listBacklog: 'searchJiraIssuesUsingJql',
-  getTicket: 'getJiraIssue',
-  comment: 'addCommentToJiraIssue'
+  listBacklog: 'search_jira_issues',
+  getTicket: 'read_jira_issue',
+  comment: 'add_jira_comment'
 } as const;
 
 export interface JiraMcpTicketPortOptions {
@@ -75,7 +75,7 @@ export class JiraMcpTicketPort implements JiraConnector {
   }
 
   async comment(key: string, body: string): Promise<void> {
-    await this.callJiraTool(this.toolNames.comment, 'comment', { issueKey: key, comment: body });
+    await this.callJiraTool(this.toolNames.comment, 'comment', { issueKey: key, body });
   }
 
   private async callJiraTool(configuredToolName: string, action: 'listBacklog' | 'getTicket' | 'comment', argumentsObject: JsonObject): Promise<McpToolCallExecutionResult> {

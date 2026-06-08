@@ -5,6 +5,7 @@ import { test } from 'node:test';
 
 import {
   JiraMcpTicketPort,
+  defaultJiraMcpToolNames,
   McpToolNotFoundError,
   MockJiraConnector,
   MockMcpClient,
@@ -17,15 +18,18 @@ import {
 } from '../src/index.js';
 
 const serverId = 'atlassian';
-const toolNames = {
-  search: ['search', 'Jira', 'Issues', 'Using', 'Jql'].join(''),
-  get: ['get', 'Jira', 'Issue'].join(''),
-  comment: ['add', 'Comment', 'To', 'Jira', 'Issue'].join('')
-};
+
+test('Jira MCP default tool names match Atlassian MCP documented tools', () => {
+  assert.deepEqual(defaultJiraMcpToolNames, {
+    listBacklog: 'search_jira_issues',
+    getTicket: 'read_jira_issue',
+    comment: 'add_jira_comment'
+  });
+});
 
 test('Jira MCP TicketPort lists backlog issues through discovered and allowed MCP tools', async () => {
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, toolNames.search, (input) => ({
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, (input) => ({
       content: {
         issues: [
           {
@@ -77,7 +81,7 @@ test('Jira MCP TicketPort lists backlog issues through discovered and allowed MC
   assert.deepEqual(client.listToolRequests, [{ serverId }]);
   assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
     {
-      toolName: toolNames.search,
+      toolName: defaultJiraMcpToolNames.listBacklog,
       arguments: { jql: 'project in (LK) ORDER BY updated DESC' }
     }
   ]);
@@ -86,9 +90,9 @@ test('Jira MCP TicketPort lists backlog issues through discovered and allowed MC
 test('Jira MCP TicketPort emits started and completed audit records for each operation', async () => {
   const auditRecords: McpToolCallAuditRecord[] = [];
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, toolNames.search, () => ({ content: { issues: [jiraIssue('LK-301')] }, isError: false })),
-    createMockMcpTool(serverId, toolNames.get, () => ({ content: { issue: jiraIssue('LK-302') }, isError: false })),
-    createMockMcpTool(serverId, toolNames.comment, () => ({ content: { ok: true }, isError: false }))
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({ content: { issues: [jiraIssue('LK-301')] }, isError: false })),
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.getTicket, () => ({ content: { issue: jiraIssue('LK-302') }, isError: false })),
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.comment, () => ({ content: { ok: true }, isError: false }))
   ]);
   const port = new JiraMcpTicketPort({
     client,
@@ -114,7 +118,7 @@ test('Jira MCP TicketPort emits started and completed audit records for each ope
 
 test('Jira MCP TicketPort builds safe JQL from multiple valid project keys', async () => {
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, toolNames.search, () => ({
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({
       content: { issues: [] },
       isError: false
     }))
@@ -130,7 +134,7 @@ test('Jira MCP TicketPort builds safe JQL from multiple valid project keys', asy
 
   assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
     {
-      toolName: toolNames.search,
+      toolName: defaultJiraMcpToolNames.listBacklog,
       arguments: { jql: 'project in (LK2, LK_API) ORDER BY updated DESC' }
     }
   ]);
@@ -138,7 +142,7 @@ test('Jira MCP TicketPort builds safe JQL from multiple valid project keys', asy
 
 test('Jira MCP TicketPort leaves backlog unconstrained when project keys are empty', async () => {
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, toolNames.search, () => ({
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({
       content: { issues: [] },
       isError: false
     }))
@@ -154,7 +158,7 @@ test('Jira MCP TicketPort leaves backlog unconstrained when project keys are emp
 
   assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
     {
-      toolName: toolNames.search,
+      toolName: defaultJiraMcpToolNames.listBacklog,
       arguments: { jql: 'ORDER BY updated DESC' }
     }
   ]);
@@ -201,7 +205,7 @@ test('Jira MCP TicketPort supports custom configured MCP tool names', async () =
 test('Jira MCP TicketPort gets one issue and comments through MCP without live calls', async () => {
   let liveCallAttempts = 0;
   const client = new MockMcpClient([
-    createMockMcpTool(serverId, toolNames.get, (input) => ({
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.getTicket, (input) => ({
       content: {
         issue: {
           key: input.arguments.issueKey,
@@ -218,8 +222,8 @@ test('Jira MCP TicketPort gets one issue and comments through MCP without live c
       },
       isError: false
     })),
-    createMockMcpTool(serverId, toolNames.comment, (input) => {
-      assert.deepEqual(input.arguments, { issueKey: 'LK-202', comment: 'Implementation started.' });
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.comment, (input) => {
+      assert.deepEqual(input.arguments, { issueKey: 'LK-202', body: 'Implementation started.' });
       return { content: { ok: true }, isError: false };
     })
   ]);
@@ -231,12 +235,31 @@ test('Jira MCP TicketPort gets one issue and comments through MCP without live c
   assert.equal(liveCallAttempts, 0);
   assert.equal(ticket.ref.key, 'LK-202');
   assert.equal(ticket.description, 'Fetch by key through MCP.');
-  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [toolNames.get, toolNames.comment]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultJiraMcpToolNames.getTicket, defaultJiraMcpToolNames.comment]);
+});
+
+test('Jira MCP TicketPort comment uses body argument with the documented default tool', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.comment, (input) => {
+      assert.deepEqual(input.arguments, { issueKey: 'LK-203', body: 'Body payload only.' });
+      return { content: { ok: true }, isError: false };
+    })
+  ]);
+  const port = new JiraMcpTicketPort({ client, serverId, baseUrl: 'https://jira.example.test', projectKeys: ['LK'] });
+
+  await port.comment('LK-203', 'Body payload only.');
+
+  assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
+    {
+      toolName: defaultJiraMcpToolNames.comment,
+      arguments: { issueKey: 'LK-203', body: 'Body payload only.' }
+    }
+  ]);
 });
 
 test('Jira MCP TicketPort missing tools fail with actionable MCP tool errors', async () => {
   const port = new JiraMcpTicketPort({
-    client: new MockMcpClient([createMockMcpTool(serverId, toolNames.get, () => ({ content: {}, isError: false }))]),
+    client: new MockMcpClient([createMockMcpTool(serverId, defaultJiraMcpToolNames.getTicket, () => ({ content: {}, isError: false }))]),
     serverId,
     baseUrl: 'https://jira.example.test',
     projectKeys: ['LK']
@@ -245,7 +268,7 @@ test('Jira MCP TicketPort missing tools fail with actionable MCP tool errors', a
   await assert.rejects(() => port.listBacklog(), (error: unknown) => {
     assert.ok(error instanceof McpToolNotFoundError);
     assert.equal(error.serverId, serverId);
-    assert.equal(error.toolName, toolNames.search);
+    assert.equal(error.toolName, defaultJiraMcpToolNames.listBacklog);
     assert.match(error.message, /Configure or allow the MCP server tool before retrying/u);
     return true;
   });
@@ -253,7 +276,7 @@ test('Jira MCP TicketPort missing tools fail with actionable MCP tool errors', a
 
 test('Jira MCP TicketPort missing configured tools fail with actionable MCP tool errors', async () => {
   const port = new JiraMcpTicketPort({
-    client: new MockMcpClient([createMockMcpTool(serverId, toolNames.search, () => ({ content: { issues: [] }, isError: false }))]),
+    client: new MockMcpClient([createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({ content: { issues: [] }, isError: false }))]),
     serverId,
     baseUrl: 'https://jira.example.test',
     projectKeys: ['LK'],
@@ -266,6 +289,27 @@ test('Jira MCP TicketPort missing configured tools fail with actionable MCP tool
     assert.match(error.message, /Configure or allow the MCP server tool before retrying/u);
     return true;
   });
+});
+
+test('Jira MCP TicketPort missing comment tools fail before any provider tool call', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({ content: { issues: [] }, isError: false })),
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.getTicket, () => ({ content: { issue: jiraIssue('LK-404') }, isError: false }))
+  ]);
+  const port = new JiraMcpTicketPort({
+    client,
+    serverId,
+    baseUrl: 'https://jira.example.test',
+    projectKeys: ['LK'],
+    toolNames: { comment: 'customJiraComment' }
+  });
+
+  await assert.rejects(() => port.comment('LK-404', 'Denied before call.'), (error: unknown) => {
+    assert.ok(error instanceof McpToolNotFoundError);
+    assert.equal(error.toolName, 'customJiraComment');
+    return true;
+  });
+  assert.deepEqual(client.toolCallRequests, []);
 });
 
 test('workspace config accepts jira.mode mcp and top-level Atlassian mcp-remote server config only for Jira', () => {
@@ -284,9 +328,9 @@ test('workspace config accepts jira.mode mcp and top-level Atlassian mcp-remote 
     envVarNames: []
   });
   assert.deepEqual(config.jira.mcpToolNames, {
-    listBacklog: toolNames.search,
-    getTicket: toolNames.get,
-    comment: toolNames.comment
+    listBacklog: defaultJiraMcpToolNames.listBacklog,
+    getTicket: defaultJiraMcpToolNames.getTicket,
+    comment: defaultJiraMcpToolNames.comment
   });
 });
 

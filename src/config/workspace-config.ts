@@ -136,9 +136,9 @@ type WorkspaceConfigInput = Record<string, unknown>;
 
 const requiredTopLevelSections = ['workspace', 'jira', 'github', 'railway', 'dev_runner', 'quality', 'repos'] as const;
 const defaultJiraMcpToolNames: JiraMcpToolNameConfig = {
-  listBacklog: 'searchJiraIssuesUsingJql',
-  getTicket: 'getJiraIssue',
-  comment: 'addCommentToJiraIssue'
+  listBacklog: 'search_jira_issues',
+  getTicket: 'read_jira_issue',
+  comment: 'add_jira_comment'
 };
 const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
   createBranch: 'createGitHubBranch',
