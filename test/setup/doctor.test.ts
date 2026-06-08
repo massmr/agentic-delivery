@@ -57,8 +57,7 @@ test('doctor redacts env values while reporting provider readiness', async () =>
   writeFileSync(
     join(cwd, '.ewokbot', '.env'),
     [
-      'GITHUB_ORG=secret-org',
-      'GITHUB_TOKEN=ghp_secret_value',
+      'GITHUB_PERSONAL_ACCESS_TOKEN=ghp_secret_value',
       'JIRA_BASE_URL=https://secret-jira.example.test',
       'JIRA_EMAIL=secret@example.test',
       'JIRA_API_TOKEN=jira_secret_value',
@@ -78,7 +77,7 @@ test('doctor redacts env values while reporting provider readiness', async () =>
   assert.equal(report.checks.some((check) => check.label === 'GitHub' && check.status === 'pass'), true);
   assert.equal(report.checks.some((check) => check.label === 'Jira' && check.status === 'pass'), true);
   assert.equal(report.checks.some((check) => check.label === 'Railway' && check.status === 'pass'), true);
-  assert.doesNotMatch(rendered, /ghp_secret_value|jira_secret_value|railway_secret_value|secret-org|secret@example/u);
+  assert.doesNotMatch(rendered, /ghp_secret_value|jira_secret_value|railway_secret_value|secret@example/u);
   assert.match(rendered, /\[redacted\]/u);
 });
 

@@ -176,7 +176,7 @@ test('smoke command reads one Jira MCP ticket and stays on local checks only', a
 
 test('smoke command ignores non-AT provider env readiness and does not call their MCP clients', async (t) => {
   const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml(), {
-    envLines: ['ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted']
+    envLines: ['GITHUB_PERSONAL_ACCESS_TOKEN=redacted', 'ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted', 'VERCEL_TOKEN=redacted']
   });
   const captured = createCapturedIO();
   const clients = createSmokeMcpClients();
@@ -394,12 +394,12 @@ async function createTempRoot(t: TestContext): Promise<string> {
 async function createSmokeWorkspace(t: TestContext, configYaml: string, options: { readonly envLines?: readonly string[] | undefined } = {}): Promise<string> {
   const rootPath = await createTempRoot(t);
   const repoPath = join(rootPath, 'frontend');
-  const envLines = options.envLines ?? ['GITHUB_ORG=redacted', 'GITHUB_TOKEN=redacted', 'ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted', 'RAILWAY_TOKEN=redacted'];
+  const envLines = options.envLines ?? ['GITHUB_PERSONAL_ACCESS_TOKEN=redacted', 'ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted', 'RAILWAY_TOKEN=redacted'];
 
   await mkdir(join(rootPath, '.ewokbot'), { recursive: true });
   await mkdir(repoPath, { recursive: true });
   await writeFile(join(rootPath, '.ewokbot', 'workspace.yml'), configYaml, 'utf8');
-  await writeFile(join(rootPath, '.ewokbot', '.env.example'), ['GITHUB_ORG=', 'GITHUB_TOKEN=', 'ATLASSIAN_BASE_URL=', 'ATLASSIAN_EMAIL=', 'ATLASSIAN_API_TOKEN=', 'RAILWAY_TOKEN=', ''].join('\n'), 'utf8');
+  await writeFile(join(rootPath, '.ewokbot', '.env.example'), ['GITHUB_PERSONAL_ACCESS_TOKEN=', 'ATLASSIAN_BASE_URL=', 'ATLASSIAN_EMAIL=', 'ATLASSIAN_API_TOKEN=', 'RAILWAY_TOKEN=', ''].join('\n'), 'utf8');
   await writeFile(join(rootPath, '.ewokbot', '.env'), [...envLines, ''].join('\n'), 'utf8');
   await writeFile(join(repoPath, '.agent-quality.yml'), ['commands:', '  test: mock test', 'required:', '  - test', ''].join('\n'), 'utf8');
   return rootPath;
@@ -723,7 +723,6 @@ jira:
   mcp_server: atlassian
 github:
   mode: mcp
-  organization: agentic
   mcp_server: github
 railway:
   mode: mcp
@@ -748,10 +747,21 @@ mcp_servers:
       - ATLASSIAN_API_TOKEN
   github:
     display_name: GitHub MCP
-    url: https://mcp.example.test/github
+    command: docker
+    args:
+      - run
+      - -i
+      - --rm
+      - -e
+      - GITHUB_PERSONAL_ACCESS_TOKEN
+      - ghcr.io/github/github-mcp-server
+    env_var_names:
+      - GITHUB_PERSONAL_ACCESS_TOKEN
   railway:
     display_name: Railway MCP
-    url: https://mcp.example.test/railway
+    command: railway
+    args:
+      - mcp
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend

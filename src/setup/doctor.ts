@@ -257,6 +257,7 @@ function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetad
     commandExists: probes.commandExists,
     runCommand: probes.runCommand
   }).doctor()));
+  checks.push(...checkMcpServerCommands(config, probes));
 
   const optionalTools = metadata.optionalTools ?? [];
 
@@ -269,6 +270,42 @@ function checkTools(config: WorkspaceConfig, metadata: SetupGeneratedConfigMetad
   }
 
   return checks;
+}
+
+function checkMcpServerCommands(config: WorkspaceConfig, probes: DoctorProbeSet): readonly DoctorCheck[] {
+  return config.mcpServers.map((server) => {
+    const command = server.command;
+
+    if (command === undefined || command.trim().length === 0) {
+      return failCheck(`MCP ${server.id}`, `${server.displayName} has no stdio command configured.`, `Set mcp_servers.${server.id}.command or choose a supported local MCP preset.`);
+    }
+
+    if (probes.commandExists(command)) {
+      return passCheck(`MCP ${server.id}`, `${command} is available for ${server.displayName}.`);
+    }
+
+    return failCheck(
+      `MCP ${server.id}`,
+      `${command} command was not found for ${server.displayName}.`,
+      mcpInstallHint(command)
+    );
+  });
+}
+
+function mcpInstallHint(command: string): string {
+  if (command === 'docker') {
+    return 'Install Docker Desktop and make sure the docker command is available before using the GitHub MCP Docker preset.';
+  }
+
+  if (command === 'mcp-atlassian') {
+    return 'Install and configure mcp-atlassian before using Jira MCP.';
+  }
+
+  if (command === 'railway') {
+    return 'Install the Railway CLI and run railway login before using Railway MCP.';
+  }
+
+  return `Install ${command} or update the matching mcp_servers entry in .ewokbot/workspace.yml.`;
 }
 
 function mapDevToolDoctorChecks(checks: readonly DevToolDoctorCheck[]): readonly DoctorCheck[] {
@@ -313,7 +350,7 @@ function checkEnvFile(envFile: { readonly exists: boolean; readonly values: EnvV
 
 function checkProviderReadiness(config: WorkspaceConfig, selections: SetupSelections, envFileValues: EnvValueMap, processEnv: NodeJS.ProcessEnv, probes: DoctorProbeSet): readonly DoctorCheck[] {
   const checks: DoctorCheck[] = [];
-  checks.push(checkProviderEnv('GitHub', config.github.mode, ['GITHUB_ORG', 'GITHUB_TOKEN'], envFileValues, processEnv));
+  checks.push(checkProviderEnv('GitHub', config.github.mode, githubProviderEnvNames(config), envFileValues, processEnv));
   checks.push(checkProviderEnv('Jira', config.jira.mode, jiraProviderEnvNames(config), envFileValues, processEnv));
 
   if (selections.deploymentMonitor === 'railway' || selections.deploymentMonitor === 'both') {
@@ -325,6 +362,14 @@ function checkProviderReadiness(config: WorkspaceConfig, selections: SetupSelect
   }
 
   return checks;
+}
+
+function githubProviderEnvNames(config: WorkspaceConfig): readonly string[] {
+  if (config.github.mode === 'real') {
+    return ['GITHUB_TOKEN'];
+  }
+
+  return ['GITHUB_PERSONAL_ACCESS_TOKEN'];
 }
 
 function checkRailwayReadiness(config: WorkspaceConfig, probes: DoctorProbeSet): DoctorCheck {

@@ -484,7 +484,7 @@ function requireWorkspaceRepository(config: WorkspaceConfig, repository: Reposit
   return workspaceRepository;
 }
 
-function toRepositoryConfig(repository: WorkspaceRepositoryConfig, owner: string, rootPath: string): RepositoryConfig {
+function toRepositoryConfig(repository: WorkspaceRepositoryConfig, owner: string | undefined, rootPath: string): RepositoryConfig {
   return {
     ref: toRepositoryRef(repository, owner),
     role: 'application',

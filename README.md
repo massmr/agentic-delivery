@@ -288,6 +288,8 @@ The default inspect output stays compact and human-readable. `--schema` adds san
 
 `ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. In an interactive terminal, init uses an `@inquirer/prompts` TUI with guided selections for OpenCode command readiness, optional oh-my-openagent intent, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default. Missing or not-ready OpenCode states offer mock mode, setup instructions, or explicit custom-command/acknowledged continuation choices only; Ewokbot does not install OpenCode, launch auth, or copy OpenCode-owned auth and model/provider credentials into `.ewokbot/.env`.
 
+For GitHub MCP, init configures the official Docker-based local MCP server preset and asks only for `GITHUB_PERSONAL_ACCESS_TOKEN`. Ewokbot should derive repository owners and names from the local git remotes in the directory where it is launched, so there is no global GitHub organization prompt in the onboarding flow. Run `ewokbot doctor` after init to verify Docker, provider secrets, local MCP commands, OpenCode, and repository readiness before using `ewokbot mcp inspect github`.
+
 User-level paths follow XDG overrides when present and otherwise default to:
 
 ```text

@@ -82,7 +82,7 @@ export interface JiraWorkspaceConfig {
 
 export interface GitHubWorkspaceConfig {
   readonly mode: GitHubProviderMode;
-  readonly organization: string;
+  readonly organization?: string | undefined;
   readonly mcpServerId?: string | undefined;
   readonly mcpToolNames: GitHubMcpToolNameConfig;
 }
@@ -367,13 +367,13 @@ function validateJiraProjectKeysInWorkspaceConfig(projectKeys: readonly string[]
 
 function parseGitHubConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): GitHubWorkspaceConfig | undefined {
   const mode = readGitHubProviderMode(section, issues);
-  const organization = readNonEmptyString(section, 'github.organization', 'Set github.organization to the GitHub organization name.', issues);
+  const organization = readOptionalNonEmptyString(section.organization, 'github.organization', 'Set github.organization to a non-empty fallback GitHub owner, or remove it to derive owners from repository remotes.', issues);
   const mcpServerId = mode === 'mcp'
     ? readNonEmptyString(section, 'github.mcp_server', 'Set github.mcp_server to the id of a configured top-level mcp_servers entry.', issues)
     : readOptionalNonEmptyString(section.mcp_server, 'github.mcp_server', 'Remove github.mcp_server unless github.mode is mcp, or set it to a non-empty MCP server id.', issues);
   const mcpToolNames = parseGitHubMcpToolNames(section.mcp_tools, issues);
 
-  if (mode === undefined || organization === undefined || (mode === 'mcp' && mcpServerId === undefined)) {
+  if (mode === undefined || (mode === 'mcp' && mcpServerId === undefined)) {
     return undefined;
   }
 

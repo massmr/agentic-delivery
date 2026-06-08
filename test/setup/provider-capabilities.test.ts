@@ -30,7 +30,7 @@ test('setup provider capabilities describe steps and secrets without executing s
   assert.equal(capabilities.every((capability) => capability.installSteps.length > 0), true);
   assert.deepEqual(
     capabilities.flatMap((capability) => capability.requiredSecretEnvVars),
-    ['GITHUB_TOKEN', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN', 'VERCEL_TOKEN']
+    ['GITHUB_PERSONAL_ACCESS_TOKEN', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN', 'VERCEL_TOKEN']
   );
 });
 
@@ -39,8 +39,7 @@ test('setup provider capabilities detect existing local setup with injectable ch
   const input = {
     cwd: '/workspace',
     env: {
-      GITHUB_TOKEN: 'present',
-      GITHUB_ORG: 'agentic',
+      GITHUB_PERSONAL_ACCESS_TOKEN: 'present',
       ATLASSIAN_BASE_URL: 'https://jira.example.test',
       ATLASSIAN_EMAIL: 'bot@example.test',
       ATLASSIAN_API_TOKEN: 'present',
@@ -69,8 +68,7 @@ test('setup provider capabilities report missing local setup without live checks
   };
 
   assert.equal(capabilities.opencode.detectExistingSetup(input).configured, false);
-  assert.match(capabilities.github.detectExistingSetup(input).details.join('\n'), /GITHUB_TOKEN/u);
-  assert.match(capabilities.github.detectExistingSetup(input).details.join('\n'), /GITHUB_ORG/u);
+  assert.match(capabilities.github.detectExistingSetup(input).details.join('\n'), /GITHUB_PERSONAL_ACCESS_TOKEN/u);
   assert.match(capabilities.jira.detectExistingSetup(input).details.join('\n'), /ATLASSIAN_BASE_URL/u);
   assert.match(capabilities.railway.detectExistingSetup(input).details.join('\n'), /railway command/u);
   assert.match(capabilities.vercel.detectExistingSetup(input).details.join('\n'), /VERCEL_TOKEN/u);

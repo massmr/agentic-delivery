@@ -50,7 +50,12 @@ class InitArgumentError extends Error {
   }
 }
 
-const defaultGitHubMcpServer: McpServerSelection = { id: 'github', command: 'github-mcp-server', args: [], envVarNames: ['GITHUB_TOKEN'] };
+const defaultGitHubMcpServer: McpServerSelection = {
+  id: 'github',
+  command: 'docker',
+  args: ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'],
+  envVarNames: ['GITHUB_PERSONAL_ACCESS_TOKEN']
+};
 
 export async function runInitCommand(options: InitCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
@@ -313,9 +318,8 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
   let githubMcpServer = defaults.githubMcpServer;
 
   if (codeHostProvider === 'github-mcp') {
-    githubOrganization = nonEmptyPromptValue(await prompts.input({ message: 'GitHub organization', defaultValue: defaults.githubOrganization ?? 'agentic' }), defaults.githubOrganization);
-    envValues.GITHUB_TOKEN = await askSecret(prompts, 'GITHUB_TOKEN value');
-    githubMcpServer = await promptForMcpServer(prompts, 'GitHub MCP', defaults.githubMcpServer ?? defaultGitHubMcpServer);
+    envValues.GITHUB_PERSONAL_ACCESS_TOKEN = await askSecret(prompts, 'GITHUB_PERSONAL_ACCESS_TOKEN value');
+    githubMcpServer = defaults.githubMcpServer ?? defaultGitHubMcpServer;
   }
 
   const deploymentMonitor = deploymentMonitorFromChoices(await prompts.checkbox({

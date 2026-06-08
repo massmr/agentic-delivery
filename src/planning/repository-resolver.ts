@@ -67,14 +67,38 @@ export function resolveRepositoriesForTicket(ticket: DeliveryTicket, config: Wor
     .sort((left, right) => right.confidence - left.confidence);
 }
 
-export function toRepositoryRef(repository: WorkspaceRepositoryConfig, owner: string): RepositoryRef {
+export function toRepositoryRef(repository: WorkspaceRepositoryConfig, fallbackOwner?: string | undefined): RepositoryRef {
   return {
     provider: 'github',
-    owner,
+    owner: resolveRepositoryOwner(repository, fallbackOwner),
     name: repository.name,
     defaultBranch: repository.defaultBranch,
     url: repository.url
   };
+}
+
+export function resolveRepositoryOwner(repository: WorkspaceRepositoryConfig, fallbackOwner?: string | undefined): string {
+  return parseGitHubOwnerFromRemoteUrl(repository.url) ?? fallbackOwner ?? 'local';
+}
+
+function parseGitHubOwnerFromRemoteUrl(url: string): string | undefined {
+  const trimmed = url.trim();
+
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  const sshMatch = /^git@github\.com:([^/]+)\/[^/]+(?:\.git)?$/u.exec(trimmed);
+  if (sshMatch !== null) {
+    return sshMatch[1];
+  }
+
+  const httpsMatch = /^https:\/\/github\.com\/([^/]+)\/[^/]+(?:\.git)?$/u.exec(trimmed);
+  if (httpsMatch !== null) {
+    return httpsMatch[1];
+  }
+
+  return undefined;
 }
 
 function splitDescription(description: string): readonly string[] {

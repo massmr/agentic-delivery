@@ -336,8 +336,7 @@ test('ewokbot init injected wizard answers generate MCP workspace and secret-saf
       jiraProjectKeys: ['AJ', 'OPS'],
       jiraMcpServer: { id: 'atlassian', command: 'mcp-atlassian', args: [], envVarNames: ['ATLASSIAN_BASE_URL', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'] },
       codeHostProvider: 'github-mcp',
-      githubOrganization: 'ewokbot',
-      githubMcpServer: { id: 'github', command: 'github-mcp', args: [], envVarNames: ['GITHUB_TOKEN'] },
+      githubMcpServer: { id: 'github', command: 'docker', args: ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'], envVarNames: ['GITHUB_PERSONAL_ACCESS_TOKEN'] },
       railwayProvider: 'railway-mcp',
       railwayMcpServer: { id: 'railway', command: 'railway', args: ['mcp'], envVarNames: [] },
       envValues: { ATLASSIAN_API_TOKEN: secretValue }
@@ -392,12 +391,7 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     secrets.jiraEmail,
     secrets.jiraToken,
     'github-mcp',
-    'ewokbot-org',
     secrets.github,
-    'company-github',
-    'github-mcp',
-    '--stdio',
-    'GITHUB_TOKEN',
     ['railway', 'vercel'],
     'railway-mcp',
     secrets.vercel
@@ -432,7 +426,9 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP server id')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP command')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP env_var_names')), false);
-  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GitHub MCP command')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GitHub organization')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GITHUB_PERSONAL_ACCESS_TOKEN value')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GitHub MCP command')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('RAILWAY_TOKEN value')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Railway MCP server id')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Railway MCP command')), false);
@@ -443,11 +439,11 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   const config = parseWorkspaceConfig(configYaml);
   assert.equal(config.devRunner.mode, 'real');
   assert.equal(config.jira.mcpServerId, 'atlassian');
-  assert.equal(config.github.mcpServerId, 'company-github');
+  assert.equal(config.github.mcpServerId, 'github');
   assert.equal(config.railway.mcpServerId, 'railway');
   assert.deepEqual(config.mcpServers.map((server) => ({ id: server.id, command: server.command, args: server.args, envVarNames: server.envVarNames })), [
     { id: 'atlassian', command: 'mcp-atlassian', args: [], envVarNames: ['ATLASSIAN_BASE_URL', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'] },
-    { id: 'company-github', command: 'github-mcp', args: ['--stdio'], envVarNames: ['GITHUB_TOKEN'] },
+    { id: 'github', command: 'docker', args: ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'], envVarNames: ['GITHUB_PERSONAL_ACCESS_TOKEN'] },
     { id: 'railway', command: 'railway', args: ['mcp'], envVarNames: [] }
   ]);
   assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP']);
@@ -459,7 +455,7 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.match(env, /^ATLASSIAN_BASE_URL=https:\/\/jira\.company\.test$/mu);
   assert.match(env, /^ATLASSIAN_EMAIL=agent@example\.test$/mu);
   assert.match(env, /^ATLASSIAN_API_TOKEN=jira-secret-value$/mu);
-  assert.match(env, /^GITHUB_TOKEN=github-secret-value$/mu);
+  assert.match(env, /^GITHUB_PERSONAL_ACCESS_TOKEN=github-secret-value$/mu);
   assert.doesNotMatch(env, /^RAILWAY_TOKEN=/mu);
   assert.match(env, /^VERCEL_TOKEN=vercel-secret-value$/mu);
   for (const secret of Object.values(secrets)) {
@@ -470,7 +466,7 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.match(envExample, /^ATLASSIAN_BASE_URL=$/mu);
   assert.match(envExample, /^ATLASSIAN_EMAIL=$/mu);
   assert.match(envExample, /^ATLASSIAN_API_TOKEN=$/mu);
-  assert.match(envExample, /^GITHUB_TOKEN=$/mu);
+  assert.match(envExample, /^GITHUB_PERSONAL_ACCESS_TOKEN=$/mu);
   assert.doesNotMatch(envExample, /^RAILWAY_TOKEN=/mu);
   assert.match(envExample, /^VERCEL_TOKEN=$/mu);
 });

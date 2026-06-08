@@ -22,7 +22,7 @@ interface NormalizedSetupSelections {
   readonly jiraProjectKeys: readonly string[];
   readonly jiraMcpServer: McpServerSelection;
   readonly codeHostProvider: NonNullable<SetupSelections['codeHostProvider']>;
-  readonly githubOrganization: string;
+  readonly githubOrganization?: string | undefined;
   readonly githubMcpServer: McpServerSelection;
   readonly railwayProvider: NonNullable<SetupSelections['railwayProvider']>;
   readonly railwayMcpServer: McpServerSelection;
@@ -59,8 +59,8 @@ jira:
   mcp_server: ${normalized.jiraMcpServer.id}` : ''}
 
 github:
-  mode: ${normalized.codeHostProvider === 'github-mcp' ? 'mcp' : 'mock'}
-  organization: ${normalized.githubOrganization}${normalized.codeHostProvider === 'github-mcp' ? `
+  mode: ${normalized.codeHostProvider === 'github-mcp' ? 'mcp' : 'mock'}${normalized.githubOrganization === undefined ? '' : `
+  organization: ${normalized.githubOrganization}`}${normalized.codeHostProvider === 'github-mcp' ? `
   mcp_server: ${normalized.githubMcpServer.id}` : ''}
 
 railway:
@@ -134,8 +134,8 @@ function normalizeSelections(selections: SetupSelections): NormalizedSetupSelect
     jiraProjectKeys: nonEmptyList(selections.jiraProjectKeys, defaultSetupSelections.jiraProjectKeys ?? ['AD']),
     jiraMcpServer: selections.jiraMcpServer ?? atlassianJiraMcpPreset.server,
     codeHostProvider: selections.codeHostProvider ?? defaultSetupSelections.codeHostProvider ?? 'mock',
-    githubOrganization: nonEmpty(selections.githubOrganization, defaultSetupSelections.githubOrganization ?? 'agentic'),
-    githubMcpServer: selections.githubMcpServer ?? { id: 'github', command: 'github-mcp-server', args: [], envVarNames: ['GITHUB_TOKEN'] },
+    githubOrganization: optionalNonEmpty(selections.githubOrganization),
+    githubMcpServer: selections.githubMcpServer ?? { id: 'github', command: 'docker', args: ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'], envVarNames: ['GITHUB_PERSONAL_ACCESS_TOKEN'] },
     railwayProvider: selections.railwayProvider ?? defaultSetupSelections.railwayProvider ?? 'mock',
     railwayMcpServer: selections.railwayMcpServer ?? railwayCliMcpPreset.server,
     envValues: selections.envValues ?? {}
@@ -164,7 +164,6 @@ function collectEnvNames(normalized: NormalizedSetupSelections, selections: Setu
   const names = [
     'OPENCODE_COMMAND',
     normalized.ticketProvider === 'jira-mcp' ? undefined : 'JIRA_BASE_URL',
-    'GITHUB_ORG',
     ...getRequiredEnvPlaceholders(selections),
     ...collectMcpServers(normalized).flatMap((server) => server.envVarNames)
   ].filter((name): name is string => name !== undefined);
@@ -193,16 +192,17 @@ function defaultNonSecretEnvValue(name: string, selections: NormalizedSetupSelec
     return selections.jiraBaseUrl;
   }
 
-  if (name === 'GITHUB_ORG') {
-    return selections.githubOrganization;
-  }
-
   return '';
 }
 
 function nonEmpty(value: string | undefined, fallback: string): string {
   const trimmed = value?.trim();
   return trimmed === undefined || trimmed.length === 0 ? fallback : trimmed;
+}
+
+function optionalNonEmpty(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
 }
 
 function nonEmptyList(values: readonly string[] | undefined, fallback: readonly string[]): readonly string[] {

@@ -85,7 +85,6 @@ export const defaultSetupSelections: SetupSelections = {
   jiraBaseUrl: 'https://jira.example.test',
   jiraProjectKeys: ['AD'],
   codeHostProvider: 'mock',
-  githubOrganization: 'agentic',
   railwayProvider: 'mock',
   envValues: {}
 };
@@ -177,16 +176,15 @@ const githubCapability = createCapability({
   label: 'GitHub',
   category: 'code-host',
   order: 30,
-  installSteps: ['Create a GitHub token with repository permissions before leaving mock mode.'],
-  nonSecretConfigKeys: ['github.organization'],
-  requiredSecretEnvVars: ['GITHUB_TOKEN'],
+  installSteps: ['Create a GitHub personal access token with repository permissions before leaving mock mode. Ewokbot derives repository owners from local git remotes.'],
+  nonSecretConfigKeys: ['github.mode', 'github.mcp_server'],
+  requiredSecretEnvVars: ['GITHUB_PERSONAL_ACCESS_TOKEN'],
   detectExistingSetup(input) {
-    return allEnvPresent(input, ['GITHUB_TOKEN', 'GITHUB_ORG']);
+    return allEnvPresent(input, ['GITHUB_PERSONAL_ACCESS_TOKEN']);
   },
   validateGeneratedConfig(config) {
     return validationResult([
-      config.github.mode === undefined ? 'github.mode must exist.' : undefined,
-      config.github.organization.trim().length > 0 ? undefined : 'github.organization must be non-empty.'
+      config.github.mode === undefined ? 'github.mode must exist.' : undefined
     ].filter((issue): issue is string => issue !== undefined));
   }
 });
