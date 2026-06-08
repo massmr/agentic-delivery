@@ -294,16 +294,16 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
   const opencodeCommand = opencodeChoice.opencodeCommand;
   const includeOhMyOpenAgent = await prompts.confirm({ message: 'Include oh-my-openagent setup notes?', defaultValue: defaults.includeOhMyOpenAgent });
 
-  const ticketProvider = await prompts.select({ message: 'Ticket provider', choices: [
+  const ticketProvider = await prompts.select({ message: 'Atlassian work-item provider', choices: [
     { label: 'Mock', value: 'mock' as const },
-    { label: 'Jira MCP', value: 'jira-mcp' as const }
+    { label: 'Atlassian MCP', value: 'jira-mcp' as const }
   ], defaultValue: defaults.ticketProvider ?? 'mock' });
   let jiraBaseUrl = defaults.jiraBaseUrl;
   let jiraProjectKeys = defaults.jiraProjectKeys;
   let jiraMcpServer = defaults.jiraMcpServer;
 
   if (ticketProvider === 'jira-mcp') {
-    jiraBaseUrl = nonEmptyPromptValue(await prompts.input({ message: 'Jira base URL', defaultValue: defaults.jiraBaseUrl ?? 'https://jira.example.test' }), defaults.jiraBaseUrl);
+    jiraBaseUrl = nonEmptyPromptValue(await prompts.input({ message: 'Atlassian site URL', defaultValue: defaults.jiraBaseUrl ?? 'https://jira.example.test' }), defaults.jiraBaseUrl);
     jiraProjectKeys = parseCsv(await prompts.input({
       message: 'Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)',
       defaultValue: defaults.jiraProjectKeys?.join(',') ?? ''

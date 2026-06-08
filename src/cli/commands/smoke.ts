@@ -41,8 +41,8 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
 
   const cwd = options.cwd ?? process.cwd();
   const environment = loadWorkspaceEnvironment(cwd);
-  options.io.stdout(`AT Jira-only smoke run requested for ${ticketKey}.\n`);
-  options.io.stdout('Scope: one Jira ticket, one selected repository, local branch, OpenCode, quality, and evidence only; no PR, deployment, or provider handoff.\n');
+  options.io.stdout(`Atlassian MCP Jira work-item smoke run requested for ${ticketKey}.\n`);
+  options.io.stdout('Scope: one Jira work item, one selected repository, local branch, OpenCode, quality, and evidence only; no PR, deployment, or provider handoff.\n');
   options.io.stdout('Local-only boundary: Ewokbot will not push, open GitHub PRs, call Railway or Vercel, verify deployments, write an operation ledger, or merge/deploy production.\n');
   options.io.stdout('Phase 1/3: running local doctor before side effects.\n');
 
@@ -50,11 +50,11 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
   renderDoctorReport(options.io, doctorReport.checks);
 
   if (!doctorReport.ok) {
-    options.io.stderr('Smoke preflight failed: fix FAIL checks above before running Jira-only MCP preflight. No run state, git, OpenCode, quality, provider, or deployment writes were started.\n');
+    options.io.stderr('Smoke preflight failed: fix FAIL checks above before running Atlassian MCP Jira work-item preflight. No run state, git, OpenCode, quality, provider, or deployment writes were started.\n');
     return 1;
   }
 
-  options.io.stdout(`Phase 2/3: loading ${ewokbotWorkspaceConfigPath}, workspace env, and validating Jira MCP TicketPort.getTicket readiness.\n`);
+  options.io.stdout(`Phase 2/3: loading ${ewokbotWorkspaceConfigPath}, workspace env, and validating Atlassian MCP Jira work-item TicketPort.getTicket readiness.\n`);
   const config = await loadSmokeConfig(cwd, options.configPath, options.io);
 
   if (config === undefined) {
@@ -79,7 +79,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
 
     const devRunner = options.delivery?.devRunner ?? createDevRunner({ config, environment });
 
-    options.io.stdout('Phase 3/3: Jira MCP getTicket readiness confirmed; reading the ticket and running local execution evidence.\n');
+    options.io.stdout('Phase 3/3: Atlassian MCP Jira work-item getTicket readiness confirmed; reading the work item and running local execution evidence.\n');
     const result = await runDevelopmentExecution({
       ticketKey,
       config,
@@ -128,7 +128,7 @@ function validateSmokeConfig(config: Awaited<ReturnType<typeof loadWorkspaceConf
     return undefined;
   }
 
-  return `Jira mode is ${config.jira.mode}. Smoke preflight requires jira.mode to be mcp for TicketPort.getTicket readiness.`;
+  return `Configured jira.mode is ${config.jira.mode}. Smoke preflight requires jira.mode to be mcp for Atlassian MCP Jira work-item TicketPort.getTicket readiness.`;
 }
 
 async function loadSmokeConfig(cwd: string, configPath: string | undefined, io: CliProgramIO): Promise<Awaited<ReturnType<typeof loadWorkspaceConfig>> | undefined> {
@@ -188,7 +188,7 @@ function renderSmokeResult(io: CliProgramIO, ticketKey: string, result: Developm
     io.stdout(`Human Action Needed: ${result.state.humanActionNeeded.reason}\n`);
   }
   io.stdout(`Final Report: ${result.finalReportPath ?? 'n/a'}\n`);
-  io.stdout('Local-only boundary preserved: no git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, Jira comment/transition, staging report, production merge, or production deploy was attempted.\n');
+  io.stdout('Local-only boundary preserved: no git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, Jira work-item comment/transition, staging report, production merge, or production deploy was attempted.\n');
 }
 
 function formatSmokeFailure(ticketKey: string, error: unknown): string {
@@ -197,7 +197,7 @@ function formatSmokeFailure(ticketKey: string, error: unknown): string {
 
   return [
     `Smoke run failed: ${formatSmokeFailureReason(ticketKey, mappedError.kind, originalMessage)}.`,
-    'No git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, Jira comment/transition, staging report, production merge, or production deploy was attempted.',
+    'No git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, Jira work-item comment/transition, staging report, production merge, or production deploy was attempted.',
     'If a run id was created, review local evidence under .ewokbot/runs/.'
   ].join('\n') + '\n';
 }
@@ -205,16 +205,16 @@ function formatSmokeFailure(ticketKey: string, error: unknown): string {
 function formatSmokeFailureReason(ticketKey: string, kind: ReturnType<typeof mapMcpError>['kind'], message: string): string {
   switch (kind) {
     case 'tool_not_found':
-      return `missing required Jira MCP tool for TicketPort.getTicket (${message})`;
+      return `missing required Atlassian MCP Jira work-item tool for TicketPort.getTicket (${message})`;
     case 'allowlist':
-      return `Jira MCP tool is not allowlisted for TicketPort.getTicket (${message})`;
+      return `Atlassian MCP Jira work-item tool is not allowlisted for TicketPort.getTicket (${message})`;
     case 'auth':
     case 'session':
-      return `unable to read Jira ticket ${ticketKey}; MCP auth/session is not ready (${message})`;
+      return `unable to read Jira work item ${ticketKey}; MCP auth/session is not ready (${message})`;
     case 'timeout':
-      return `unable to read Jira ticket ${ticketKey}; MCP tool call timed out (${message})`;
+      return `unable to read Jira work item ${ticketKey}; MCP tool call timed out (${message})`;
     case 'provider_error':
-      return `unable to read Jira ticket ${ticketKey}; check the configured MCP client/server and ticket access (${message})`;
+      return `unable to read Jira work item ${ticketKey}; check the configured MCP client/server and work-item access (${message})`;
     case 'unknown':
       return message;
   }

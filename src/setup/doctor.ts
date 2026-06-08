@@ -298,7 +298,7 @@ function mcpInstallHint(command: string): string {
   }
 
   if (command === 'mcp-atlassian') {
-    return 'Install and configure mcp-atlassian before using Jira MCP.';
+    return 'Install and configure mcp-atlassian before using Atlassian MCP for Jira work items.';
   }
 
   if (command === 'railway') {

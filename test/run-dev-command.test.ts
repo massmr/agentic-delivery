@@ -74,6 +74,9 @@ test('run-dev command executes one selected repository through local checks only
 
   assert.equal(exitCode, 0);
   assert.match(captured.stdout, /Development execution requested for AI-101/u);
+  assert.match(captured.stdout, /Scope: one Jira work item/u);
+  assert.match(captured.stdout, /creating Atlassian MCP Jira work-item TicketPort\.getTicket runtime path/u);
+  assert.match(captured.stdout, /reading one Jira work item/u);
   assert.match(captured.stdout, /Execution boundary confirmed before run state, git, OpenCode, and quality side effects/u);
   assert.match(captured.stdout, /Repository: agentic\/frontend/u);
   assert.match(captured.stdout, /Branch: agent\/AI-101-dev-frontend-local-path/u);

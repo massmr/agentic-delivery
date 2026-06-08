@@ -22,7 +22,8 @@
 18. Atlassian setup was partially realigned after AW by making Jira project keys an optional backlog constraint, not credentials: the init prompt now says `Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)`, empty input writes `project_keys: []`, and Jira MCP backlog JQL becomes unconstrained across all visible projects.
 19. The product direction is now Atlassian-first rather than Jira-only. Jira remains the first work-item surface, but AX should prepare the provider boundary for the Atlassian suite so Confluence documentation can be added later under explicit policy.
 20. The previous GitHub PR handoff milestone is intentionally deferred until after MCP schema inspection, tool registry, policy modes, Atlassian mapping, Railway mapping, and GitHub mapping are accepted.
-21. The next planned milestone is AX - Atlassian MCP Real Mapping, but AX is not started yet. Do not implement AX or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AX is explicitly approved.
+21. Milestone AX0 - Atlassian Naming And Init Realignment is implemented in this pass and awaiting acceptance.
+22. AX - Atlassian MCP Real Mapping is planned after AX0 acceptance, but AX is not started yet. Do not implement AX or later MCP mappings, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AX is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -90,14 +91,14 @@ ewokbot plan <ticket-key>
 ewokbot run-dev <ticket-key> --confirm-dev-execution
 ```
 
-AJ should configure OpenCode, optional oh-my-openagent intent/detection, model/provider env vars, Jira MCP, GitHub MCP intent, Railway MCP intent, Vercel placeholder/mock intent, and direct sibling repository discovery. It must write secrets only to `.ewokbot/.env`, keep `.ewokbot/.env.example` placeholder-only, never print secret values, and add runtime `.ewokbot/.env` loading before provider/OpenCode construction.
+AJ should configure OpenCode, optional oh-my-openagent intent/detection, model/provider env vars, Atlassian MCP for Jira work items, GitHub MCP intent, Railway MCP intent, Vercel placeholder/mock intent, and direct sibling repository discovery. It must write secrets only to `.ewokbot/.env`, keep `.ewokbot/.env.example` placeholder-only, never print secret values, and add runtime `.ewokbot/.env` loading before provider/OpenCode construction.
 
 AJ must preserve non-interactive deterministic init for tests and automation. It must not auto-install tools, mutate non-Ewokbot config, start live MCP/OAuth flows, call providers, run OpenCode, run package managers, create branches, open PRs, deploy, merge production, or enable autonomous production automation.
 
 AJ implementation status:
 
 - `ewokbot init` now generates `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/`.
-- Interactive and injected wizard selections can configure OpenCode, optional oh-my-openagent, model/provider env vars, Jira MCP, GitHub MCP, Railway MCP, Vercel monitor intent, and direct sibling repository discovery.
+- Interactive and injected wizard selections can configure OpenCode, optional oh-my-openagent, model/provider env vars, Atlassian MCP for Jira work items, GitHub MCP, Railway MCP, Vercel monitor intent, and direct sibling repository discovery.
 - `.ewokbot/.env.example` remains placeholder-only, `.ewokbot/.env` is the only generated secrets file, and init/doctor output remains secret-safe.
 - Runtime commands load `.ewokbot/.env` before provider, OpenCode, and public MCP construction.
 - Tests remain fake-only and no later PR, staging, production, Telegram, dashboard, daemonization, or deployment scope was added.
@@ -177,14 +178,15 @@ Continue in this order:
 3. AW - MCP Policy Modes. Completed and accepted.
 4. GitHub MCP Docker preset unblocker. Completed after AW: maintained onboarding now uses the official Docker-based GitHub MCP server, asks only for `GITHUB_PERSONAL_ACCESS_TOKEN`, derives repo owners from local git remotes, and `ewokbot mcp inspect github` has been live-smoke verified to list the GitHub tools without calling them.
 5. Atlassian setup realignment unblocker. Completed after AW: project keys are optional constraints, empty constraints mean all visible Jira projects, and docs now describe Jira under an Atlassian-first direction.
-6. AX - Atlassian MCP Real Mapping. Planned next, not started.
-7. AY - Railway MCP Real Mapping. Planned after AX acceptance only.
-8. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only.
-9. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
-10. BB - Real Staging Verification v1. Planned after BA acceptance only.
-11. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
+6. AX0 - Atlassian Naming And Init Realignment. Implemented in this pass; awaiting acceptance.
+7. AX - Atlassian MCP Real Mapping. Planned after AX0 acceptance only.
+8. AY - Railway MCP Real Mapping. Planned after AX acceptance only.
+9. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only.
+10. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
+11. BB - Real Staging Verification v1. Planned after BA acceptance only.
+12. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
 
-Anything outside AX planning must wait until AX is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
+Anything outside AX0 must wait until the later milestone is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -231,12 +233,13 @@ The next milestones should move in this order:
 23. AW - MCP Policy Modes. Completed and accepted.
 24. GitHub MCP Docker preset unblocker. Completed after AW.
 25. Atlassian setup realignment unblocker. Completed after AW.
-26. AX - Atlassian MCP Real Mapping. Planned next, not started.
-27. AY - Railway MCP Real Mapping. Planned after AX.
-28. AZ - GitHub MCP Real Mapping. Planned after AY.
-29. BA - GitHub PR Handoff v1. Planned after AZ.
-30. BB - Real Staging Verification v1. Planned after BA.
-31. BC - Operator Agent Action Sandbox. Planned after BB.
+26. AX0 - Atlassian Naming And Init Realignment. Implemented; awaiting acceptance.
+27. AX - Atlassian MCP Real Mapping. Planned after AX0.
+28. AY - Railway MCP Real Mapping. Planned after AX.
+29. AZ - GitHub MCP Real Mapping. Planned after AY.
+30. BA - GitHub PR Handoff v1. Planned after AZ.
+31. BB - Real Staging Verification v1. Planned after BA.
+32. BC - Operator Agent Action Sandbox. Planned after BB.
 
 Non-goals for the immediate next milestone:
 

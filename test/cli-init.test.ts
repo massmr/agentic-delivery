@@ -418,15 +418,19 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.equal(prompts.calls.some((call) => call.kind === 'select' && call.message === 'Development runner' && call.choices.some((choice) => choice.includes('OpenCode'))), true);
   assert.equal(prompts.calls.some((call) => call.message.includes('OpenCode-specific env vars')), false);
   assert.equal(prompts.calls.some((call) => call.message.includes('Model/provider API key env vars')), false);
-  assert.equal(prompts.calls.some((call) => call.kind === 'select' && call.message === 'Ticket provider'), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'select' && call.message === 'Atlassian work-item provider' && call.choices.includes('Atlassian MCP')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message === 'Atlassian site URL'), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'checkbox' && call.message === 'Deployment/CI monitors'), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message.includes('oh-my-openagent')), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('ATLASSIAN_EMAIL value')), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('ATLASSIAN_API_TOKEN value')), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message === 'Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)'), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP server id')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Atlassian MCP server id')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP command')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Atlassian MCP command')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP env_var_names')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Atlassian MCP env_var_names')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GitHub organization')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GITHUB_PERSONAL_ACCESS_TOKEN value')), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GitHub MCP command')), false);
@@ -526,6 +530,7 @@ test('ewokbot init interactive-style mock wizard skips provider credential and M
   assert.match(env, /^OPENCODE_COMMAND=opencode$/mu);
   assert.equal(prompts.calls.some((call) => call.message.includes('JIRA_EMAIL')), false);
   assert.equal(prompts.calls.some((call) => call.message.includes('Jira MCP server')), false);
+  assert.equal(prompts.calls.some((call) => call.message.includes('Atlassian MCP server')), false);
   assert.equal(prompts.calls.some((call) => call.message.includes('GITHUB_TOKEN')), false);
   assert.equal(prompts.calls.some((call) => call.message.includes('GitHub MCP command')), false);
   assert.equal(prompts.calls.some((call) => call.message.includes('RAILWAY_TOKEN')), false);

@@ -6,12 +6,12 @@
 
 Ewokbot is an open-source agent runtime for autonomous software delivery.
 
-It is designed to read work from Jira, inspect the relevant repositories, delegate implementation to a coding agent such as OpenCode, run quality gates, verify staging through Railway and/or Vercel, and prepare production pull requests for human approval.
+It is designed to read work from an Atlassian workspace through Jira work items, inspect the relevant repositories, delegate implementation to a coding agent such as OpenCode, run quality gates, verify staging through Railway and/or Vercel, and prepare production pull requests for human approval.
 
 The core idea is simple:
 
 ```text
-Jira ticket
+Jira work item
   -> repo analysis
   -> implementation by coding runner
   -> tests and quality gates
@@ -33,7 +33,7 @@ Current capabilities:
 - Package aliases for `ewokbot`, `ewok`, and the retained `agentic` binary.
 - Interactive and non-interactive local onboarding that writes `.ewokbot/workspace.yml`, `.ewokbot/.env`, and placeholder-only `.ewokbot/.env.example` setup files.
 - User-level Ewokbot config/data/auth/cache layout under XDG-style paths, with workspace delivery evidence still kept under `.ewokbot/`.
-- Ewokbot-owned auth metadata commands for Jira, GitHub, Railway, and Vercel that keep OpenCode auth external.
+- Ewokbot-owned auth metadata commands for Atlassian/Jira, GitHub, Railway, and Vercel that keep OpenCode auth external.
 - Dev tool setup detection adapters, starting with OpenCode command/config/auth/model readiness without taking ownership of OpenCode credentials.
 - Local-only `ewokbot doctor` readiness checks with PASS/WARN/FAIL output and secret redaction.
 - Deterministic mock end-to-end ticket runs.
@@ -42,7 +42,7 @@ Current capabilities:
 - Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, meaningful diff, agent completion, core safety, test relevance, and local quality evidence only.
 - Local fixture harness with `ewokbot harness run <fixture-id>` and `ewokbot harness run --all` for deterministic scoring of meaningful diff, repository selection, policy decisions, quality results, and report presence.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
-- Jira ticket intake boundary with MCP-backed adapter support.
+- Atlassian MCP ticket intake boundary with Jira as the first supported work-item surface.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
 - Railway staging verification boundary for deployment state and service URLs.
 - OpenCode execution contract with subprocess guardrails.
@@ -51,11 +51,11 @@ Current capabilities:
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
 - Read-only MCP schema inspection with human-readable and JSON output, plus policy-gated tool registry metadata for configured provider servers.
-- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Jira MCP ticket read followed by local run-dev evidence only.
+- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Atlassian MCP Jira work-item read followed by local run-dev evidence only.
 
 Default behavior is safe:
 
-- No real Jira, GitHub, Railway, or OpenCode calls by default.
+- No real Atlassian/Jira, GitHub, Railway, or OpenCode calls by default.
 - No remote git fetch, pull, or push by default.
 - No production merge.
 - No production deployment.
@@ -80,7 +80,7 @@ ewokbot status
 
 The first control surface is the terminal. It should feel familiar to users of Claude Code or OpenCode: explicit commands, readable state, local logs, and human approval gates. Telegram, WhatsApp, and other remote controls are future interfaces, not the current product surface.
 
-The first supported setup path should cover OpenCode, optional oh-my-openagent configuration, GitHub, Jira, Railway, and Vercel. Railway and Vercel are both first-class deployment/CI monitoring targets.
+The first supported setup path should cover OpenCode, optional oh-my-openagent configuration, GitHub, Atlassian MCP with Jira work items, Railway, and Vercel. Railway and Vercel are both first-class deployment/CI monitoring targets. Confluence is future policy-gated Atlassian work and is not implemented in the current setup or runtime workflows.
 
 ## Why Ewokbot?
 
@@ -166,7 +166,7 @@ node dist/src/cli/index.js auth login github
 node dist/src/cli/index.js auth logout github
 ```
 
-Scan the configured Jira backlog from `.ewokbot/workspace.yml`. Mock mode remains the default; when Jira is configured as MCP, scan uses the typed `TicketPort` without writing run evidence:
+Scan the configured Jira backlog from `.ewokbot/workspace.yml`. Mock mode remains the default; when the Atlassian MCP Jira surface is configured as MCP, scan uses the typed `TicketPort` without writing run evidence:
 
 ```bash
 node dist/src/cli/index.js scan
@@ -178,7 +178,7 @@ Plan one ticket against the discovered or explicitly configured repositories:
 node dist/src/cli/index.js plan LK-101
 ```
 
-The planning command is a dry-run boundary. It reads exactly one ticket through the configured typed `TicketPort.getTicket`, can use Jira MCP when `.ewokbot/workspace.yml` selects `jira.mode: mcp`, selects candidate repositories from direct sibling Git discovery or explicit `repos: [...]`, and writes only local planning evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`. It does not create branches, run OpenCode, run package scripts, write an operation ledger, call GitHub, call Railway or Vercel, open pull requests, verify deployments, merge production, or deploy production.
+The planning command is a dry-run boundary. It reads exactly one ticket through the configured typed `TicketPort.getTicket`, can use Atlassian MCP for Jira work items when `.ewokbot/workspace.yml` selects `jira.mode: mcp`, selects candidate repositories from direct sibling Git discovery or explicit `repos: [...]`, and writes only local planning evidence under `.ewokbot/runs/<ticket-key>/<run-id>/`. It does not create branches, run OpenCode, run package scripts, write an operation ledger, call GitHub, call Railway or Vercel, open pull requests, verify deployments, merge production, or deploy production.
 
 Execute one explicitly confirmed development-only ticket after planning selects exactly one repository:
 
@@ -286,7 +286,7 @@ The default inspect output stays compact and human-readable. `--schema` adds san
 
 ## Configuration
 
-`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. In an interactive terminal, init uses an `@inquirer/prompts` TUI with guided selections for OpenCode command readiness, optional oh-my-openagent intent, Jira MCP, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default. Missing or not-ready OpenCode states offer mock mode, setup instructions, or explicit custom-command/acknowledged continuation choices only; Ewokbot does not install OpenCode, launch auth, or copy OpenCode-owned auth and model/provider credentials into `.ewokbot/.env`.
+`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. In an interactive terminal, init uses an `@inquirer/prompts` TUI with guided selections for OpenCode command readiness, optional oh-my-openagent intent, Atlassian MCP for Jira work items, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default. Missing or not-ready OpenCode states offer mock mode, setup instructions, or explicit custom-command/acknowledged continuation choices only; Ewokbot does not install OpenCode, launch auth, or copy OpenCode-owned auth and model/provider credentials into `.ewokbot/.env`.
 
 For GitHub MCP, init configures the official Docker-based local MCP server preset and asks only for `GITHUB_PERSONAL_ACCESS_TOKEN`. Ewokbot should derive repository owners and names from the local git remotes in the directory where it is launched, so there is no global GitHub organization prompt in the onboarding flow. Run `ewokbot doctor` after init to verify Docker, provider secrets, local MCP commands, OpenCode, and repository readiness before using `ewokbot mcp inspect github`.
 
@@ -299,7 +299,7 @@ User-level paths follow XDG overrides when present and otherwise default to:
 ~/.cache/ewokbot/
 ```
 
-The generated user `auth.json` is Ewokbot auth metadata only; OpenCode credentials remain owned by OpenCode and provider secrets remain in `.ewokbot/.env`. Where supported, `auth.json` is created with owner-only permissions. `ewokbot auth status`, `ewokbot auth list`, `ewokbot auth login <provider>`, and `ewokbot auth logout <provider>` manage metadata-only Jira, GitHub, Railway, and Vercel entries in that user-level auth file without live OAuth/provider calls or workspace `.ewokbot/` auth writes. `ewokbot auth login opencode` refuses and points operators to OpenCode because OpenCode auth is managed by OpenCode. `ewokbot doctor` reports whether these user-level paths are present without reading or printing auth contents.
+The generated user `auth.json` is Ewokbot auth metadata only; OpenCode credentials remain owned by OpenCode and provider secrets remain in `.ewokbot/.env`. Where supported, `auth.json` is created with owner-only permissions. `ewokbot auth status`, `ewokbot auth list`, `ewokbot auth login <provider>`, and `ewokbot auth logout <provider>` manage metadata-only Atlassian/Jira, GitHub, Railway, and Vercel entries in that user-level auth file without live OAuth/provider calls or workspace `.ewokbot/` auth writes. `ewokbot auth login opencode` refuses and points operators to OpenCode because OpenCode auth is managed by OpenCode. `ewokbot doctor` reports whether these user-level paths are present without reading or printing auth contents.
 
 The generated `.ewokbot/.env.example` file is placeholder-only. Secret values belong only in `.ewokbot/.env`, and `init` refuses to overwrite existing `.ewokbot/workspace.yml`, `.ewokbot/.env`, or `.ewokbot/.env.example` by default.
 
@@ -321,11 +321,11 @@ ewokbot init --non-interactive --deployment-monitor vercel
 ewokbot init --non-interactive --deployment-monitor both
 ```
 
-`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Jira, Railway, Vercel, discovered or explicit repository paths, staging/production branch settings, and static quality gate presence. OpenCode readiness uses a dev-tool setup adapter with normalized states for missing commands, command failures, unsupported versions, missing authentication, missing model configuration, and ready setups. It checks configured/custom command paths, OpenCode config presence at `~/.config/opencode/opencode.json`, OpenCode auth presence at `~/.local/share/opencode/auth.json` or an explicitly injected `opencode auth list` probe, and project config at `<workspace-root>/opencode.json` without printing raw config or auth values. Discovery mode warns clearly when no direct sibling Git repositories are found.
+`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Atlassian/Jira, Railway, Vercel, discovered or explicit repository paths, staging/production branch settings, and static quality gate presence. OpenCode readiness uses a dev-tool setup adapter with normalized states for missing commands, command failures, unsupported versions, missing authentication, missing model configuration, and ready setups. It checks configured/custom command paths, OpenCode config presence at `~/.config/opencode/opencode.json`, OpenCode auth presence at `~/.local/share/opencode/auth.json` or an explicitly injected `opencode auth list` probe, and project config at `<workspace-root>/opencode.json` without printing raw config or auth values. Discovery mode warns clearly when no direct sibling Git repositories are found.
 
-Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
+Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Atlassian/Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The AT smoke command also requires only Jira MCP `TicketPort.getTicket` readiness plus local workspace, tool, repository, and quality readiness; GitHub, Railway, and Vercel readiness checks are not required or contacted by smoke. The existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
+Providers default to `mock` mode. The Atlassian/Jira ticket provider, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The AT smoke command also requires only Atlassian MCP `TicketPort.getTicket` readiness for Jira work items plus local workspace, tool, repository, and quality readiness; GitHub, Railway, and Vercel readiness checks are not required or contacted by smoke. The existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
 
 MCP policy defaults to `read_only` and is configured through top-level `mcp_policy`. Supported modes are `read_only`, `supervised`, `trusted`, and `custom`; supported decisions are `allow`, `allow_redacted`, `require_human`, and `deny`. Overrides can target providers, servers, or tools, with tool overrides taking precedence. Runtime MCP readiness evaluates the inspected registry classification and configured policy before typed-port allowlist checks; autonomous runtime execution proceeds only for `allow`, while `deny`, `require_human`, and `allow_redacted` stop before provider side effects. Secret-sensitive tools, unknown tools, destructive deletes, production merge, and production deploy are not autonomously allowed by default.
 
@@ -348,7 +348,7 @@ mcp_policy:
       reason: PR handoff is not enabled until the approved GitHub mapping milestone.
 ```
 
-Example Jira MCP configuration:
+Example Atlassian MCP configuration for Jira work items:
 
 ```yaml
 jira:
@@ -374,7 +374,7 @@ mcp_servers:
       - ATLASSIAN_API_TOKEN
 ```
 
-`ewokbot init` keeps the Jira connector as an Ewokbot-owned preset, so operators should not need to know or type the MCP server id, command, args, or environment allowlist for the default Jira path. The current maintained preset is the local `mcp-atlassian` stdio server with `ATLASSIAN_BASE_URL`, `ATLASSIAN_EMAIL`, and `ATLASSIAN_API_TOKEN`. Jira project keys are an optional backlog constraint, not credentials; leaving them blank writes `project_keys: []` and scans all visible projects available to the configured Atlassian MCP session. Ewokbot does not read OpenCode MCP configuration for Jira; OpenCode remains only the development runner. The CLI passes a restricted environment allowlist to MCP subprocesses: standard local process variables plus any `mcp_servers.<id>.env_var_names` entries.
+`ewokbot init` keeps the Atlassian MCP Jira connector as an Ewokbot-owned preset, so operators should not need to know or type the MCP server id, command, args, or environment allowlist for the default Jira path. The current maintained preset is the local `mcp-atlassian` stdio server with `ATLASSIAN_BASE_URL`, `ATLASSIAN_EMAIL`, and `ATLASSIAN_API_TOKEN`. Jira project keys are an optional backlog constraint, not credentials; leaving them blank writes `project_keys: []` and scans all visible projects available to the configured Atlassian MCP session. Ewokbot does not read OpenCode MCP configuration for Jira; OpenCode remains only the development runner. Confluence remains future policy-gated work and is not read, scanned, or mutated by this setup path. The CLI passes a restricted environment allowlist to MCP subprocesses: standard local process variables plus any `mcp_servers.<id>.env_var_names` entries.
 
 Example Railway MCP configuration generated by the maintained local preset:
 

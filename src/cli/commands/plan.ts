@@ -76,7 +76,7 @@ function formatPlanPreflightFailure(ticketKey: string, error: unknown): string {
 
   return [
     `Plan preflight failed before writing run state or planning evidence: ${reason}.`,
-    `Next step: fix .ewokbot/workspace.yml, Jira MCP server/client setup, tool mapping, allowlist, MCP auth/session, and ticket access, then rerun ewokbot plan ${ticketKey}.`,
+    `Next step: fix .ewokbot/workspace.yml, Atlassian MCP server/client setup for Jira work items, tool mapping, allowlist, MCP auth/session, and work-item access, then rerun ewokbot plan ${ticketKey}.`,
     'No run state, branch, OpenCode, package script, operation ledger, GitHub, Railway/Vercel, PR, deployment, production merge, or production deploy was started.'
   ].join('\n') + '\n';
 }
@@ -84,18 +84,18 @@ function formatPlanPreflightFailure(ticketKey: string, error: unknown): string {
 function formatPlanPreflightReason(ticketKey: string, kind: ReturnType<typeof mapMcpError>['kind'], message: string): string {
   switch (kind) {
     case 'tool_not_found':
-      return `missing required Jira MCP tool for TicketPort.getTicket (${message})`;
+      return `missing required Atlassian MCP Jira work-item tool for TicketPort.getTicket (${message})`;
     case 'allowlist':
-      return `Jira MCP tool is not allowlisted for TicketPort.getTicket (${message})`;
+      return `Atlassian MCP Jira work-item tool is not allowlisted for TicketPort.getTicket (${message})`;
     case 'auth':
     case 'session':
-      return `unable to read Jira ticket ${ticketKey}; MCP auth/session is not ready (${message})`;
+      return `unable to read Jira work item ${ticketKey}; MCP auth/session is not ready (${message})`;
     case 'timeout':
-      return `unable to read Jira ticket ${ticketKey}; MCP tool call timed out (${message})`;
+      return `unable to read Jira work item ${ticketKey}; MCP tool call timed out (${message})`;
     case 'provider_error':
-      return `unable to read Jira ticket ${ticketKey}; check the configured MCP client/server and ticket access (${message})`;
+      return `unable to read Jira work item ${ticketKey}; check the configured MCP client/server and work-item access (${message})`;
     case 'unknown':
-      return `unable to read Jira ticket ${ticketKey}; check MCP readiness (${message})`;
+      return `unable to read Jira work item ${ticketKey}; check MCP readiness (${message})`;
   }
 }
 

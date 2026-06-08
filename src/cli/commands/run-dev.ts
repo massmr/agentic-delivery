@@ -39,16 +39,16 @@ export async function runRunDevCommand(ticketKey: string, options: RunDevCommand
   const cwd = options.cwd ?? process.cwd();
   const environment = loadWorkspaceEnvironment(cwd);
   options.io.stdout(`Development execution requested for ${ticketKey}.\n`);
-  options.io.stdout('Scope: one Jira ticket, exactly one selected repository, local branch, OpenCode, agent completion check, local quality gates, and local evidence only.\n');
+  options.io.stdout('Scope: one Jira work item, exactly one selected repository, local branch, OpenCode, agent completion check, local quality gates, and local evidence only.\n');
   options.io.stdout('Local-only boundary: Ewokbot will not push, open PRs, call Railway/Vercel, verify deployments, merge production, or deploy production.\n');
-  options.io.stdout(`Phase 1/3: loading ${ewokbotWorkspaceConfigPath} and creating Jira TicketPort.getTicket runtime path.\n`);
+  options.io.stdout(`Phase 1/3: loading ${ewokbotWorkspaceConfigPath} and creating Atlassian MCP Jira work-item TicketPort.getTicket runtime path.\n`);
 
   try {
     const config = await loadWorkspaceConfig(resolve(cwd, options.configPath ?? ewokbotWorkspaceConfigPath), { workspaceRoot: cwd });
     const ticketPort = await createRuntimeTicketPort({ config, environment, ...options.runtimeMcp, requiredJiraMcpActions: ['getTicket'] });
     const devRunner = options.delivery?.devRunner ?? createDevRunner({ config, environment });
 
-    options.io.stdout('Phase 2/3: reading one Jira ticket and planning a single repository before side effects.\n');
+    options.io.stdout('Phase 2/3: reading one Jira work item and planning a single repository before side effects.\n');
     const result = await runDevelopmentExecution({
       ticketKey,
       config,
@@ -153,16 +153,16 @@ function formatRunDevFailure(ticketKey: string, error: unknown): string {
 function formatRunDevFailureReason(ticketKey: string, kind: ReturnType<typeof mapMcpError>['kind'], message: string): string {
   switch (kind) {
     case 'tool_not_found':
-      return `missing required Jira MCP tool for TicketPort.getTicket (${message})`;
+      return `missing required Atlassian MCP Jira work-item tool for TicketPort.getTicket (${message})`;
     case 'allowlist':
-      return `Jira MCP tool is not allowlisted for TicketPort.getTicket (${message})`;
+      return `Atlassian MCP Jira work-item tool is not allowlisted for TicketPort.getTicket (${message})`;
     case 'auth':
     case 'session':
-      return `unable to read Jira ticket ${ticketKey}; MCP auth/session is not ready (${message})`;
+      return `unable to read Jira work item ${ticketKey}; MCP auth/session is not ready (${message})`;
     case 'timeout':
-      return `unable to read Jira ticket ${ticketKey}; MCP tool call timed out (${message})`;
+      return `unable to read Jira work item ${ticketKey}; MCP tool call timed out (${message})`;
     case 'provider_error':
-      return `unable to read Jira ticket ${ticketKey}; check the configured MCP client/server and ticket access (${message})`;
+      return `unable to read Jira work item ${ticketKey}; check the configured MCP client/server and work-item access (${message})`;
     case 'unknown':
       return message;
   }

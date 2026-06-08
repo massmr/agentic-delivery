@@ -133,6 +133,32 @@ test('doctor validates Railway MCP through the Railway CLI preset instead of env
   assert.equal(readyCliReport.checks.some((check) => check.label === 'Railway' && check.status === 'pass' && /railway command is available/u.test(check.message)), true);
 });
 
+test('doctor describes the Atlassian MCP preset when Jira work-item setup is missing the local command', async () => {
+  const cwd = await createWorkspace('ewokbot-doctor-ax0-atlassian-mcp-');
+  const files = createOnboardingFiles({
+    deploymentMonitor: 'vercel',
+    includeOhMyOpenAgent: false,
+    ticketProvider: 'jira-mcp'
+  });
+  mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
+  writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), files.workspaceYaml, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env'), files.env, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env.example'), files.envExample, 'utf8');
+
+  const report = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
+  });
+
+  const atlassianCheck = report.checks.find((check) => check.label === 'MCP atlassian');
+  assert.equal(atlassianCheck?.status, 'fail');
+  assert.match(atlassianCheck?.nextStep ?? '', /Atlassian MCP for Jira work items/u);
+  assert.doesNotMatch(atlassianCheck?.nextStep ?? '', /Jira MCP/u);
+});
+
 test('doctor validates repository branch and quality readiness statically', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ab-repo-');
   const repoPath = join(cwd, 'frontend');

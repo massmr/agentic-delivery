@@ -191,10 +191,10 @@ const githubCapability = createCapability({
 
 const jiraCapability = createCapability({
   id: 'jira',
-  label: 'Jira',
+  label: 'Atlassian MCP (Jira work items)',
   category: 'ticket-provider',
   order: 40,
-  installSteps: ['Install mcp-atlassian and create an Atlassian API token before leaving mock mode.'],
+  installSteps: ['Install mcp-atlassian and create an Atlassian API token before leaving mock mode; Jira is the first supported Atlassian work-item product.'],
   nonSecretConfigKeys: ['jira.base_url', 'jira.project_keys optional filter'],
   requiredSecretEnvVars: ['ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'],
   detectExistingSetup(input) {

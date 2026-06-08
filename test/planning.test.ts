@@ -213,7 +213,7 @@ test('agentic plan fails missing Jira MCP get ticket readiness before writing ru
   assert.equal(exitCode, 1);
   assert.equal(captured.stdout, '');
   assert.match(captured.stderr, /Plan preflight failed before writing run state or planning evidence/u);
-  assert.match(captured.stderr, /missing required Jira MCP tool/u);
+  assert.match(captured.stderr, /missing required Atlassian MCP Jira work-item tool/u);
   assert.match(captured.stderr, /atlassian/u);
   assert.match(captured.stderr, new RegExp(defaultJiraMcpToolNames.getTicket, 'u'));
   assert.match(captured.stderr, /No run state, branch, OpenCode, package script, operation ledger, GitHub, Railway\/Vercel, PR, deployment, production merge, or production deploy was started/u);
@@ -266,7 +266,7 @@ test('agentic plan reports Jira MCP ticket read failures before writing run evid
   assert.equal(exitCode, 1);
   assert.equal(captured.stdout, '');
   assert.match(captured.stderr, /Plan preflight failed before writing run state or planning evidence/u);
-  assert.match(captured.stderr, /unable to read Jira ticket AD-804/u);
+  assert.match(captured.stderr, /unable to read Jira work item AD-804/u);
   assert.match(captured.stderr, /Unauthorized Jira MCP session expired/u);
   assert.match(captured.stderr, /fix .*MCP auth\/session/u);
   assert.match(captured.stderr, /No run state, branch, OpenCode, package script, operation ledger, GitHub, Railway\/Vercel, PR, deployment, production merge, or production deploy was started/u);

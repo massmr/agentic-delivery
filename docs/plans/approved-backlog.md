@@ -398,7 +398,7 @@ Build:
   - Dev runner: OpenCode only.
   - Optional OpenCode preset/tooling: oh-my-openagent yes/no.
   - Code host: GitHub only.
-  - Ticket provider: Jira only.
+  - Ticket provider: Atlassian MCP for Jira work items, plus mock mode.
   - Deployment/CI monitor: Railway, Vercel, or both.
   - Control plane: CLI only.
 - Non-secret workspace config generation in `config/workspace.yml`.
@@ -665,8 +665,8 @@ Build:
 - Detect whether OpenCode is installed; if missing, print the exact install command and stop or continue in mock mode based on explicit operator choice. Do not auto-install without explicit confirmation.
 - Ask whether to use oh-my-openagent; detect existing local config when possible and write only Ewokbot-owned config or documented instructions unless explicit mutation is approved.
 - Ask for model/provider environment variables needed by the selected OpenCode setup and write them to `.ewokbot/.env`; never print secret values back to stdout/stderr.
-- Ask for ticket provider, with Jira MCP as the only supported real provider for now and mock mode as an explicit option.
-- Configure Jira MCP through maintained Ewokbot connector presets, starting with the local `mcp-atlassian` stdio server, so normal users enter only Jira URL, optional project-key constraints, email, and API token instead of MCP server id, command, args, or env allowlists.
+- Ask for the Atlassian work-item provider, with Atlassian MCP for Jira work items as the only supported real provider for now and mock mode as an explicit option.
+- Configure the Atlassian MCP Jira path through maintained Ewokbot connector presets, starting with the local `mcp-atlassian` stdio server, so normal users enter only the Atlassian site URL, optional Jira project-key constraints, email, and API token instead of MCP server id, command, args, or env allowlists.
 - Ask for code host provider, with GitHub MCP as the first real target and mock mode as an explicit option.
 - Configure GitHub MCP server settings when selected, but do not require GitHub for `run-dev`.
 - Ask for deployment/CI monitor, supporting Railway MCP, Vercel placeholder/mock, both, or none where appropriate. Railway remains the first real staging target; Vercel may be captured as config intent if real support is not implemented yet.
@@ -1109,6 +1109,41 @@ Explicit safety constraints:
 - Do not call live tools in policy tests.
 - Do not allow `set_variables`, secret reads, destructive deletes, production merge, or production deploy by default.
 - Do not expose raw MCP tool calling to coding agents or operator agents.
+
+### Milestone AX0: Atlassian Naming And Init Realignment
+
+Goal:
+
+Make the user-facing setup and documentation Atlassian-first before implementing the real Atlassian tool mapping. Jira remains the first work-item surface, but Ewokbot should no longer present the provider as Jira-only where the selected MCP server can also expose Confluence and other Atlassian products.
+
+Build:
+
+- Update `ewokbot init` user-facing prompts:
+  - `Ticket provider` should become an Atlassian-oriented provider prompt.
+  - `Jira MCP` should become `Atlassian MCP`.
+  - `Jira base URL` should become `Atlassian site URL`.
+  - `Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)` should remain a Jira-specific backlog filter.
+- Update provider capability wording from Jira-only setup to Atlassian MCP setup with Jira as the first supported work-item product.
+- Update README and tracking docs to use "Atlassian MCP" for the provider and "Jira" for the work-item/project-key surface.
+- Keep the current `jira:` workspace config shape for now unless a fully tested backward-compatible migration to `atlassian:` is implemented in this milestone.
+- If an `atlassian:` config alias is introduced, keep `jira:` backward compatible and document the migration clearly.
+- Update tests for init prompt labels, setup summaries, and docs expectations.
+
+Acceptance:
+
+- Fresh `ewokbot init` no longer presents the real ticket provider as "Jira MCP"; it presents "Atlassian MCP".
+- The init flow still writes a config accepted by current runtime commands.
+- Jira project keys remain optional constraints and empty input still means all visible Jira projects.
+- Docs clearly explain that Jira is the first supported Atlassian work-item surface and Confluence is future policy-gated work.
+- No real Atlassian tool-name/schema mapping is implemented in AX0.
+- Tests remain fake-only with no live Atlassian, MCP, OAuth, provider, network, OpenCode, git, PR, staging, or production side effects.
+
+Explicit safety constraints:
+
+- Do not implement AX real tool mapping in AX0.
+- Do not introduce Confluence business workflows in AX0.
+- Do not remove `jira:` config compatibility without a tested migration.
+- Production merge and production deployment remain human-only.
 
 ### Milestone AX: Atlassian MCP Real Mapping
 

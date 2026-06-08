@@ -17,7 +17,7 @@ Ewokbot is an agent runtime with typed business ports backed first by MCP tools,
 
 See [MCP-First Architecture](mcp-first-architecture.md).
 
-MCP is the preferred control plane for external SaaS providers such as Jira, GitHub, Railway, Vercel, and Bitbucket. The runtime still owns state, decisions, policy, retries, reports, and production approval gates.
+MCP is the preferred control plane for external SaaS providers such as Atlassian with Jira as the first work-item surface, GitHub, Railway, Vercel, and Bitbucket. The runtime still owns state, decisions, policy, retries, reports, and production approval gates.
 
 ## High-Level Components
 

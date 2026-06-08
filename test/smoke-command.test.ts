@@ -69,7 +69,7 @@ test('smoke command stops on doctor fail before MCP readiness or run state', asy
   await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs')));
 });
 
-test('smoke command reads one Jira MCP ticket and stays on local checks only', async (t) => {
+test('smoke command reads one Atlassian MCP Jira work item and stays on local checks only', async (t) => {
   const rootPath = await createSmokeWorkspace(t, smokeWorkspaceYaml());
   const captured = createCapturedIO();
   const clients = createSmokeMcpClients();
@@ -107,7 +107,9 @@ test('smoke command reads one Jira MCP ticket and stays on local checks only', a
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke', '--run-id', 'smoke-run-1']);
 
   assert.equal(exitCode, 0);
-  assert.match(captured.stdout, /AT Jira-only smoke run requested for AE-101/u);
+  assert.match(captured.stdout, /Atlassian MCP Jira work-item smoke run requested for AE-101/u);
+  assert.match(captured.stdout, /validating Atlassian MCP Jira work-item TicketPort\.getTicket readiness/u);
+  assert.match(captured.stdout, /Atlassian MCP Jira work-item getTicket readiness confirmed/u);
   assert.match(captured.stdout, /Execution boundary confirmed/u);
   assert.match(captured.stdout, /Final State: LOCAL_CHECKS_PASSED/u);
   assert.match(captured.stdout, /Run Directory: \.ewokbot\/runs\/AE-101\/smoke-run-1/u);
@@ -119,7 +121,7 @@ test('smoke command reads one Jira MCP ticket and stays on local checks only', a
   assert.match(captured.stdout, /Quality Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/quality-report\.md/u);
   assert.match(captured.stdout, /Test Relevance Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/test-relevance\.json/u);
   assert.match(captured.stdout, /Final Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/final-report\.md/u);
-  assert.match(captured.stdout, /no git push, GitHub PR, Railway\/Vercel deployment verification, operation ledger, Jira comment\/transition, staging report/u);
+  assert.match(captured.stdout, /no git push, GitHub PR, Railway\/Vercel deployment verification, operation ledger, Jira work-item comment\/transition, staging report/u);
   assert.doesNotMatch(captured.stdout, /Provider Modes: Jira=mcp, GitHub=mcp, Railway=mcp/u);
   assert.doesNotMatch(captured.stdout, /Phase 5\/6: delivery contracts completed through staging verification/u);
   assert.doesNotMatch(captured.stdout, /Phase 6\/6: production PR preparation completed; merge\/deploy remains human-only\./u);
@@ -340,7 +342,7 @@ test('smoke command refuses an existing run directory before delivery side effec
   await assertNoSmokeSideEffectFiles(rootPath);
 });
 
-test('smoke command fails missing Jira MCP readiness before run state, repository branch/git, OpenCode, quality, package-manager, or provider side effects', async (t) => {
+test('smoke command fails missing Atlassian MCP Jira work-item readiness before run state, repository branch/git, OpenCode, quality, package-manager, or provider side effects', async (t) => {
   const rootPath = await createSmokeWorkspace(t, smokeWorkspaceYaml());
   const captured = createCapturedIO();
   const clients = createSmokeMcpClients();
@@ -370,7 +372,7 @@ test('smoke command fails missing Jira MCP readiness before run state, repositor
 
   assert.equal(exitCode, 1);
   assert.match(captured.stderr, /Smoke run failed/u);
-  assert.match(captured.stderr, /missing required Jira MCP tool/u);
+  assert.match(captured.stderr, /missing required Atlassian MCP Jira work-item tool/u);
   assert.match(captured.stderr, new RegExp(defaultJiraMcpToolNames.getTicket, 'u'));
   assert.match(captured.stderr, /No git push, GitHub PR, Railway\/Vercel deployment verification, operation ledger/u);
   assert.deepEqual(clients.atlassian.toolCallRequests, []);

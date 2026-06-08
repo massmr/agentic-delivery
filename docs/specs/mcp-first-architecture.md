@@ -100,7 +100,7 @@ The workspace-level `mcp_policy` section selects one of four policy modes: `read
 Preferred defaults:
 
 ```text
-Jira       -> MCP first
+Atlassian  -> MCP first, with Jira work items as the first supported surface
 GitHub     -> MCP first, native fallback when precise checks/branch operations require it
 Railway    -> MCP first, native fallback when deployment polling requires stronger guarantees
 Vercel     -> MCP first, future provider

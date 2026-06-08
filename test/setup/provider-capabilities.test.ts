@@ -28,6 +28,11 @@ test('setup provider capabilities describe steps and secrets without executing s
     ['opencode', 'github', 'jira', 'vercel', 'cli']
   );
   assert.equal(capabilities.every((capability) => capability.installSteps.length > 0), true);
+  const jiraCapability = capabilitiesById(capabilities).jira;
+  assert.equal(jiraCapability.label, 'Atlassian MCP (Jira work items)');
+  assert.match(jiraCapability.summarize(), /Atlassian MCP \(Jira work items\)/u);
+  assert.match(jiraCapability.installSteps.join('\n'), /Atlassian MCP|Atlassian API token/u);
+  assert.match(jiraCapability.installSteps.join('\n'), /Jira is the first supported Atlassian work-item product/u);
   assert.deepEqual(
     capabilities.flatMap((capability) => capability.requiredSecretEnvVars),
     ['GITHUB_PERSONAL_ACCESS_TOKEN', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN', 'VERCEL_TOKEN']

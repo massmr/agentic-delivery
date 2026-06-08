@@ -102,7 +102,7 @@ Status legend:
 - `[x]` OpenCode setup detection
 - `[x]` oh-my-openagent optional setup detection
 - `[x]` GitHub setup prompts and official Docker MCP preset
-- `[~]` Atlassian setup prompts, with Jira project-key constraints optional
+- `[x]` Atlassian setup prompts, with Jira project-key constraints optional
 - `[x]` Railway setup prompts
 - `[x]` Vercel setup prompts
 - `[x]` Secret placeholder and redaction policy for onboarding
@@ -132,6 +132,7 @@ Status legend:
 - `[x]` MCP policy modes: read-only, supervised, trusted, and custom
 - `[x]` GitHub MCP Docker preset and local inspect smoke
 - `[x]` Atlassian/Jira project-key constraint made optional
+- `[x]` Atlassian naming and init realignment
 - `[ ]` Atlassian MCP real mapping for Jira intake/comment tools
 - `[ ]` Railway MCP real mapping for read-only staging evidence
 - `[ ]` GitHub MCP real mapping for PR handoff tools

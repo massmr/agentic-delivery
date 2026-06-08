@@ -2,6 +2,21 @@
 
 ## 2026-06-08
 
+Implemented Milestone AX0 Atlassian Naming And Init Realignment:
+
+- Renamed interactive init setup wording from Jira-only provider language to Atlassian-first language: the provider prompt now offers `Atlassian MCP`, and the URL prompt now asks for the `Atlassian site URL`.
+- Kept the Jira-specific backlog filter wording unchanged: `Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)`, with empty input still writing `project_keys: []` for all visible Jira projects.
+- Updated setup capability and doctor guidance to describe Atlassian MCP setup with Jira as the first supported work-item product while preserving `jira:` config compatibility and the existing `jira-mcp` runtime selection value.
+- Updated README/spec wording to explain Atlassian MCP as the provider setup boundary, Jira as the currently implemented work-item surface, and Confluence as future policy-gated work that is not implemented now.
+- Preserved AX0 scope only: no real Atlassian tool-name/schema mapping, default MCP tool-name changes, Confluence workflows, provider mutations, GitHub PR handoff, staging verification, operator-agent sandbox, production merge, or production deployment work was added.
+
+Verification commands run for AX0:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm test` (`354/354`)
+- `git diff --check`
+
 Accepted Milestone AW MCP Policy Modes:
 
 - Marked AW as complete and accepted after review.
@@ -26,6 +41,13 @@ Completed Atlassian setup realignment unblocker:
 - Empty project-key input writes `project_keys: []`.
 - Jira MCP backlog search now omits `project in (...)` when `project_keys` is empty, so the MCP session can scan all visible Jira projects.
 - This was an onboarding/config unblocker, not AX implementation. Real Atlassian tool-name/schema mapping remains the next planned milestone and is not started.
+
+Approved Milestone AX0 Atlassian Naming And Init Realignment:
+
+- Added AX0 before AX so the product-facing setup is Atlassian-first before real tool mapping work begins.
+- AX0 should rename init prompts and docs from "Jira MCP" provider language to "Atlassian MCP" provider language while keeping Jira-specific project-key constraints as the first work-item filter.
+- AX0 should keep `jira:` config compatibility unless a tested backward-compatible `atlassian:` alias/migration is included.
+- AX0 must not implement real Atlassian tool-name/schema mapping, Confluence workflows, provider mutations, GitHub PR handoff, staging verification, or production automation.
 
 Implemented Milestone AW MCP Policy Modes review candidate:
 

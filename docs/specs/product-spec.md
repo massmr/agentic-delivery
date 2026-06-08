@@ -2,7 +2,7 @@
 
 ## Vision
 
-Build an autonomous delivery orchestrator that processes the full Jira backlog, analyzes the relevant repositories, delegates implementation to OpenCode, verifies quality, monitors staging through Railway and/or Vercel, and prepares production pull requests for human approval.
+Build an autonomous delivery orchestrator that processes Atlassian-hosted Jira work items, analyzes the relevant repositories, delegates implementation to OpenCode, verifies quality, monitors staging through Railway and/or Vercel, and prepares production pull requests for human approval.
 
 The orchestrator is a standalone software product. It does not live inside the business applications it modifies.
 
