@@ -126,8 +126,8 @@ Status legend:
 - `[x]` Agent completion contract
 - `[x]` Test relevance guard
 - `[x]` Harness v1 for fixture-based scoring
-- `[ ]` Real provider smoke v1 with Jira MCP and local run-dev, next approved milestone
-- `[ ]` GitHub draft PR handoff after validated local evidence
+- `[x]` Real provider smoke v1 with Jira MCP and local run-dev
+- `[ ]` GitHub draft PR handoff after validated local evidence, next approved milestone
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 
 ## Future Control Surfaces

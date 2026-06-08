@@ -50,7 +50,7 @@ Current capabilities:
 - Foreground `ewokbot worker start` runtime with bounded or continuous operation, dry-run preview, workspace locking, graceful shutdown, and restart-safe state reuse.
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
-- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one real-provider MCP smoke run through production PR preparation only.
+- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Jira MCP ticket read followed by local run-dev evidence only.
 
 Default behavior is safe:
 
@@ -208,7 +208,7 @@ Run one explicitly confirmed real-provider smoke ticket after `.ewokbot/workspac
 node dist/src/cli/index.js smoke LK-101 --confirm-real-provider-smoke
 ```
 
-The smoke command uses `.ewokbot/workspace.yml` by default, refuses to start without `--confirm-real-provider-smoke`, runs `ewokbot doctor` checks before side effects, requires Jira, GitHub, and Railway to be configured as `mcp`, reads exactly one Jira ticket through `TicketPort.getTicket`, and requires planning to select exactly one repository. After preflight passes it creates local run state, creates a local git branch, invokes the configured OpenCode runner, runs local quality gates, opens the develop PR through the typed code host port, verifies Railway staging, and prepares a production PR for human review. It does not list the full backlog, merge production, or deploy production.
+The smoke command uses `.ewokbot/workspace.yml` by default, refuses to start without `--confirm-real-provider-smoke`, runs AT-scoped local/Jira preflight checks before side effects, requires only `jira.mode: mcp`, validates `TicketPort.getTicket` readiness, reads exactly one Jira ticket, and requires planning to select exactly one repository. After preflight passes it creates local run state, creates a local git branch, invokes the configured OpenCode runner, writes meaningful-diff, agent-completion, core-safety, test-relevance, local quality, and final-report evidence, then stops at `LOCAL_CHECKS_PASSED` or a local failure/human-action state. It does not require GitHub, Railway, or Vercel provider readiness, list the full backlog, transition or comment on Jira, push git branches, open GitHub pull requests, call Railway or Vercel, verify deployments, write an operation ledger, write a staging report, merge production, or deploy production.
 
 Inspect persisted run state:
 
@@ -309,7 +309,7 @@ ewokbot init --non-interactive --deployment-monitor both
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The real-provider smoke command requires all three provider modes to be explicitly set to `mcp`; the existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
+Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The AT smoke command also requires only Jira MCP `TicketPort.getTicket` readiness plus local workspace, tool, repository, and quality readiness; GitHub, Railway, and Vercel readiness checks are not required or contacted by smoke. The existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
 
 Example Jira MCP configuration:
 

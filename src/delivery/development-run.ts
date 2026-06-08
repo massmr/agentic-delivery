@@ -612,4 +612,9 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-const localOnlyNote = 'Development execution remained local-only. Ewokbot did not push git branches, open GitHub pull requests, call Railway/Vercel, verify deployments, merge production, or deploy production.';
+const localOnlyNote = [
+  'Development execution remained local-only.',
+  'This operator report records the Jira ticket read through TicketPort.getTicket, the selected local repository, the local branch, and all local run evidence produced under .ewokbot/runs/.',
+  'Local actions performed: repository planning, local branch creation, OpenCode/dev-runner execution, meaningful diff inspection, agent completion evaluation, core safety evaluation, local quality gates, test relevance evaluation, and final-report writing.',
+  'Explicit non-actions: Ewokbot did not transition or comment on Jira, push git branches, open GitHub pull requests, call Railway or Vercel, verify deployments, write an operation ledger, write a staging report, merge production, or deploy production.'
+].join('\n\n');

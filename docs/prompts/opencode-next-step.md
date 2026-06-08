@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, AQ, AR, and AS are complete and accepted. Milestone AT: Real Provider Smoke v1 is the next approved implementation milestone. Do not implement AU or later work until AT is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, AQ, AR, AS, and AT are complete and accepted. Milestone AU: GitHub PR Handoff v1 is the next approved implementation milestone. Do not implement AV or later work until AU is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -118,29 +118,34 @@ AR planning scope:
 
 AS Harness v1 is complete and accepted.
 
-AT is the active next implementation milestone: Real Provider Smoke v1. Use `docs/tracking/next-actions.md` and `docs/plans/approved-backlog.md` for the exact approved scope before editing.
+AT Real Provider Smoke v1 is complete and accepted.
 
-AT planning scope:
+AU is the active next implementation milestone: GitHub PR Handoff v1. Use `docs/tracking/next-actions.md` and `docs/plans/approved-backlog.md` for the exact approved scope before editing.
 
-- Use Jira MCP to read one explicitly selected sandbox ticket.
-- Reuse planning, `run-dev`, meaningful-diff, safety, completion, test relevance, and local quality evidence.
-- Do not open GitHub PRs or call deployment providers in this milestone.
-- Produce an operator report that explains exactly what was read and what local actions happened.
-- Prove that one real Jira ticket can drive `scan`, `plan`, and `run-dev` locally.
-- Ensure missing Jira MCP readiness fails before repository or agent side effects.
-- Keep GitHub, Railway, Vercel, production, and remote mutation out of scope.
+AU planning scope:
 
-AT safety constraints:
+- After local evidence passes, hand off a validated branch to GitHub as a draft pull request without merging.
+- Push the local branch through the allowed local git/native fallback path.
+- Open or reuse a draft PR against the configured develop branch through the typed CodeHostPort.
+- Attach the run report, safety decision, quality evidence, and known limitations to the PR body/comment.
+- Add idempotency protection for repeated handoff attempts.
+- Require meaningful diff, safety pass or accepted human review, completion pass, and quality gates before PR handoff.
+- Keep tests fake-only with fake CodeHostPort and fake git remotes.
 
-- Do not implement AU GitHub PR Handoff v1 or AV Operator Agent Action Sandbox until AT is complete and accepted and a later milestone is explicitly approved.
-- Do not implement GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
+AU safety constraints:
+
+- Do not implement AV Operator Agent Action Sandbox until AU is complete and accepted and a later milestone is explicitly approved.
+- Do not implement staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
+- Do not merge PRs automatically.
+- Do not open production PRs in AU.
+- Do not perform real remote pushes in tests.
 - Do not transition Jira tickets.
 - Do not add live provider calls, live MCP calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
 - Do not delete or revert user changes outside controlled temporary test repositories.
 - Do not print secret values, even when a secret scan fails.
 - Production merge and production deployment remain human-only.
 
-After AT is complete and accepted, the planned sequence is AU GitHub PR Handoff v1, then AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
+After AU is complete and accepted, the planned next milestone is AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
 
 ## Required Reading
 

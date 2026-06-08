@@ -14,8 +14,9 @@
 10. Milestone AQ: Agent Completion Contract is complete and accepted.
 11. Milestone AR: Test Relevance Guard is complete and accepted.
 12. Milestone AS: Harness v1 is complete and accepted.
-13. Milestone AT: Real Provider Smoke v1 is the next approved implementation milestone.
-14. Do not implement AU or later PR handoff, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AT is complete and accepted and a later milestone is explicitly approved.
+13. Milestone AT: Real Provider Smoke v1 is complete and accepted.
+14. Milestone AU: GitHub PR Handoff v1 is the next approved implementation milestone.
+15. Do not implement AV or later operator-agent sandbox, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AU is accepted and a later milestone is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -33,7 +34,7 @@ Milestone AC added `ewokbot worker start`, `--once`, `--dry-run`, foreground con
 
 Milestone AD added local CLI control commands: `ewokbot runs`, `ewokbot inspect <run-id>`, `ewokbot pause`, `ewokbot resume <run-id>`, `ewokbot approve <run-id>`, `ewokbot reject <run-id>`, and `ewokbot logs <run-id>`. After AG, these commands operate on persisted state and sidecar control files under `.ewokbot/runs/`, and approval commands record local human decisions only without merging or deploying production.
 
-Milestone AE added `ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]` for one explicitly confirmed real-provider smoke path. After AG, the command loads `.ewokbot/workspace.yml`, fails missing confirmation before any doctor/config/MCP/state/git/OpenCode/PR/deployment/ledger/provider side effects, runs local doctor before effects, requires Jira/GitHub/Railway `mcp` provider modes, validates runtime MCP readiness, reads exactly one Jira ticket through `TicketPort.getTicket`, refuses an existing `.ewokbot/runs/<ticket-key>/<run-id>/` directory or `state.json` before delivery side effects, requires exactly one selected repository, then proceeds through local git, OpenCode, local quality gates, develop PR handoff with the existing operation ledger, staging verification, and production PR preparation only. It does not list the full backlog, implement multi-repo autonomy, merge production, or deploy production.
+Milestone AE added `ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]` for one explicitly confirmed real-provider smoke path. After AT, the command loads `.ewokbot/workspace.yml`, fails missing confirmation before any doctor/config/MCP/state/git/OpenCode/quality/provider/deployment side effects, runs AT-scoped local/Jira preflight before effects, requires only Jira `mcp` mode, validates `TicketPort.getTicket` readiness, reads exactly one Jira ticket, refuses an existing `.ewokbot/runs/<ticket-key>/<run-id>/` directory or `state.json` before repository side effects, requires exactly one selected repository, then proceeds only through local git branch creation, OpenCode/dev-runner execution, meaningful diff, agent completion, core safety, local quality gates, test relevance, and final report evidence. It does not require GitHub, Railway, or Vercel readiness, list the full backlog, transition or comment on Jira, push git branches, open GitHub pull requests, call Railway or Vercel, verify deployments, write an operation ledger, write a staging report, implement multi-repo autonomy, merge production, or deploy production.
 
 Milestone AF added public CLI stdio MCP client construction, and AG moved the default config source to `.ewokbot/workspace.yml` for scan, worker, and smoke. Supported MCP server entries use `mcp_servers.<id>.command` plus optional `args`; HTTP MCP server entries currently fail fast as unsupported by the public runtime. Missing, unsupported, unavailable, unauthenticated, missing-tool, or disallowed MCP setup fails before Jira reads, worker locks, run-state writes, git, OpenCode, PRs, Railway checks, operation-ledger writes, or provider mutations where applicable. Tests remain fake-only and do not start live MCP servers or OAuth flows.
 
@@ -165,11 +166,10 @@ Implemented:
 
 Continue in this order:
 
-1. AT - Real Provider Smoke v1. Next approved implementation milestone.
-2. AU - GitHub PR Handoff v1. Planned after AT acceptance only.
-3. AV - Operator Agent Action Sandbox. Planned after AU acceptance only.
+1. AU - GitHub PR Handoff v1. Next approved implementation milestone.
+2. AV - Operator Agent Action Sandbox. Planned after AU acceptance only.
 
-Anything outside AT implementation must wait until AT is complete and accepted and a later milestone is explicitly approved. Anything outside AT-AV must be proposed here first and must not be implemented until approved.
+Anything outside AU implementation must wait until AU is complete and accepted and a later milestone is explicitly approved. Anything outside AU-AV must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -210,8 +210,8 @@ The next milestones should move in this order:
 17. AQ - Agent Completion Contract. Completed.
 18. AR - Test Relevance Guard. Completed.
 19. AS - Harness v1. Completed.
-20. AT - Real Provider Smoke v1. Next approved implementation milestone.
-21. AU - GitHub PR Handoff v1. Planned after AT.
+20. AT - Real Provider Smoke v1. Completed.
+21. AU - GitHub PR Handoff v1. Next approved implementation milestone.
 22. AV - Operator Agent Action Sandbox. Planned after AU.
 
 Non-goals for the immediate next milestone:

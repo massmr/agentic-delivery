@@ -2,6 +2,60 @@
 
 ## 2026-06-07
 
+Accepted Milestone AT Real Provider Smoke v1:
+
+- Accepted the Jira-only real-provider smoke flow after scoped preflight hardening.
+- Confirmed `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` requires only Jira MCP `TicketPort.getTicket` readiness plus local workspace/tool/repository/quality readiness.
+- Confirmed smoke reaches local run-dev evidence only and stops at `LOCAL_CHECKS_PASSED`, `FAILED`, or `NEEDS_HUMAN`.
+- Confirmed smoke does not require or contact GitHub, Railway, or Vercel; it also does not transition/comment on Jira, push branches, open PRs, write an operation ledger, verify deployments, write staging reports, merge production, or deploy production.
+- AU - GitHub PR Handoff v1 is now the next approved implementation milestone.
+
+Verification commands run for AT acceptance:
+
+- `pnpm typecheck`
+- `pnpm test` (`323/323`)
+- `git diff --check`
+
+Addressed AT smoke review finding for scoped preflight:
+
+- Scoped `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` doctor output to AT-local and Jira readiness so missing GitHub, Railway, or Vercel provider credentials no longer block Jira-only smoke runs.
+- Preserved standalone `ewokbot doctor` provider readiness behavior and kept smoke blocking on local prerequisites plus Jira MCP `TicketPort.getTicket` readiness before side effects.
+- Added regression coverage for GitHub/Railway MCP modes with missing non-AT env vars reaching `LOCAL_CHECKS_PASSED` while making zero GitHub/Railway MCP list/tool calls and creating no PR, deployment, operation ledger, staging report, or provider handoff files.
+- Removed stale `smokeVerifier` wiring from the CLI smoke delivery options and smoke command tests; staging smoke verifier code remains intact for later milestones.
+- Updated README and next-actions wording so AT smoke requires Jira MCP plus local readiness only and does not require GitHub/Railway/Vercel readiness.
+- Preserved AT scope only: no AU GitHub PR Handoff v1, AV sandbox, staging verification, provider mutation, operation ledger, production merge/deploy, dashboard, live provider calls, or live OpenCode execution in tests were added.
+
+Verification commands run for this AT review fix:
+
+- `lsp_diagnostics` on `src/cli/commands/smoke.ts` and `test/smoke-command.test.ts` was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm test` (`323/323`)
+- `git diff --check`
+
+Implemented Milestone AT Real Provider Smoke v1 review candidate:
+
+- Repurposed `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` from the stale full-provider smoke path into an AT local-only flow.
+- Kept the confirmation and local doctor gates before side effects, then required only Jira MCP readiness for `TicketPort.getTicket` and one explicitly selected ticket.
+- Routed the smoke command through the existing local `run-dev` execution evidence path so successful runs stop at `LOCAL_CHECKS_PASSED` after local branch creation, OpenCode/dev-runner execution, meaningful-diff inspection, agent completion evaluation, core safety evaluation, local quality gates, test relevance evaluation, and final report writing.
+- Preserved AT non-actions explicitly: no Jira transition/comment, no backlog listing, no git push, no GitHub PR, no Railway/Vercel call, no deployment verification, no operation ledger, no staging report, and no production merge/deploy.
+- Expanded the final operator report note so it records the Jira ticket read through `TicketPort.getTicket`, the selected local repository, local branch, local actions, evidence paths, and explicit non-actions.
+- Updated smoke tests to assert Jira `getTicket` only, local evidence files, `LOCAL_CHECKS_PASSED`, no provider handoff files, no GitHub/Railway tool calls, no git push, and fail-before-side-effects behavior when Jira MCP readiness is missing.
+- Updated README and tracking docs to describe AT as implemented pending acceptance while keeping AU and later PR handoff, staging verification, provider mutation, and production automation blocked until explicit acceptance/approval.
+- Preserved AT scope only: no AU GitHub PR Handoff v1, AV sandbox, staging verification, production merge/deploy, dashboard, Telegram/WhatsApp, Sentry/PostHog/Notion ingestion, live provider calls in tests, live OpenCode execution in tests, package-manager setup, or real home-directory mutation were added.
+
+Verification commands run for AT:
+
+- `lsp_diagnostics` on `src/cli/commands/smoke.ts`, `src/delivery/development-run.ts`, and `test/smoke-command.test.ts` was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `rg "requires Jira, GitHub, and Railway|opens the develop PR|verifies Railway staging|production PR preparation|Provider Modes: Jira=mcp" README.md docs/tracking/next-actions.md docs/tracking/roadmap.md src/cli/commands/smoke.ts test/smoke-command.test.ts` found only intentional negative assertions in `test/smoke-command.test.ts`.
+- `pnpm run typecheck`
+- Initial `pnpm test` failed `321/322` because the expanded operator-report wording removed the legacy phrase expected by the `run-dev` test; the phrase was restored while keeping the richer AT wording.
+- `node --test dist/test/run-dev-command.test.js dist/test/smoke-command.test.js` (`21/21`)
+- `pnpm test` (`322/322`)
+- `pnpm run build`
+- `git diff --check`
+
+AT was reviewed, corrected, accepted, and committed. AU is now the next approved implementation milestone.
+
 Accepted Milestone AS Harness v1:
 
 - Accepted the local fixture harness after review fixes for realistic pathspec status and tracked-file unified diff evidence.
