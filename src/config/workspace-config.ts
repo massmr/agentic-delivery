@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises';
 
 import { parseDocument } from 'yaml';
 
-import type { McpServerConfig, McpServerTransport } from '../mcp/index.js';
-import { defaultMcpToolTimeoutMs } from '../mcp/index.js';
+import type { McpPolicyConfig, McpPolicyDecision, McpPolicyMode, McpPolicyOverride, McpServerConfig, McpServerTransport } from '../mcp/index.js';
+import { createDefaultMcpPolicyConfig, defaultMcpToolTimeoutMs, mcpPolicyDecisions, mcpPolicyModes } from '../mcp/index.js';
 import { validateJiraProjectKeys } from '../connectors/jira/jira-project-key-validation.js';
 import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
 import {
@@ -55,6 +55,7 @@ export interface WorkspaceConfig {
   readonly devRunner: DevRunnerWorkspaceConfig;
   readonly quality: QualityWorkspaceConfig;
   readonly mcpServers: readonly McpServerConfig[];
+  readonly mcpPolicy: McpPolicyConfig;
   readonly repos: readonly WorkspaceRepositoryConfig[];
   readonly repositoryDiscovery?: WorkspaceRepositoryDiscoveryConfig | undefined;
 }
@@ -219,6 +220,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
   const devRunner = readSection(input, 'dev_runner', issues);
   const quality = readSection(input, 'quality', issues);
   const mcpServers = readOptionalSection(input, 'mcp_servers', issues);
+  const mcpPolicy = readOptionalMappingSection(input, 'mcp_policy', 'Set mcp_policy.mode and optional provider/server/tool overrides, or remove mcp_policy to use read_only defaults.', issues);
   const reposValue = input.repos;
 
   const parsedWorkspace = workspace === undefined ? undefined : parseWorkspaceSettings(workspace, issues);
@@ -228,6 +230,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
   const parsedDevRunner = devRunner === undefined ? undefined : parseDevRunnerConfig(devRunner, issues);
   const parsedQuality = quality === undefined ? undefined : parseQualityConfig(quality, issues);
   const parsedMcpServers = mcpServers === undefined ? [] : parseMcpServers(mcpServers, issues);
+  const parsedMcpPolicy = mcpPolicy === undefined ? createDefaultMcpPolicyConfig() : parseMcpPolicyConfig(mcpPolicy, issues);
   const parsedRepos = parseRepositories(reposValue, issues, options);
 
   if (parsedJira !== undefined && parsedMcpServers !== undefined) {
@@ -251,6 +254,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
     parsedDevRunner === undefined ||
     parsedQuality === undefined ||
     parsedMcpServers === undefined ||
+    parsedMcpPolicy === undefined ||
     parsedRepos === undefined
   ) {
     return { valid: false, issues };
@@ -267,6 +271,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
       devRunner: parsedDevRunner,
       quality: parsedQuality,
       mcpServers: parsedMcpServers,
+      mcpPolicy: parsedMcpPolicy,
       repos: parsedRepos.repos,
       repositoryDiscovery: parsedRepos.discovery
     }
@@ -494,6 +499,73 @@ function parseQualityConfig(section: WorkspaceConfigInput, issues: WorkspaceConf
   }
 
   return { defaultProfile };
+}
+
+function parseMcpPolicyConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): McpPolicyConfig | undefined {
+  const mode = readMcpPolicyMode(section.mode, issues);
+  const providers = parseMcpPolicyOverrideMap(section.providers, 'mcp_policy.providers', issues);
+  const servers = parseMcpPolicyOverrideMap(section.servers, 'mcp_policy.servers', issues);
+  const tools = parseMcpPolicyOverrideMap(section.tools, 'mcp_policy.tools', issues);
+
+  if (mode === undefined || providers === undefined || servers === undefined || tools === undefined) {
+    return undefined;
+  }
+
+  return { mode, providers, servers, tools };
+}
+
+function parseMcpPolicyOverrideMap(value: unknown, path: string, issues: WorkspaceConfigIssue[]): Readonly<Record<string, McpPolicyOverride>> | undefined {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      message: `${path} must be a YAML mapping when provided.`,
+      action: `Set ${path} entries to mappings with a policy decision, or remove ${path}.`
+    });
+    return undefined;
+  }
+
+  const overrides: Record<string, McpPolicyOverride> = {};
+  let valid = true;
+
+  for (const [key, entry] of Object.entries(value)) {
+    const override = parseMcpPolicyOverride(entry, `${path}.${key}`, issues);
+    if (override === undefined) {
+      valid = false;
+    } else {
+      overrides[key] = override;
+    }
+  }
+
+  return valid ? overrides : undefined;
+}
+
+function parseMcpPolicyOverride(value: unknown, path: string, issues: WorkspaceConfigIssue[]): McpPolicyOverride | undefined {
+  if (typeof value === 'string') {
+    const decision = readMcpPolicyDecision(value, `${path}.decision`, issues);
+    return decision === undefined ? undefined : { decision };
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      message: `${path} must be a policy decision string or a YAML mapping with decision and optional reason.`,
+      action: `Set ${path}.decision to allow, allow_redacted, require_human, or deny.`
+    });
+    return undefined;
+  }
+
+  const decision = readMcpPolicyDecision(value.decision, `${path}.decision`, issues);
+  const reason = readOptionalNonEmptyString(value.reason, `${path}.reason`, `Set ${path}.reason to a non-empty explanation or remove it.`, issues);
+
+  if (decision === undefined) {
+    return undefined;
+  }
+
+  return { decision, reason };
 }
 
 interface ParsedRepositories {
@@ -741,6 +813,25 @@ function readOptionalSection(input: WorkspaceConfigInput, key: string, issues: W
   return value;
 }
 
+function readOptionalMappingSection(input: WorkspaceConfigInput, key: string, action: string, issues: WorkspaceConfigIssue[]): WorkspaceConfigInput | undefined {
+  const value = input[key];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path: key,
+      message: `${key} must be a YAML mapping.`,
+      action
+    });
+    return undefined;
+  }
+
+  return value;
+}
+
 function readStringFields(
   section: WorkspaceConfigInput,
   path: string,
@@ -940,6 +1031,40 @@ function readOptionalMcpTransport(value: unknown, path: string, issues: Workspac
   }
 
   return value;
+}
+
+function readMcpPolicyMode(value: unknown, issues: WorkspaceConfigIssue[]): McpPolicyMode | undefined {
+  if (isMcpPolicyMode(value)) {
+    return value;
+  }
+
+  issues.push({
+    path: 'mcp_policy.mode',
+    message: "mcp_policy.mode must be 'read_only', 'supervised', 'trusted', or 'custom'.",
+    action: "Set mcp_policy.mode to 'read_only' for safe defaults, or choose supervised/trusted/custom intentionally."
+  });
+  return undefined;
+}
+
+function readMcpPolicyDecision(value: unknown, path: string, issues: WorkspaceConfigIssue[]): McpPolicyDecision | undefined {
+  if (isMcpPolicyDecision(value)) {
+    return value;
+  }
+
+  issues.push({
+    path,
+    message: `${path} must be 'allow', 'allow_redacted', 'require_human', or 'deny'.`,
+    action: `Set ${path} to one of the supported MCP policy decisions.`
+  });
+  return undefined;
+}
+
+function isMcpPolicyMode(value: unknown): value is McpPolicyMode {
+  return typeof value === 'string' && mcpPolicyModes.includes(value as McpPolicyMode);
+}
+
+function isMcpPolicyDecision(value: unknown): value is McpPolicyDecision {
+  return typeof value === 'string' && mcpPolicyDecisions.includes(value as McpPolicyDecision);
 }
 
 function readOptionalProviderMode(section: WorkspaceConfigInput, sectionPath: 'dev_runner', issues: WorkspaceConfigIssue[]): ProviderMode | undefined {

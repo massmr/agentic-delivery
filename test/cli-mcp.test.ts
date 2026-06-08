@@ -35,9 +35,11 @@ test('ewokbot mcp inspect lists configured server tools without calling them', a
   assert.match(captured.stdout, /Transport: stdio/u);
   assert.match(captured.stdout, /Command: railway mcp/u);
   assert.match(captured.stdout, /Tools: 3/u);
+  assert.match(captured.stdout, /MCP policy mode: read_only/u);
   assert.match(captured.stdout, /- check-railway-status/u);
   assert.match(captured.stdout, /- list-projects/u);
   assert.match(captured.stdout, /- list-services/u);
+  assert.match(captured.stdout, /policy: allow - Read-only mode allows read-classified tools/u);
   assert.match(captured.stdout, /no MCP tool was called/u);
   assert.equal(captured.stderr, '');
   assert.deepEqual(railway.listToolRequests, [{ serverId: 'railway' }]);
@@ -147,6 +149,11 @@ test('ewokbot mcp inspect --json emits sanitized schemas and output metadata', a
       readonly outputMetadata?: JsonObject;
     }[];
     readonly registry: McpToolRegistry;
+    readonly policy: {
+      readonly mode: string;
+      readonly summary: { readonly allow: number; readonly allowRedacted: number; readonly requireHuman: number; readonly deny: number };
+      readonly evaluations: readonly { readonly toolName: string; readonly decision: string; readonly classification: string }[];
+    };
     readonly safety: { readonly inspectOnly: boolean; readonly mcpMethodsCalled: readonly string[]; readonly toolCallsPerformed: number };
   };
 
@@ -173,6 +180,20 @@ test('ewokbot mcp inspect --json emits sanitized schemas and output metadata', a
     unknownToolsDeniedByDefault: true,
     mcpMethodsCalled: ['listTools'],
     toolCallsPerformed: 0
+  });
+  assert.equal(payload.policy.mode, 'read_only');
+  assert.deepEqual(payload.policy.summary, { allow: 1, allowRedacted: 0, requireHuman: 0, deny: 0 });
+  assert.deepEqual(payload.policy.evaluations[0], {
+    provider: 'railway',
+    serverId: 'railway',
+    toolName: 'list-services',
+    classification: 'read',
+    mode: 'read_only',
+    decision: 'allow',
+    reason: 'Read-only mode allows read-classified tools.',
+    redacted: false,
+    humanApprovalRequired: false,
+    blocked: false
   });
   assert.deepEqual(payload.safety, { inspectOnly: true, mcpMethodsCalled: ['listTools'], toolCallsPerformed: 0 });
   assert.deepEqual(railway.listToolRequests, [{ serverId: 'railway' }]);
@@ -229,6 +250,38 @@ test('ewokbot mcp inspect writes registry snapshots only when explicitly request
     }
   });
   assert.deepEqual(snapshot.safety, { inspectOnly: true, mcpMethodsCalled: ['listTools'], toolCallsPerformed: 0 });
+});
+
+test('ewokbot mcp inspect reports custom policy overrides without calling tools', async () => {
+  const rootPath = createWorkspaceRoot(`${workspaceWithAtlassianMcp()}
+mcp_policy:
+  mode: supervised
+  tools:
+    atlassian.add_jira_comment:
+      decision: require_human
+      reason: Comments require operator review.
+`);
+  const captured = createCapturedIO();
+  const atlassian = new MockMcpClient([
+    createMockMcpTool('atlassian', 'search_jira_issues', () => ({ content: { issues: [] }, isError: false })),
+    createMockMcpTool('atlassian', 'add_jira_comment', () => ({ content: { ok: true }, isError: false }))
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: captured.io,
+    runtimeMcp: { mcpClients: { atlassian } }
+  }).run(['node', 'ewokbot', 'mcp', 'inspect', 'atlassian']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /MCP policy mode: supervised/u);
+  assert.match(captured.stdout, /- search_jira_issues/u);
+  assert.match(captured.stdout, /policy: allow - Supervised mode allows read-classified tools/u);
+  assert.match(captured.stdout, /- add_jira_comment/u);
+  assert.match(captured.stdout, /policy: require_human - Comments require operator review/u);
+  assert.deepEqual(atlassian.listToolRequests, [{ serverId: 'atlassian' }]);
+  assert.deepEqual(atlassian.toolCallRequests, []);
 });
 
 test('ewokbot mcp inspect reports missing configured servers', async () => {

@@ -8,6 +8,7 @@ import { runDevelopmentExecution } from '../delivery/index.js';
 import type { DevelopmentRunResult } from '../delivery/index.js';
 import type { DeliveryTicket, DevRunInput, DevRunResult, DevRunner, QualityReport } from '../domain/index.js';
 import type { GitCommandInput, GitCommandResult, GitCommandRunner } from '../git/index.js';
+import { createDefaultMcpPolicyConfig } from '../mcp/index.js';
 import type { TicketPort } from '../ports/index.js';
 import { getRunDirectoryPath } from '../state/index.js';
 
@@ -192,6 +193,7 @@ function buildWorkspaceConfig(fixture: HarnessFixture): WorkspaceConfig {
       defaultProfile: 'node'
     },
     mcpServers: [],
+    mcpPolicy: createDefaultMcpPolicyConfig(),
     repos: fixture.repositories.map((repository) => ({
       name: repository.name,
       url: `https://github.example.test/ewokbot-fixtures/${repository.name}`,

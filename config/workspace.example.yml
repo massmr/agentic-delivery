@@ -33,6 +33,12 @@ railway:
   staging_branch: develop
   production_branch: main
 
+mcp_policy:
+  mode: read_only
+  providers: {}
+  servers: {}
+  tools: {}
+
 dev_runner:
   provider: opencode
   command: opencode

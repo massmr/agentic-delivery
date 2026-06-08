@@ -252,6 +252,15 @@ dev_runner:
   max_attempts: 2
 quality:
   default_profile: node
+mcp_policy:
+  mode: trusted
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+      reason: Opening a staging pull request is allowed by the worker MCP fixture.
+    ${defaultRailwayMcpToolNames.waitForDeployment}:
+      decision: allow
+      reason: Waiting for a staging deployment is allowed by the worker MCP fixture.
 mcp_servers:
   atlassian:
     display_name: Atlassian MCP

@@ -11,6 +11,7 @@ export {
 export type { ProviderFactoryEnvironment, ProviderFactoryOptions, WorkspaceAdapters } from './adapter-factory.js';
 export {
   RuntimeMcpClientResolutionError,
+  RuntimeMcpPolicyError,
   RuntimeMcpServerConfigError,
   collectRuntimeMcpRequirements,
   createRuntimeTicketPort,

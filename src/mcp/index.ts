@@ -12,6 +12,13 @@ export {
   createRailwayMcpToolRegistry,
   inferMcpToolRegistryProvider
 } from './tool-registry.js';
+export {
+  createDefaultMcpPolicyConfig,
+  createMcpPolicyReport,
+  evaluateMcpToolPolicy,
+  mcpPolicyDecisions,
+  mcpPolicyModes
+} from './policy.js';
 export { sanitizeMcpJsonValue } from './schema-sanitizer.js';
 export {
   McpToolAllowlistError,
@@ -51,5 +58,16 @@ export type {
   McpToolRegistryProvider,
   McpToolRegistrySource
 } from './tool-registry.js';
+export type {
+  McpPolicyConfig,
+  McpPolicyDecision,
+  McpPolicyEvaluation,
+  McpPolicyEvaluationInput,
+  McpPolicyMatchedOverride,
+  McpPolicyMode,
+  McpPolicyOverride,
+  McpPolicyOverrideScope,
+  McpPolicyReport
+} from './policy.js';
 export type { McpMappedError, McpMappedErrorKind } from './errors.js';
 export type { McpServerConfig, McpServerConfigValidationIssue, McpServerTransport } from './server-config.js';

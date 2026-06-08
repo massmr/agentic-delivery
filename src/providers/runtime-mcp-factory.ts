@@ -3,8 +3,8 @@ import { createGitHubMcpToolRequirements } from '../connectors/github/index.js';
 import { createJiraMcpToolRequirements } from '../connectors/jira/index.js';
 import { createRailwayMcpToolRequirements } from '../connectors/railway/index.js';
 import type { DeliveryTicket } from '../domain/index.js';
-import type { McpClient, McpServerConfig, McpToolAllowlistRule, McpToolCallAuditRecord } from '../mcp/index.js';
-import { assertMcpToolAllowed, discoverMcpTools, requireDiscoveredMcpTool } from '../mcp/index.js';
+import type { McpClient, McpPolicyConfig, McpPolicyDecision, McpServerConfig, McpToolAllowlistRule, McpToolCallAuditRecord } from '../mcp/index.js';
+import { assertMcpToolAllowed, createMcpToolRegistry, discoverMcpTools, evaluateMcpToolPolicy, inferMcpToolRegistryProvider, requireDiscoveredMcpTool } from '../mcp/index.js';
 import type { TicketPort } from '../ports/index.js';
 import { createJiraConnector, createWorkspaceAdapters } from './adapter-factory.js';
 import type { ProviderFactoryEnvironment, WorkspaceAdapters } from './adapter-factory.js';
@@ -48,6 +48,22 @@ export class RuntimeMcpServerConfigError extends Error {
   }
 }
 
+export class RuntimeMcpPolicyError extends Error {
+  readonly provider: string;
+  readonly serverId: string;
+  readonly toolName: string;
+  readonly decision: McpPolicyDecision;
+
+  constructor(input: { readonly provider: string; readonly serverId: string; readonly toolName: string; readonly decision: McpPolicyDecision; readonly reason: string }) {
+    super(`${input.provider} MCP runtime tool '${input.toolName}' on server '${input.serverId}' is blocked by MCP policy (${input.decision}): ${input.reason}`);
+    this.name = 'RuntimeMcpPolicyError';
+    this.provider = input.provider;
+    this.serverId = input.serverId;
+    this.toolName = input.toolName;
+    this.decision = input.decision;
+  }
+}
+
 interface RuntimeMcpBinding {
   readonly provider: 'Jira' | 'GitHub' | 'Railway';
   readonly serverId: string;
@@ -59,7 +75,7 @@ export async function createRuntimeWorkspaceAdapters(options: RuntimeProviderFac
   const mcpClients = await resolveRuntimeMcpClients(options, bindings);
   const requirements = bindings.flatMap((binding) => [...binding.requirements]);
 
-  await validateRuntimeMcpReadiness(mcpClients, bindings, options.mcpAllowlist ?? requirements);
+  await validateRuntimeMcpReadiness(mcpClients, bindings, options.mcpAllowlist ?? requirements, options.config.mcpPolicy);
 
   const auditSink = options.mcpAuditSink;
 
@@ -89,7 +105,7 @@ export async function createRuntimeTicketPort(options: RuntimeProviderFactoryOpt
 
   const scopedBinding = scopeJiraMcpBinding(binding, options.requiredJiraMcpActions);
   const mcpClients = await resolveRuntimeMcpClients(options, [scopedBinding]);
-  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements);
+  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements, options.config.mcpPolicy);
 
   return createJiraConnector({
     config: options.config,
@@ -193,7 +209,8 @@ async function resolveRuntimeMcpClients(
 async function validateRuntimeMcpReadiness(
   clients: Readonly<Record<string, McpClient | undefined>>,
   bindings: readonly RuntimeMcpBinding[],
-  allowlist: readonly McpToolAllowlistRule[]
+  allowlist: readonly McpToolAllowlistRule[],
+  policy: McpPolicyConfig
 ): Promise<void> {
   const catalogsByServer = new Map<string, Awaited<ReturnType<typeof discoverMcpTools>>>();
 
@@ -211,6 +228,7 @@ async function validateRuntimeMcpReadiness(
 
     for (const requirement of binding.requirements) {
       requireDiscoveredMcpTool(catalog, requirement.toolName);
+      assertRuntimeMcpPolicyAllowsRequirement(binding, catalog, requirement, policy);
       assertMcpToolAllowed(
         allowlist,
         { serverId: requirement.serverId, toolName: requirement.toolName, arguments: {} },
@@ -218,6 +236,38 @@ async function validateRuntimeMcpReadiness(
       );
     }
   }
+}
+
+function assertRuntimeMcpPolicyAllowsRequirement(
+  binding: RuntimeMcpBinding,
+  catalog: Awaited<ReturnType<typeof discoverMcpTools>>,
+  requirement: McpToolAllowlistRule,
+  policy: McpPolicyConfig
+): void {
+  const registry = createMcpToolRegistry({
+    provider: inferMcpToolRegistryProvider(binding.serverId),
+    serverId: binding.serverId,
+    tools: catalog.tools
+  });
+  const entry = registry.entries.find((candidate) => candidate.toolName === requirement.toolName);
+
+  if (entry === undefined) {
+    return;
+  }
+
+  const evaluation = evaluateMcpToolPolicy({ entry, policy });
+
+  if (evaluation.decision === 'allow') {
+    return;
+  }
+
+  throw new RuntimeMcpPolicyError({
+    provider: binding.provider,
+    serverId: binding.serverId,
+    toolName: requirement.toolName,
+    decision: evaluation.decision,
+    reason: evaluation.reason
+  });
 }
 
 function findRuntimeMcpServer(config: WorkspaceConfig, provider: string, serverId: string): McpServerConfig {

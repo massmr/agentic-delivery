@@ -84,6 +84,7 @@ Responsibilities:
 - Server process/session lifecycle.
 - Tool discovery.
 - Tool registry metadata from inspected provider contracts.
+- Tool policy evaluation from registry classifications and workspace `mcp_policy`.
 - Tool allowlist.
 - Tool schema mapping.
 - Tool call timeout handling.
@@ -91,6 +92,8 @@ Responsibilities:
 - Audit log entries for every external operation.
 
 The tool registry is built from inspection data, not from guessed provider names. Registry entries record the provider, server id, raw tool name, description, sanitized input schema, optional output schema and output metadata, category, classification, source, and default-deny authorization metadata. Operators may explicitly cache sanitized inspection snapshots under `.ewokbot/cache/mcp-tools/`; these snapshots are separate from provider credentials, run evidence, and operation ledgers. Registry data supports full mapping with policy-gated execution, but it does not by itself authorize MCP tool calls.
+
+The workspace-level `mcp_policy` section selects one of four policy modes: `read_only`, `supervised`, `trusted`, or `custom`. Provider, server, and tool overrides may return `allow`, `allow_redacted`, `require_human`, or `deny`; tool overrides take precedence over server and provider overrides. `read_only` permits only read-classified tools. `supervised` permits reads and requires human approval for unoverridden writes. `trusted` permits reads and staging-safe writes while still blocking secret-sensitive, unknown, and destructive tools unless an explicit safe override exists. `custom` denies by default and honors explicit overrides only after the global safety constraints are applied.
 
 ## Provider Strategy
 
@@ -164,7 +167,9 @@ write     -> allowed only through a typed port and state transition
 danger    -> human approval or explicit policy required
 ```
 
-Inspection registry classifications are more detailed than the current runtime allowlist labels: `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`. Unknown or unclassified registry entries are explicit and denied by default. Later policy-mode milestones must decide when, if ever, a classified entry can be executed through a typed business port; AV registry metadata does not add autonomous provider execution.
+Inspection registry classifications are more detailed than the runtime allowlist labels: `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`. Unknown or unclassified registry entries are explicit and denied by default. Policy reports explain whether a registry entry is allowed, redacted, blocked, or requires human approval. Runtime MCP readiness evaluates policy before typed-port allowlist checks and before provider side effects; only `allow` can continue into autonomous typed-port execution. `allow_redacted` is for reporting surfaces and does not broaden runtime execution of secret-sensitive tools.
+
+Global safety constraints override every mode and override: production merge and production deploy cannot become autonomous, destructive delete/remove/destroy tools cannot be autonomously allowed, and raw MCP tool calling is not exposed to coding agents or operator agents. AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, and BC operator-agent sandbox remain separate approved milestones.
 
 Examples:
 

@@ -2,8 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/index.js';
-import { createMcpToolRegistry, inferMcpToolRegistryProvider, sanitizeMcpJsonValue } from '../../mcp/index.js';
-import type { JsonObject, JsonValue, McpClient, McpServerConfig, McpToolDefinition, McpToolRegistry } from '../../mcp/index.js';
+import { createMcpPolicyReport, createMcpToolRegistry, inferMcpToolRegistryProvider, sanitizeMcpJsonValue } from '../../mcp/index.js';
+import type { JsonObject, JsonValue, McpClient, McpPolicyReport, McpServerConfig, McpToolDefinition, McpToolRegistry } from '../../mcp/index.js';
 import { ewokbotMcpToolsCacheDirectory, ewokbotWorkspaceConfigPath, getEwokbotMcpToolRegistrySnapshotPath } from '../../workspace-layout.js';
 import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
@@ -58,7 +58,8 @@ async function runMcpInspectCommand(serverId: string, inspectOptions: McpInspect
   const client = await resolveMcpClient(server, cwd, options);
   const tools = await client.listTools({ serverId: server.id });
   const registry = createMcpToolRegistry({ provider: inferMcpToolRegistryProvider(server.id), serverId: server.id, tools });
-  const payload = createMcpInspectJsonPayload(server, tools, registry);
+  const policyReport = createMcpPolicyReport(registry.entries, config.mcpPolicy);
+  const payload = createMcpInspectJsonPayload(server, tools, registry, policyReport);
 
   if (inspectOptions.cacheRegistry) {
     await writeMcpToolRegistrySnapshot(cwd, server.id, payload);
@@ -80,10 +81,15 @@ async function runMcpInspectCommand(serverId: string, inspectOptions: McpInspect
 
   options.io.stdout(`Tools: ${tools.length}\n`);
   options.io.stdout(`Registry entries: ${registry.entries.length}\n`);
+  options.io.stdout(`MCP policy mode: ${policyReport.mode}\n`);
 
   for (const tool of tools) {
     const description = tool.description.trim();
     options.io.stdout(`- ${tool.name}${description.length > 0 ? `: ${description}` : ''}\n`);
+    const evaluation = policyReport.evaluations.find((candidate) => candidate.toolName === tool.name);
+    if (evaluation !== undefined) {
+      options.io.stdout(`  policy: ${evaluation.decision} - ${evaluation.reason}\n`);
+    }
 
     if (inspectOptions.includeSchemas) {
       writeSchemaBlock('inputSchema', tool.inputSchema, options.io);
@@ -126,7 +132,7 @@ function parseMcpInspectOptions(flags: readonly string[]): { readonly kind: 'ok'
   return { kind: 'ok', options: { includeSchemas, outputJson, cacheRegistry } };
 }
 
-function createMcpInspectJsonPayload(server: McpServerConfig, tools: readonly McpToolDefinition[], registry: McpToolRegistry): JsonObject {
+function createMcpInspectJsonPayload(server: McpServerConfig, tools: readonly McpToolDefinition[], registry: McpToolRegistry, policy: McpPolicyReport): JsonObject {
   return {
     server: sanitizeMcpJsonValue({
       id: server.id,
@@ -143,11 +149,39 @@ function createMcpInspectJsonPayload(server: McpServerConfig, tools: readonly Mc
       outputMetadata: tool.outputMetadata
     }) as JsonObject),
     registry: registryToJsonObject(registry),
+    policy: policyToJsonObject(policy),
     safety: {
       inspectOnly: true,
       mcpMethodsCalled: ['listTools'],
       toolCallsPerformed: 0
     }
+  };
+}
+
+function policyToJsonObject(policy: McpPolicyReport): JsonObject {
+  return {
+    mode: policy.mode,
+    summary: policy.summary,
+    evaluations: policy.evaluations.map((evaluation): JsonObject => {
+      return {
+        provider: evaluation.provider,
+        serverId: evaluation.serverId,
+        toolName: evaluation.toolName,
+        classification: evaluation.classification,
+        mode: evaluation.mode,
+        decision: evaluation.decision,
+        reason: evaluation.reason,
+        redacted: evaluation.redacted,
+        humanApprovalRequired: evaluation.humanApprovalRequired,
+        blocked: evaluation.blocked,
+        matchedOverride: evaluation.matchedOverride === undefined ? undefined : {
+          scope: evaluation.matchedOverride.scope,
+          key: evaluation.matchedOverride.key,
+          decision: evaluation.matchedOverride.decision,
+          reason: evaluation.matchedOverride.reason
+        }
+      };
+    })
   };
 }
 

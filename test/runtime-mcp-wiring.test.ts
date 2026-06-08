@@ -12,6 +12,7 @@ import {
   MockOpenCodeRunner,
   MockRailwayConnector,
   RuntimeMcpClientResolutionError,
+  RuntimeMcpPolicyError,
   collectRuntimeMcpRequirements,
   createMockMcpTool,
   createRuntimeTicketPort,
@@ -169,6 +170,26 @@ test('runtime MCP wiring fails readiness when a configured tool is not allowlist
   assert.deepEqual(client.toolCallRequests, []);
 });
 
+test('runtime MCP wiring fails readiness before side effects when policy denies a required tool', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `mcp_policy:
+  mode: read_only
+`));
+  const client = createRuntimeMcpClients().github;
+
+  await assert.rejects(
+    () => createRuntimeWorkspaceAdapters({ config, mcpClients: { github: client } }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.provider, 'GitHub');
+      assert.equal(error.serverId, 'github');
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.createBranch);
+      assert.equal(error.decision, 'deny');
+      return true;
+    }
+  );
+  assert.deepEqual(client.toolCallRequests, []);
+});
+
 test('runtime MCP requirements stay typed and exclude GitHub branch pushes', () => {
   const config = parseWorkspaceConfig(workspaceWithAllMcpProviders());
   const requirements = collectRuntimeMcpRequirements(config);
@@ -217,7 +238,7 @@ function workspaceWithAllMcpProviders(): string {
   return workspaceWithMcpProviders(['jira', 'github', 'railway']);
 }
 
-function workspaceWithMcpProviders(providers: readonly ('jira' | 'github' | 'railway')[]): string {
+function workspaceWithMcpProviders(providers: readonly ('jira' | 'github' | 'railway')[], policyBlock = trustedRuntimePolicyBlock()): string {
   const jiraMode = providers.includes('jira') ? 'mcp' : 'mock';
   const githubMode = providers.includes('github') ? 'mcp' : 'mock';
   const railwayMode = providers.includes('railway') ? 'mcp' : 'mock';
@@ -251,7 +272,7 @@ ${railwayServer}dev_runner:
   max_attempts: 2
 quality:
   default_profile: node
-mcp_servers:
+${policyBlock}mcp_servers:
 ${serverEntries}
 repos:
   - name: frontend
@@ -263,6 +284,19 @@ repos:
     hints:
       - frontend
     staging_smoke_urls: []
+`;
+}
+
+function trustedRuntimePolicyBlock(): string {
+  return `mcp_policy:
+  mode: trusted
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+      reason: Opening a staging pull request is allowed by the runtime fixture.
+    ${defaultRailwayMcpToolNames.waitForDeployment}:
+      decision: allow
+      reason: Waiting for a staging deployment is allowed by the runtime fixture.
 `;
 }
 

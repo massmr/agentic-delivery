@@ -69,6 +69,12 @@ railway:
   production_branch: main${normalized.railwayProvider === 'railway-mcp' && (normalized.deploymentMonitor === 'railway' || normalized.deploymentMonitor === 'both') ? `
   mcp_server: ${normalized.railwayMcpServer.id}` : ''}
 
+mcp_policy:
+  mode: read_only
+  providers: {}
+  servers: {}
+  tools: {}
+
 dev_runner:
   mode: ${normalized.devRunnerMode === 'opencode' ? 'real' : 'mock'}
   provider: opencode

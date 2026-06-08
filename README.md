@@ -280,9 +280,9 @@ node dist/src/cli/index.js mcp inspect railway --json
 node dist/src/cli/index.js mcp inspect railway --cache-registry
 ```
 
-The default inspect output stays compact and human-readable. `--schema` adds sanitized input schemas plus any output schema or output metadata exposed by MCP discovery, and `--json` emits the same inspected server/tool data as parseable JSON with safety metadata and an internal tool registry. Registry entries record provider, server id, tool name, sanitized schemas, output metadata when present, category, classification, source, and default-deny policy metadata. Known registry classifications are `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`; unknown tools are represented explicitly and remain denied by default until a later policy milestone allows them.
+The default inspect output stays compact and human-readable. `--schema` adds sanitized input schemas plus any output schema or output metadata exposed by MCP discovery, and `--json` emits the same inspected server/tool data as parseable JSON with safety metadata, an internal tool registry, and MCP policy decisions. Registry entries record provider, server id, tool name, sanitized schemas, output metadata when present, category, classification, source, and default-deny policy metadata. Known registry classifications are `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`; unknown and unclassified tools remain denied by default.
 
-`--cache-registry` is the explicit operator opt-in for writing an inspection snapshot to `.ewokbot/cache/mcp-tools/<server-id>.json`. Snapshots are sanitized, live separately from provider credentials and run evidence, and are intended to support full mapping with policy-gated execution in later milestones. Inspect mode remains read-only: it may call MCP tool discovery (`listTools`) for the configured server, but it does not call provider tools, deploy Railway services, mutate Jira/GitHub, execute registry entries, cache schemas outside Ewokbot-owned paths, or print credential-like defaults/examples.
+`--cache-registry` is the explicit operator opt-in for writing an inspection snapshot to `.ewokbot/cache/mcp-tools/<server-id>.json`. Snapshots are sanitized, live separately from provider credentials and run evidence, and support full mapping with policy-gated execution. Inspect mode remains read-only: it may call MCP tool discovery (`listTools`) for the configured server, but it does not call provider tools, deploy Railway services, mutate Jira/GitHub, execute registry entries, cache schemas outside Ewokbot-owned paths, or print credential-like defaults/examples.
 
 ## Configuration
 
@@ -324,6 +324,27 @@ ewokbot init --non-interactive --deployment-monitor both
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
 Providers default to `mock` mode. Jira, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The AT smoke command also requires only Jira MCP `TicketPort.getTicket` readiness plus local workspace, tool, repository, and quality readiness; GitHub, Railway, and Vercel readiness checks are not required or contacted by smoke. The existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
+
+MCP policy defaults to `read_only` and is configured through top-level `mcp_policy`. Supported modes are `read_only`, `supervised`, `trusted`, and `custom`; supported decisions are `allow`, `allow_redacted`, `require_human`, and `deny`. Overrides can target providers, servers, or tools, with tool overrides taking precedence. Runtime MCP readiness evaluates the inspected registry classification and configured policy before typed-port allowlist checks; autonomous runtime execution proceeds only for `allow`, while `deny`, `require_human`, and `allow_redacted` stop before provider side effects. Secret-sensitive tools, unknown tools, destructive deletes, production merge, and production deploy are not autonomously allowed by default.
+
+Example MCP policy configuration:
+
+```yaml
+mcp_policy:
+  mode: read_only
+  providers:
+    atlassian:
+      decision: require_human
+      reason: Jira writes require operator approval.
+  servers:
+    railway:
+      decision: deny
+      reason: Railway writes are disabled in this workspace.
+  tools:
+    github.openGitHubPullRequest:
+      decision: require_human
+      reason: PR handoff is not enabled until the approved GitHub mapping milestone.
+```
 
 Example Jira MCP configuration:
 

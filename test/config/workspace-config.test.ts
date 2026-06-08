@@ -39,6 +39,7 @@ test('loads and validates config/workspace.example.yml', async () => {
   assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP']);
   assert.equal(config.devRunner.maxAttempts, 2);
   assert.equal(config.quality.defaultProfile, 'node');
+  assert.deepEqual(config.mcpPolicy, { mode: 'read_only', providers: {}, servers: {}, tools: {} });
   assert.equal(config.repos.length, 2);
   assert.deepEqual(config.repos[0], {
     name: 'frontend',
@@ -270,6 +271,52 @@ test('workspace config uses default GitHub MCP tool names when mcp_tools is omit
   const config = parseWorkspaceConfig(workspaceWithGitHubMcpDefaults());
 
   assert.deepEqual(config.github.mcpToolNames, defaultGitHubMcpToolNames);
+});
+
+test('workspace config parses MCP policy modes and override maps', () => {
+  const config = parseWorkspaceConfig(`${minimalWorkspaceConfig('repos:\n  discovery: sibling-git-directories\n  exclude: []\n')}
+mcp_policy:
+  mode: custom
+  providers:
+    atlassian: require_human
+  servers:
+    railway:
+      decision: deny
+      reason: Railway writes are paused.
+  tools:
+    github.openGitHubPullRequest:
+      decision: allow
+      reason: Staging PRs are allowed.
+`);
+
+  assert.equal(config.mcpPolicy.mode, 'custom');
+  assert.deepEqual(config.mcpPolicy.providers?.atlassian, { decision: 'require_human' });
+  assert.deepEqual(config.mcpPolicy.servers?.railway, { decision: 'deny', reason: 'Railway writes are paused.' });
+  assert.deepEqual(config.mcpPolicy.tools?.['github.openGitHubPullRequest'], { decision: 'allow', reason: 'Staging PRs are allowed.' });
+});
+
+test('workspace config defaults omitted MCP policy to read_only', () => {
+  const config = parseWorkspaceConfig(minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`));
+
+  assert.deepEqual(config.mcpPolicy, { mode: 'read_only', providers: {}, servers: {}, tools: {} });
+});
+
+test('workspace config rejects invalid MCP policy modes and decisions', () => {
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(`${minimalWorkspaceConfig('repos:\n  discovery: sibling-git-directories\n  exclude: []\n')}
+mcp_policy:
+  mode: reckless
+  tools:
+    github.merge:
+      decision: execute
+`));
+
+  assert.ok(error.issues.some((issue) => issue.path === 'mcp_policy.mode'));
+  assert.ok(error.issues.some((issue) => issue.path === 'mcp_policy.tools.github.merge.decision'));
+  assert.match(error.message, /mcp_policy\.mode must be 'read_only', 'supervised', 'trusted', or 'custom'/u);
+  assert.match(error.message, /must be 'allow', 'allow_redacted', 'require_human', or 'deny'/u);
 });
 
 test('workspace config rejects invalid Jira MCP project keys', () => {

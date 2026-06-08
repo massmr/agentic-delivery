@@ -2,6 +2,29 @@
 
 ## 2026-06-08
 
+Implemented Milestone AW MCP Policy Modes review candidate:
+
+- Added typed MCP policy modes `read_only`, `supervised`, `trusted`, and `custom`, plus policy decisions `allow`, `allow_redacted`, `require_human`, and `deny`.
+- Added registry-based policy evaluation and reports with provider/server/tool override precedence, safe `read_only` defaults, unknown/unclassified default deny, redacted reporting for explicitly approved secret-sensitive reads, and human-readable reasons for every decision.
+- Extended workspace config, generated onboarding config, and example config with top-level `mcp_policy` parsing and validation.
+- Extended `ewokbot mcp inspect <server-id>` human and JSON output with policy decisions while preserving inspect-only behavior: it calls `listTools` and never calls provider tools.
+- Added runtime MCP readiness policy checks before the existing typed-port allowlist guard and before provider side effects. Autonomous runtime execution proceeds only for `allow`; `deny`, `require_human`, and `allow_redacted` stop readiness.
+- Preserved production merge/deploy as human-only, denied unknown tools by default, kept destructive delete/remove/destroy tools from autonomous allow, and kept raw MCP tool calling away from coding/operator agents.
+- Added fake-only tests covering Atlassian, Railway, GitHub, custom, inspect output, config parsing, and runtime readiness decisions.
+- Preserved AW scope only: no AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC operator-agent sandbox, live provider/MCP/OAuth/network calls in tests, production merge/deploy automation, worker daemon, dashboard, Telegram, Sentry/PostHog/Notion ingestion, or autonomous production automation were added.
+
+Verification commands run for AW so far:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm build`
+- Initial focused `node --test dist/test/mcp-policy.test.js dist/test/config/workspace-config.test.js dist/test/cli-mcp.test.js dist/test/runtime-mcp-wiring.test.js` surfaced three test/fixture alignment issues; those were corrected.
+- `node --test dist/test/mcp-policy.test.js dist/test/config/workspace-config.test.js dist/test/cli-mcp.test.js dist/test/runtime-mcp-wiring.test.js` (`46/46`)
+- Initial `pnpm test` surfaced seven MCP readiness fixture issues where scan and worker tests were still validating write/destructive tools under the safe default policy; scan readiness is now scoped to backlog reads and worker fixtures declare explicit staging-safe overrides.
+- `node --test dist/test/cli-scan.test.js dist/test/worker-mcp-mode.test.js` (`12/12`)
+- `pnpm typecheck`
+- `pnpm test` (`350/350`)
+- `git diff --check`
+
 Implemented Milestone AV MCP Tool Registry review candidate:
 
 - Added typed MCP tool registry entries for inspected Atlassian, Railway, GitHub, and custom servers, including provider, server id, tool name, description, sanitized schemas, optional output metadata, category, classification, source, and default-deny policy metadata.

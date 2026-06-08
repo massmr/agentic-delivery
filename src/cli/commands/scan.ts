@@ -18,7 +18,12 @@ export async function runScanCommand(options: ScanCommandOptions): Promise<numbe
   const configPath = resolveScanConfigPath(cwd, options.configPath);
   const environment = loadWorkspaceEnvironment(cwd);
   const config = await loadWorkspaceConfig(configPath, { workspaceRoot: cwd });
-  const jira = await createRuntimeTicketPort({ config, environment, ...options.runtimeMcp });
+  const jira = await createRuntimeTicketPort({
+    config,
+    environment,
+    requiredJiraMcpActions: ['listBacklog'],
+    ...options.runtimeMcp
+  });
   const tickets = await jira.listBacklog();
 
   options.io.stdout(`Found ${tickets.length} Jira backlog tickets:\n`);
