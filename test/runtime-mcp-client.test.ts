@@ -68,7 +68,20 @@ test('public CLI runtime MCP resolves stdio environment from environmentProvider
 });
 
 test('SDK runtime MCP client maps listTools and structured tool results', async () => {
-  const client = new FakeSdkClient({ callToolResult: { structuredContent: { issue: { key: 'AD-100' } }, isError: false } });
+  const client = new FakeSdkClient({
+    callToolResult: { structuredContent: { issue: { key: 'AD-100' } }, isError: false },
+    listToolsResult: {
+      tools: [
+        {
+          name: 'jira.search',
+          description: 'Search Jira',
+          inputSchema: { type: 'object' },
+          outputSchema: { type: 'object', properties: { issues: { type: 'array' } } },
+          outputMetadata: { contentType: 'application/json', example: { issues: [] } }
+        }
+      ]
+    }
+  });
   const mcpClient = await createSdkRuntimeMcpClient(stdioServer(), {
     clientFactory: () => client,
     transportFactory: () => new FakeTransport()
@@ -77,7 +90,15 @@ test('SDK runtime MCP client maps listTools and structured tool results', async 
   const tools = await mcpClient.listTools({ serverId: 'atlassian' });
   const result = await mcpClient.callTool({ serverId: 'atlassian', toolName: 'jira.search', arguments: { jql: 'project = AD' } });
 
-  assert.deepEqual(tools, [{ name: 'jira.search', description: 'Search Jira', inputSchema: { type: 'object' } }]);
+  assert.deepEqual(tools, [
+    {
+      name: 'jira.search',
+      description: 'Search Jira',
+      inputSchema: { type: 'object' },
+      outputSchema: { type: 'object', properties: { issues: { type: 'array' } } },
+      outputMetadata: { contentType: 'application/json', example: { issues: [] } }
+    }
+  ]);
   assert.deepEqual(client.callToolCalls, [
     {
       params: { name: 'jira.search', arguments: { jql: 'project = AD' } },
@@ -188,6 +209,7 @@ class FakeSdkClient implements RuntimeMcpSdkClient {
       readonly connectError?: Error | undefined;
       readonly closeError?: Error | undefined;
       readonly callToolResult?: unknown;
+      readonly listToolsResult?: unknown;
     } = {}
   ) {}
 
@@ -199,7 +221,7 @@ class FakeSdkClient implements RuntimeMcpSdkClient {
   }
 
   async listTools(): Promise<unknown> {
-    return {
+    return this.options.listToolsResult ?? {
       tools: [{ name: 'jira.search', description: 'Search Jira', inputSchema: { type: 'object' } }]
     };
   }

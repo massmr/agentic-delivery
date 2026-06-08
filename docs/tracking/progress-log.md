@@ -1,5 +1,32 @@
 # Progress Log
 
+## 2026-06-08
+
+Implemented Milestone AU MCP Inspect Schemas review candidate:
+
+- Extended `ewokbot mcp inspect <server-id>` with `--schema` and `--json` while preserving the existing default human-readable output.
+- Added sanitized schema rendering for MCP tool input schemas plus optional output schema and output metadata when discovery exposes them.
+- Kept inspect mode read-only: tests use injected mock MCP clients only and assert discovery calls `listTools` without any `callTool` provider execution.
+- Documented the command behavior and updated tracking so AV remains blocked until AU is accepted.
+- Preserved AU scope only: no MCP tool registry, policy modes, Atlassian/Railway/GitHub business-port remapping, GitHub PR handoff, staging verification, provider mutation, production merge/deploy, dashboard, or live provider/MCP/OAuth/network calls were added.
+
+Verification commands run for AU:
+
+- `lsp_diagnostics` on `src/mcp/client.ts`, `src/cli/commands/mcp.ts`, `src/cli/program.ts`, and `test/cli-mcp.test.ts` was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm build`
+- Initial `pnpm test -- test/cli-mcp.test.ts` surfaced an AU redaction bug where credential-like strings inside top-level `examples` arrays were not redacted; the sanitizer was corrected.
+- `node --test dist/test/cli-mcp.test.js` (`5/5`)
+- `pnpm test` (`330/330`)
+- `git diff --check`
+
+Realigned the post-AT roadmap around MCP-first provider contracts:
+
+- Set AU to MCP Inspect Schemas as the next approved implementation milestone.
+- Deferred GitHub PR Handoff v1 to BA, after MCP schema inspection, tool registry, policy modes, and real Atlassian/Railway/GitHub mappings are accepted.
+- Added the approved sequence AU through BC: MCP Inspect Schemas, MCP Tool Registry, MCP Policy Modes, Atlassian MCP Real Mapping, Railway MCP Real Mapping, GitHub MCP Real Mapping, GitHub PR Handoff v1, Real Staging Verification v1, and Operator Agent Action Sandbox.
+- Recorded the product direction as full MCP tool mapping with policy-gated execution, where unknown or unclassified tools are denied by default and production merge/deploy remain human-only.
+
 ## 2026-06-07
 
 Accepted Milestone AT Real Provider Smoke v1:
@@ -8,7 +35,7 @@ Accepted Milestone AT Real Provider Smoke v1:
 - Confirmed `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` requires only Jira MCP `TicketPort.getTicket` readiness plus local workspace/tool/repository/quality readiness.
 - Confirmed smoke reaches local run-dev evidence only and stops at `LOCAL_CHECKS_PASSED`, `FAILED`, or `NEEDS_HUMAN`.
 - Confirmed smoke does not require or contact GitHub, Railway, or Vercel; it also does not transition/comment on Jira, push branches, open PRs, write an operation ledger, verify deployments, write staging reports, merge production, or deploy production.
-- AU - GitHub PR Handoff v1 is now the next approved implementation milestone.
+- At that time, AU - GitHub PR Handoff v1 was marked as the next approved implementation milestone. This was superseded on 2026-06-08 by the MCP Inspect Schemas roadmap realignment above.
 
 Verification commands run for AT acceptance:
 
@@ -54,7 +81,7 @@ Verification commands run for AT:
 - `pnpm run build`
 - `git diff --check`
 
-AT was reviewed, corrected, accepted, and committed. AU is now the next approved implementation milestone.
+AT was reviewed, corrected, accepted, and committed. At that time, AU was marked as the next approved implementation milestone; this was superseded on 2026-06-08 by the MCP Inspect Schemas roadmap realignment above.
 
 Accepted Milestone AS Harness v1:
 

@@ -50,6 +50,7 @@ Current capabilities:
 - Foreground `ewokbot worker start` runtime with bounded or continuous operation, dry-run preview, workspace locking, graceful shutdown, and restart-safe state reuse.
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
+- Read-only MCP schema inspection with human-readable and JSON output for configured provider servers.
 - Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Jira MCP ticket read followed by local run-dev evidence only.
 
 Default behavior is safe:
@@ -269,6 +270,16 @@ node dist/src/cli/index.js worker start
 Use `--once` for a single cycle, `--dry-run` for a read-only backlog preview, `--max-cycles` to bound a foreground session, and `--poll-interval-ms` to tune the continuous polling interval. `SIGINT` and `SIGTERM` request graceful shutdown and release the lock in cleanup. On restart, the worker checks the latest persisted state for each backlog ticket and skips tickets that already have run state so repeated launches do not duplicate side effects. If `.ewokbot/runs/control.json` marks the workspace paused, the worker exits before opening ticket providers or starting delivery work.
 
 The legacy `worker` command remains available for compatibility with existing local and test workflows.
+
+Inspect a configured MCP server before mapping provider tools:
+
+```bash
+node dist/src/cli/index.js mcp inspect atlassian
+node dist/src/cli/index.js mcp inspect atlassian --schema
+node dist/src/cli/index.js mcp inspect railway --json
+```
+
+The default inspect output stays compact and human-readable. `--schema` adds sanitized input schemas plus any output schema or output metadata exposed by MCP discovery, and `--json` emits the same inspected server/tool data as parseable JSON with safety metadata. Inspect mode is read-only: it may call MCP tool discovery (`listTools`) for the configured server, but it does not call provider tools, deploy Railway services, mutate Jira/GitHub, cache schemas outside Ewokbot-owned paths, or print credential-like defaults/examples.
 
 ## Configuration
 

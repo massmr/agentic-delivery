@@ -4,6 +4,8 @@ export interface McpToolDefinition {
   readonly name: string;
   readonly description: string;
   readonly inputSchema: JsonObject;
+  readonly outputSchema?: JsonObject | undefined;
+  readonly outputMetadata?: JsonObject | undefined;
 }
 
 export interface McpListToolsInput {

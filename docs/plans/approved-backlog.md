@@ -1014,11 +1014,215 @@ Explicit safety constraints:
 - Do not transition Jira tickets unless a later milestone explicitly approves it.
 - Production merge and production deployment remain human-only.
 
-### Milestone AU: GitHub PR Handoff v1
+### Milestone AU: MCP Inspect Schemas
 
 Goal:
 
-After local evidence passes, hand off a validated branch to GitHub as a draft pull request without merging.
+Make MCP inspection precise enough to discover real provider contracts before any provider mapping or automation is trusted.
+
+Build:
+
+- Extend `ewokbot mcp inspect <server-id>` with `--json` and/or `--schema` output.
+- Include tool names, descriptions, input schemas, and available output metadata where the MCP server exposes it.
+- Preserve the current default human-readable output for quick inspection.
+- Keep inspect mode read-only: it may call MCP `listTools`, but must not call any provider tool.
+- Support Atlassian, Railway, GitHub, and future configured MCP servers through the same command path.
+- Redact any secret-like values if a server ever exposes defaults or examples that look credential-like.
+- Add tests using injected mock MCP clients only.
+
+Acceptance:
+
+- `ewokbot mcp inspect atlassian --schema` can show the schema for tools such as `search_jira_issues`, `read_jira_issue`, and `add_jira_comment` when returned by the MCP server.
+- `ewokbot mcp inspect railway --schema` can show Railway tool schemas without calling `deploy`, `set_variables`, or any mutating tool.
+- Unknown servers and unsupported flags fail with actionable messages.
+- Tests prove no MCP tool call occurs beyond tool discovery.
+- Tests remain fake-only with no live MCP server startup, provider calls, OAuth flows, network calls, or credential access.
+
+Explicit safety constraints:
+
+- Do not implement provider tool execution in AU.
+- Do not change Jira, Railway, or GitHub business port mappings in AU.
+- Do not cache schemas outside Ewokbot-owned local cache paths unless explicitly requested.
+- Do not print secrets.
+- Production merge and production deployment remain human-only.
+
+### Milestone AV: MCP Tool Registry
+
+Goal:
+
+Give Ewokbot a complete internal registry for discovered MCP tools so providers can be mapped from real contracts instead of guessed names.
+
+Build:
+
+- Add typed models for MCP tool registry entries: provider, server id, tool name, description, input schema, output metadata if available, category, classification, and source.
+- Support classifications such as `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`.
+- Add a local cache path under `.ewokbot/cache/mcp-tools/` for operator-generated inspection snapshots when explicitly requested.
+- Keep registry data separate from provider credentials and run evidence.
+- Add registry loaders for inspected Atlassian, Railway, GitHub, and custom MCP servers.
+- Treat unknown or unclassified tools as denied by default until a policy explicitly allows them.
+- Update docs to explain "full mapping, policy-gated execution".
+
+Acceptance:
+
+- Registry entries can be built from fake MCP inspection data.
+- Unknown tools are represented explicitly and are not silently allowed.
+- No raw secrets are stored in registry snapshots.
+- Tests cover Atlassian, Railway, GitHub, and custom server registry data.
+- Tests remain fake-only with no live provider or MCP calls.
+
+Explicit safety constraints:
+
+- Do not execute any provider tool in AV.
+- Do not implement GitHub PR handoff, Railway staging verification, or Jira transitions in AV.
+- Production merge and production deployment remain human-only.
+
+### Milestone AW: MCP Policy Modes
+
+Goal:
+
+Make MCP execution permissions explicit, configurable, and safe by default before broad provider capabilities are enabled.
+
+Build:
+
+- Add policy modes:
+  - `read_only`
+  - `supervised`
+  - `trusted`
+  - `custom`
+- Add an `mcp_policy` config model for provider/server/tool-level overrides.
+- Define decisions: `allow`, `allow_redacted`, `require_human`, and `deny`.
+- Deny unknown or unclassified tools by default.
+- Add policy evaluation that uses the registry classification and selected autonomy mode.
+- Add clear report/audit output for why a tool was allowed, redacted, blocked, or required human approval.
+- Keep production merge and production deployment human-only regardless of mode.
+
+Acceptance:
+
+- `read_only` permits only read-classified tools.
+- `supervised` can permit selected non-destructive writes while requiring confirmation for risky writes.
+- `trusted` can permit broader staging-safe actions but still blocks production merge/deploy and destructive tools unless explicitly overridden.
+- `custom` honors explicit per-tool policy while still denying unknown tools by default.
+- Tests cover Atlassian, Railway, GitHub, and custom tool decisions.
+
+Explicit safety constraints:
+
+- Do not call live tools in policy tests.
+- Do not allow `set_variables`, secret reads, destructive deletes, production merge, or production deploy by default.
+- Do not expose raw MCP tool calling to coding agents or operator agents.
+
+### Milestone AX: Atlassian MCP Real Mapping
+
+Goal:
+
+Align Jira/Atlassian runtime mapping with the real tools exposed by the maintained local `mcp-atlassian` server.
+
+Known real tool names from local inspection:
+
+- `search_jira_issues`
+- `read_jira_issue`
+- `add_jira_comment`
+- Additional Jira and Confluence tools are present and must be classified before use.
+
+Build:
+
+- Update Jira MCP defaults from guessed names to the real `mcp-atlassian` names after AU schema inspection confirms argument shapes.
+- Adapt `JiraMcpTicketPort` argument mapping to the real input schemas.
+- Preserve `jira.mcp_tools` overrides for custom Atlassian MCP servers.
+- Classify all discovered Atlassian tools into read, write, destructive, secret-sensitive, or unknown categories.
+- Decide the initial supported business intents for Jira: search backlog, read one issue, and optionally comment only under policy.
+- Treat Confluence tools as mapped registry entries, but do not add Confluence business workflows unless separately approved.
+
+Acceptance:
+
+- `ewokbot scan`, `ewokbot plan <ticket-key>`, `ewokbot run-dev <ticket-key> --confirm-dev-execution`, and `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` can use real Atlassian tool names through fake tests and documented live-smoke instructions.
+- Missing or renamed Jira tools fail with actionable guidance showing how to inspect and override `jira.mcp_tools`.
+- Comment writes require policy permission or human confirmation according to the selected mode.
+- Tests remain fake-only.
+
+Explicit safety constraints:
+
+- Do not transition Jira issues in AX.
+- Do not create Jira issues in AX.
+- Do not add Confluence writes to delivery flows in AX.
+- Production merge and production deployment remain human-only.
+
+### Milestone AY: Railway MCP Real Mapping
+
+Goal:
+
+Align Railway runtime mapping with the real tools exposed by `railway mcp`, starting with read-only staging verification capabilities.
+
+Known real tool names from local inspection include:
+
+- `whoami`
+- `environment_status`
+- `list_deployments`
+- `list_projects`
+- `list_services`
+- `get_service_config`
+- `get_logs`
+- `service_metrics`
+- `http_error_rate`
+- `http_requests`
+- `http_response_time`
+- Mutating tools such as `deploy`, `set_variables`, `create_*`, `remove_*`, `scale_service`, and `generate_domain`.
+
+Build:
+
+- Map Railway read-only tools to staging inspection and observability intents.
+- Avoid using mutating tools for default staging verification.
+- Treat `list_variables` as denied or redacted-only by default because it can expose secrets.
+- Replace guessed Railway default tool names with real schema-driven mapping after AU confirms input shapes.
+- Add policy classifications for all discovered Railway tools.
+- Keep service URLs/smoke URLs configured by workspace/repo config unless a safe read-only tool reliably exposes them.
+
+Acceptance:
+
+- Railway readiness and staging status can be checked through read-only fake MCP tools.
+- Mutating Railway tools require human confirmation or are denied according to policy.
+- Secret-sensitive Railway outputs are redacted or blocked.
+- Tests remain fake-only.
+
+Explicit safety constraints:
+
+- Do not call `deploy`, `set_variables`, `remove_*`, `scale_service`, or `generate_domain` by default.
+- Do not print Railway variable values.
+- Production merge and production deployment remain human-only.
+
+### Milestone AZ: GitHub MCP Real Mapping
+
+Goal:
+
+Integrate GitHub MCP through the same inspection, registry, and policy model used for Atlassian and Railway.
+
+Build:
+
+- Add/confirm a maintained GitHub MCP connector preset.
+- Use AU schema inspection to discover the real GitHub MCP tool names and input schemas.
+- Map GitHub business intents: repository discovery where needed, branch/refs readiness, draft PR creation, PR comments, and checks/status reading.
+- Classify GitHub tools such as issue reads, PR creation, comments, checks, workflow operations, branch deletion, repository writes, secrets, and merges.
+- Preserve custom `github.mcp_tools` overrides.
+- Deny merge, branch deletion, secret management, and workflow mutation by default.
+
+Acceptance:
+
+- GitHub MCP real tool contracts are documented and represented in the registry.
+- GitHub write actions are policy-gated before any PR handoff milestone uses them.
+- Tests prove unclassified or destructive GitHub tools are denied by default.
+- Tests remain fake-only.
+
+Explicit safety constraints:
+
+- Do not open real PRs in AZ.
+- Do not push real branches in AZ.
+- Do not merge PRs, mutate secrets, or change workflows.
+- Production merge and production deployment remain human-only.
+
+### Milestone BA: GitHub PR Handoff v1
+
+Goal:
+
+After local evidence passes and GitHub MCP mapping/policy are accepted, hand off a validated branch to GitHub as a draft pull request without merging.
 
 Build:
 
@@ -1026,21 +1230,49 @@ Build:
 - Open or reuse a draft PR against the configured develop branch through the typed CodeHostPort.
 - Attach the run report, safety decision, quality evidence, and known limitations to the PR body/comment.
 - Add idempotency protection for repeated handoff attempts.
+- Require MCP policy permission for all GitHub MCP writes.
 
 Acceptance:
 
-- PR handoff requires meaningful diff, safety pass or accepted human review, completion pass, and quality gates.
+- PR handoff requires meaningful diff, safety pass or accepted human review, completion pass, test relevance, and quality gates.
 - Re-running the same handoff does not duplicate branches, PRs, or comments.
+- GitHub write actions pass through the policy engine.
 - Tests use fake CodeHostPort and fake git remotes only.
 
 Explicit safety constraints:
 
 - Do not merge PRs automatically.
-- Do not open production PRs in AU.
+- Do not open production PRs in BA.
 - Do not perform real remote pushes in tests.
 - Production merge and production deployment remain human-only.
 
-### Milestone AV: Operator Agent Action Sandbox
+### Milestone BB: Real Staging Verification v1
+
+Goal:
+
+Verify staging through policy-approved read-only Railway MCP evidence after a development PR handoff.
+
+Build:
+
+- Read Railway environment/deployment status through mapped Railway MCP tools.
+- Read safe logs/metrics/status evidence with redaction.
+- Run configured staging smoke URLs when available.
+- Write staging evidence into the run directory and final report.
+- Stop before production PR/merge/deploy unless a later milestone explicitly approves those handoffs.
+
+Acceptance:
+
+- Staging verification can pass/fail from fake Railway MCP status plus fake smoke checks.
+- Mutating Railway actions are not called.
+- Secret-sensitive outputs are redacted.
+- Tests remain fake-only.
+
+Explicit safety constraints:
+
+- Do not deploy, rollback, scale, mutate variables, create domains, or delete resources in BB.
+- Do not merge production or deploy production.
+
+### Milestone BC: Operator Agent Action Sandbox
 
 Goal:
 

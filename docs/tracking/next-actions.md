@@ -15,8 +15,9 @@
 11. Milestone AR: Test Relevance Guard is complete and accepted.
 12. Milestone AS: Harness v1 is complete and accepted.
 13. Milestone AT: Real Provider Smoke v1 is complete and accepted.
-14. Milestone AU: GitHub PR Handoff v1 is the next approved implementation milestone.
-15. Do not implement AV or later operator-agent sandbox, staging verification, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AU is accepted and a later milestone is explicitly approved.
+14. Milestone AU: MCP Inspect Schemas is implemented as a review candidate and pending acceptance.
+15. The previous GitHub PR handoff milestone is intentionally deferred until after MCP schema inspection, tool registry, policy modes, Atlassian mapping, Railway mapping, and GitHub mapping are accepted.
+16. Do not implement AV or later MCP registry/policy/mapping, GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AU is accepted and AV is explicitly approved.
 
 ## OpenCode Prompt
 
@@ -166,10 +167,17 @@ Implemented:
 
 Continue in this order:
 
-1. AU - GitHub PR Handoff v1. Next approved implementation milestone.
-2. AV - Operator Agent Action Sandbox. Planned after AU acceptance only.
+1. AU - MCP Inspect Schemas. Next approved implementation milestone.
+2. AV - MCP Tool Registry. Planned after AU acceptance only.
+3. AW - MCP Policy Modes. Planned after AV acceptance only.
+4. AX - Atlassian MCP Real Mapping. Planned after AW acceptance only.
+5. AY - Railway MCP Real Mapping. Planned after AX acceptance only.
+6. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only.
+7. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
+8. BB - Real Staging Verification v1. Planned after BA acceptance only.
+9. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
 
-Anything outside AU implementation must wait until AU is complete and accepted and a later milestone is explicitly approved. Anything outside AU-AV must be proposed here first and must not be implemented until approved.
+Anything outside AU implementation must wait until AU is complete and accepted and a later milestone is explicitly approved. Anything outside AU-BC must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -211,8 +219,15 @@ The next milestones should move in this order:
 18. AR - Test Relevance Guard. Completed.
 19. AS - Harness v1. Completed.
 20. AT - Real Provider Smoke v1. Completed.
-21. AU - GitHub PR Handoff v1. Next approved implementation milestone.
-22. AV - Operator Agent Action Sandbox. Planned after AU.
+21. AU - MCP Inspect Schemas. Implemented review candidate, pending acceptance.
+22. AV - MCP Tool Registry. Planned after AU acceptance; not yet approved for implementation.
+23. AW - MCP Policy Modes. Planned after AV.
+24. AX - Atlassian MCP Real Mapping. Planned after AW.
+25. AY - Railway MCP Real Mapping. Planned after AX.
+26. AZ - GitHub MCP Real Mapping. Planned after AY.
+27. BA - GitHub PR Handoff v1. Planned after AZ.
+28. BB - Real Staging Verification v1. Planned after BA.
+29. BC - Operator Agent Action Sandbox. Planned after BB.
 
 Non-goals for the immediate next milestone:
 

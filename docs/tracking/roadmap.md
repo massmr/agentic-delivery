@@ -127,7 +127,14 @@ Status legend:
 - `[x]` Test relevance guard
 - `[x]` Harness v1 for fixture-based scoring
 - `[x]` Real provider smoke v1 with Jira MCP and local run-dev
-- `[ ]` GitHub draft PR handoff after validated local evidence, next approved milestone
+- `[x]` MCP inspect schemas for real provider tool contracts, implemented review candidate pending acceptance
+- `[ ]` MCP tool registry for Atlassian, Railway, GitHub, and custom servers, planned after AU acceptance
+- `[ ]` MCP policy modes: read-only, supervised, trusted, and custom
+- `[ ]` Atlassian MCP real mapping for Jira intake/comment tools
+- `[ ]` Railway MCP real mapping for read-only staging evidence
+- `[ ]` GitHub MCP real mapping for PR handoff tools
+- `[ ]` GitHub draft PR handoff after validated local evidence and accepted MCP policy
+- `[ ]` Real staging verification through policy-approved Railway read-only evidence
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 
 ## Future Control Surfaces

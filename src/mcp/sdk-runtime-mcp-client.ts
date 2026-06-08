@@ -168,10 +168,19 @@ function normalizeToolDefinition(serverId: string, tool: unknown, index: number)
     throw new Error(`MCP server ${serverId} tools[${index}].name must be a non-empty string.`);
   }
 
-  return {
+  const definition: McpToolDefinition = {
     name,
     description: typeof object.description === 'string' ? object.description : '',
     inputSchema: toJsonObject(object.inputSchema ?? {})
+  };
+
+  const outputSchema = toOptionalJsonObject(object.outputSchema, `MCP server ${serverId} tools[${index}].outputSchema`);
+  const outputMetadata = toOptionalJsonObject(object.outputMetadata, `MCP server ${serverId} tools[${index}].outputMetadata`);
+
+  return {
+    ...definition,
+    ...(outputSchema !== undefined ? { outputSchema } : {}),
+    ...(outputMetadata !== undefined ? { outputMetadata } : {})
   };
 }
 
@@ -221,6 +230,19 @@ function toJsonObject(value: unknown): JsonObject {
   }
 
   throw new Error('Expected a JSON object.');
+}
+
+function toOptionalJsonObject(value: unknown, path: string): JsonObject | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const jsonValue = toJsonValue(value);
+  if (isJsonObjectValue(jsonValue)) {
+    return jsonValue;
+  }
+
+  throw new Error(`${path} must be a JSON object.`);
 }
 
 function isJsonObjectValue(value: JsonValue): value is JsonObject {

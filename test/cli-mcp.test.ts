@@ -8,7 +8,9 @@ import {
   MockMcpClient,
   createCliProgram,
   createMockMcpTool,
-  type CliProgramIO
+  type CliProgramIO,
+  type JsonObject,
+  type MockMcpToolRegistration
 } from '../src/index.js';
 
 test('ewokbot mcp inspect lists configured server tools without calling them', async () => {
@@ -41,6 +43,127 @@ test('ewokbot mcp inspect lists configured server tools without calling them', a
   assert.deepEqual(railway.toolCallRequests, []);
 });
 
+test('ewokbot mcp inspect --schema prints sanitized tool schemas without calling tools', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithAtlassianMcp());
+  const captured = createCapturedIO();
+  const secretDefault = 'ghp_1234567890abcdefghijklmnopqrstuvwxyz';
+  const shortSecretExample = 'short-token';
+  const shortSecretEnum = 'enum-token';
+  const atlassian = new MockMcpClient([
+    createMockMcpTool(
+      'atlassian',
+      'search_jira_issues',
+      () => ({ content: { issues: [] }, isError: false }),
+      {
+        type: 'object',
+        properties: {
+          jql: { type: 'string', description: 'JQL query.' },
+          apiToken: { type: 'string', default: secretDefault, examples: [shortSecretExample], enum: [shortSecretEnum] }
+        },
+        required: ['jql'],
+        examples: [secretDefault]
+      }
+    ),
+    createMockMcpTool('atlassian', 'read_jira_issue', () => ({ content: { issue: {} }, isError: false }), {
+      type: 'object',
+      properties: { issueKey: { type: 'string', example: 'AD-123' } }
+    }),
+    createMockMcpTool('atlassian', 'add_jira_comment', () => ({ content: { ok: true }, isError: false }), {
+      type: 'object',
+      properties: { issueKey: { type: 'string' }, body: { type: 'string' } }
+    })
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: captured.io,
+    runtimeMcp: { mcpClients: { atlassian } }
+  }).run(['node', 'ewokbot', 'mcp', 'inspect', 'atlassian', '--schema']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /MCP server: atlassian/u);
+  assert.match(captured.stdout, /- search_jira_issues/u);
+  assert.match(captured.stdout, /- read_jira_issue/u);
+  assert.match(captured.stdout, /- add_jira_comment/u);
+  assert.match(captured.stdout, /inputSchema:/u);
+  assert.match(captured.stdout, /"apiToken"/u);
+  assert.match(captured.stdout, /"type": "string"/u);
+  assert.match(captured.stdout, /"default": "\[redacted\]"/u);
+  assert.match(captured.stdout, /"enum": \[\n\s+"\[redacted\]"/u);
+  assert.match(captured.stdout, /"examples": \[\n\s+"\[redacted\]"/u);
+  assert.match(captured.stdout, /"example": "AD-123"/u);
+  assert.doesNotMatch(captured.stdout, new RegExp(secretDefault, 'u'));
+  assert.doesNotMatch(captured.stdout, new RegExp(shortSecretExample, 'u'));
+  assert.doesNotMatch(captured.stdout, new RegExp(shortSecretEnum, 'u'));
+  assert.match(captured.stdout, /no MCP tool was called/u);
+  assert.equal(captured.stderr, '');
+  assert.deepEqual(atlassian.listToolRequests, [{ serverId: 'atlassian' }]);
+  assert.deepEqual(atlassian.toolCallRequests, []);
+});
+
+test('ewokbot mcp inspect --json emits sanitized schemas and output metadata', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithRailwayMcp());
+  const captured = createCapturedIO();
+  const deployToken = 'sk-1234567890abcdefghijklmnopqrstuvwxyz';
+  const railway = new MockMcpClient([
+    createToolWithOutputMetadata('railway', 'list-services', {
+      inputSchema: {
+        type: 'object',
+        properties: {
+          projectId: { type: 'string' },
+          deployToken: { type: 'string', example: deployToken }
+        }
+      },
+      outputSchema: {
+        type: 'object',
+        properties: { services: { type: 'array' } }
+      },
+      outputMetadata: {
+        contentType: 'application/json',
+        example: { services: [] }
+      }
+    })
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: captured.io,
+    runtimeMcp: { mcpClients: { railway } }
+  }).run(['node', 'ewokbot', 'mcp', 'inspect', 'railway', '--json']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(captured.stderr, '');
+  assert.doesNotMatch(captured.stdout, new RegExp(deployToken, 'u'));
+
+  const payload = JSON.parse(captured.stdout) as {
+    readonly server: { readonly id: string; readonly transport: string; readonly command?: string; readonly args?: readonly string[] };
+    readonly tools: readonly {
+      readonly name: string;
+      readonly inputSchema: JsonObject;
+      readonly outputSchema?: JsonObject;
+      readonly outputMetadata?: JsonObject;
+    }[];
+    readonly safety: { readonly inspectOnly: boolean; readonly mcpMethodsCalled: readonly string[]; readonly toolCallsPerformed: number };
+  };
+
+  assert.deepEqual(payload.server, { id: 'railway', transport: 'stdio', command: 'railway', args: ['mcp'] });
+  assert.equal(payload.tools[0]?.name, 'list-services');
+  assert.deepEqual(payload.tools[0]?.inputSchema, {
+    type: 'object',
+    properties: {
+      projectId: { type: 'string' },
+      deployToken: { type: 'string', example: '[redacted]' }
+    }
+  });
+  assert.deepEqual(payload.tools[0]?.outputSchema, { type: 'object', properties: { services: { type: 'array' } } });
+  assert.deepEqual(payload.tools[0]?.outputMetadata, { contentType: 'application/json', example: { services: [] } });
+  assert.deepEqual(payload.safety, { inspectOnly: true, mcpMethodsCalled: ['listTools'], toolCallsPerformed: 0 });
+  assert.deepEqual(railway.listToolRequests, [{ serverId: 'railway' }]);
+  assert.deepEqual(railway.toolCallRequests, []);
+});
+
 test('ewokbot mcp inspect reports missing configured servers', async () => {
   const rootPath = createWorkspaceRoot(workspaceWithRailwayMcp());
   const captured = createCapturedIO();
@@ -66,6 +189,12 @@ test('ewokbot mcp rejects unknown subcommands and missing server ids', async () 
   const missingExitCode = await createCliProgram({ io: capturedMissing.io }).run(['node', 'ewokbot', 'mcp', 'inspect']);
   assert.equal(missingExitCode, 1);
   assert.match(capturedMissing.stderr, /Missing MCP server id/u);
+
+  const capturedUnsupported = createCapturedIO();
+  const unsupportedExitCode = await createCliProgram({ io: capturedUnsupported.io }).run(['node', 'ewokbot', 'mcp', 'inspect', 'railway', '--call']);
+  assert.equal(unsupportedExitCode, 1);
+  assert.match(capturedUnsupported.stderr, /Unsupported MCP inspect option '--call'/u);
+  assert.match(capturedUnsupported.stderr, /Supported options: --schema, --json/u);
 });
 
 function createWorkspaceRoot(configYaml: string): string {
@@ -115,6 +244,63 @@ repos:
   discovery: sibling-git-directories
   exclude: []
 `;
+}
+
+function workspaceWithAtlassianMcp(): string {
+  return `
+workspace:
+  name: MCP Inspect Test
+  autonomy: supervised
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mcp
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+  mcp_server: atlassian
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  mode: mock
+  provider: opencode
+  command: opencode
+  max_attempts: 1
+quality:
+  default_profile: node
+mcp_servers:
+  atlassian:
+    transport: http
+    url: https://mcp.example.test/atlassian
+    env_var_names: []
+repos:
+  discovery: sibling-git-directories
+  exclude: []
+`;
+}
+
+function createToolWithOutputMetadata(
+  serverId: string,
+  toolName: string,
+  metadata: { readonly inputSchema: JsonObject; readonly outputSchema?: JsonObject | undefined; readonly outputMetadata?: JsonObject | undefined }
+): MockMcpToolRegistration {
+  return {
+    serverId,
+    definition: {
+      name: toolName,
+      description: `Mock MCP tool ${toolName}.`,
+      inputSchema: metadata.inputSchema,
+      outputSchema: metadata.outputSchema,
+      outputMetadata: metadata.outputMetadata
+    },
+    handler: () => ({ content: { ok: true }, isError: false })
+  };
 }
 
 function createCapturedIO(): { readonly io: CliProgramIO; readonly stdout: string; readonly stderr: string } {

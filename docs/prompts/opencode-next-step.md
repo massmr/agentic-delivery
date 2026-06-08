@@ -12,7 +12,7 @@ The immediate next milestone is also summarized in:
 
 `docs/tracking/next-actions.md`
 
-At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, AQ, AR, AS, and AT are complete and accepted. Milestone AU: GitHub PR Handoff v1 is the next approved implementation milestone. Do not implement AV or later work until AU is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
+At the time this prompt was prepared, Milestones AH, AI, AJ, AK, AL, AM, AN, AO, AP, AQ, AR, AS, and AT are complete and accepted. Milestone AU: MCP Inspect Schemas is the next approved implementation milestone. The previous GitHub PR handoff work is intentionally deferred until after MCP schema inspection, tool registry, policy modes, and real Atlassian/Railway/GitHub mappings are accepted. Do not implement AV or later work until AU is complete and accepted and `docs/tracking/next-actions.md` explicitly approves the later milestone.
 
 AI added `ewokbot run-dev <ticket-key> --confirm-dev-execution` as a development-only command. It reuses the AH Jira MCP ticket intake and repository planning path, requires exactly one selected repository, requires the explicit confirmation flag before side effects, creates a local branch only in that repository, invokes the existing OpenCode execution contract, runs local quality gates, and persists implementation/quality evidence under `.ewokbot/runs/`.
 
@@ -120,32 +120,31 @@ AS Harness v1 is complete and accepted.
 
 AT Real Provider Smoke v1 is complete and accepted.
 
-AU is the active next implementation milestone: GitHub PR Handoff v1. Use `docs/tracking/next-actions.md` and `docs/plans/approved-backlog.md` for the exact approved scope before editing.
+AU is the active next implementation milestone: MCP Inspect Schemas. Use `docs/tracking/next-actions.md` and `docs/plans/approved-backlog.md` for the exact approved scope before editing.
 
 AU planning scope:
 
-- After local evidence passes, hand off a validated branch to GitHub as a draft pull request without merging.
-- Push the local branch through the allowed local git/native fallback path.
-- Open or reuse a draft PR against the configured develop branch through the typed CodeHostPort.
-- Attach the run report, safety decision, quality evidence, and known limitations to the PR body/comment.
-- Add idempotency protection for repeated handoff attempts.
-- Require meaningful diff, safety pass or accepted human review, completion pass, and quality gates before PR handoff.
-- Keep tests fake-only with fake CodeHostPort and fake git remotes.
+- Extend `ewokbot mcp inspect <server-id>` with `--json` and/or `--schema` output.
+- Include tool names, descriptions, input schemas, and available output metadata where the MCP server exposes it.
+- Preserve the current default human-readable output for quick inspection.
+- Keep inspect mode read-only: it may call MCP `listTools`, but must not call any provider tool.
+- Support Atlassian, Railway, GitHub, and future configured MCP servers through the same command path.
+- Redact any secret-like values if a server ever exposes defaults or examples that look credential-like.
+- Keep tests fake-only with injected mock MCP clients only.
 
 AU safety constraints:
 
-- Do not implement AV Operator Agent Action Sandbox until AU is complete and accepted and a later milestone is explicitly approved.
-- Do not implement staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
-- Do not merge PRs automatically.
-- Do not open production PRs in AU.
-- Do not perform real remote pushes in tests.
-- Do not transition Jira tickets.
-- Do not add live provider calls, live MCP calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
+- Do not implement AV MCP Tool Registry until AU is complete and accepted and a later milestone is explicitly approved.
+- Do not implement provider tool execution, Jira/Railway/GitHub business port remapping, GitHub PR handoff, staging verification, production merge, production deployment, dashboard, Telegram, WhatsApp, Sentry, PostHog, Notion, support, SEO, or external signal ingestion.
+- Do not call provider tools beyond MCP tool discovery.
+- Do not transition or comment on Jira.
+- Do not push branches, open PRs, call Railway deployment tools, or mutate providers.
+- Do not add live provider calls, live MCP provider tool calls, live OpenCode execution in tests, package-manager setup, provider network calls, or real home-directory mutation to tests.
 - Do not delete or revert user changes outside controlled temporary test repositories.
 - Do not print secret values, even when a secret scan fails.
 - Production merge and production deployment remain human-only.
 
-After AU is complete and accepted, the planned next milestone is AV Operator Agent Action Sandbox. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
+After AU is complete and accepted, the planned next milestone is AV MCP Tool Registry. Do not start any later milestone until `docs/tracking/next-actions.md` explicitly approves it.
 
 ## Required Reading
 
