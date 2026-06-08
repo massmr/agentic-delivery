@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
 import type { WorkspaceConfig } from '../config/index.js';
+import { defaultGitHubMcpToolNames } from '../connectors/github/index.js';
 import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
 import { runDevelopmentExecution } from '../delivery/index.js';
 import type { DevelopmentRunResult } from '../delivery/index.js';
@@ -165,6 +166,7 @@ function buildWorkspaceConfig(fixture: HarnessFixture): WorkspaceConfig {
       mode: 'mock',
       organization: 'ewokbot-fixtures',
       mcpToolNames: {
+        ...defaultGitHubMcpToolNames,
         createBranch: 'mockCreateBranch',
         openPullRequest: 'mockOpenPullRequest',
         getChecks: 'mockGetChecks',

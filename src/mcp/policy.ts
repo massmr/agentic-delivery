@@ -194,6 +194,10 @@ function applyPolicyOverride(entry: McpToolRegistryEntry, base: BaseDecision, ov
     return denyWithOverride('Destructive delete/remove MCP tools cannot be autonomously allowed by policy overrides.', override);
   }
 
+  if (entry.classification === 'destructive' && override.decision === 'allow' && isGitHubMergePullRequest(entry)) {
+    return requireHuman(`GitHub merge_pull_request requires human approval regardless of policy mode. Override ${override.key} cannot bypass this boundary.`);
+  }
+
   return protectProductionBoundary(entry, {
     decision: override.decision,
     reason: override.reason ?? `Explicit ${override.scope} MCP policy override selected ${override.decision}.`
@@ -201,12 +205,15 @@ function applyPolicyOverride(entry: McpToolRegistryEntry, base: BaseDecision, ov
 }
 
 function protectProductionBoundary(entry: McpToolRegistryEntry, decision: BaseDecision, override: McpPolicyMatchedOverride | undefined): BaseDecision {
-  if (decision.decision !== 'allow' || !isProductionMergeOrDeploy(entry)) {
+  if (decision.decision !== 'allow' || (!isProductionMergeOrDeploy(entry) && !isGitHubMergePullRequest(entry))) {
     return decision;
   }
 
   const suffix = override === undefined ? '' : ` Override ${override.key} cannot bypass this boundary.`;
-  return requireHuman(`Production merge/deploy MCP tools require human approval regardless of policy mode.${suffix}`);
+  const reason = isGitHubMergePullRequest(entry)
+    ? 'GitHub merge_pull_request requires human approval regardless of policy mode.'
+    : 'Production merge/deploy MCP tools require human approval regardless of policy mode.';
+  return requireHuman(`${reason}${suffix}`);
 }
 
 function findPolicyOverride(entry: McpToolRegistryEntry, policy: McpPolicyConfig): McpPolicyMatchedOverride | undefined {
@@ -250,6 +257,11 @@ function isProductionMergeOrDeploy(entry: McpToolRegistryEntry): boolean {
 function isDestructiveDelete(entry: McpToolRegistryEntry): boolean {
   const normalized = `${entry.toolName} ${entry.description}`.replace(/[-_\s]/gu, '').toLowerCase();
   return /(delete|remove|destroy)/u.test(normalized);
+}
+
+function isGitHubMergePullRequest(entry: McpToolRegistryEntry): boolean {
+  const normalized = entry.toolName.replace(/[-_\s]/gu, '').toLowerCase();
+  return entry.provider === 'github' && normalized === 'mergepullrequest';
 }
 
 function allow(reason: string): BaseDecision {

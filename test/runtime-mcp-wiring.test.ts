@@ -81,9 +81,14 @@ test('runtime MCP wiring constructs configured server clients, validates tools, 
 
   assert.equal(createdBranch.headSha, 'runtime-sha');
   const githubToolCalls: readonly { readonly toolName: string }[] = clients.github.toolCallRequests;
-  assert.deepEqual(githubToolCalls.map((call) => call.toolName), [defaultGitHubMcpToolNames.createBranch]);
-  assert.deepEqual(auditRecords.map((record) => record.status), ['started', 'succeeded']);
+  assert.deepEqual(githubToolCalls.map((call) => call.toolName), [
+    defaultGitHubMcpToolNames.listBranches,
+    defaultGitHubMcpToolNames.createBranch
+  ]);
+  assert.deepEqual(auditRecords.map((record) => record.status), ['started', 'succeeded', 'started', 'succeeded']);
   assert.deepEqual(auditRecords.map((record) => `${record.port}.${record.action}`), [
+    'CodeHostPort.createBranch',
+    'CodeHostPort.createBranch',
     'CodeHostPort.createBranch',
     'CodeHostPort.createBranch'
   ]);
@@ -157,7 +162,9 @@ test('runtime MCP wiring fails before delivery side effects when an MCP client c
 test('runtime MCP wiring fails readiness when a configured tool is not discovered', async () => {
   const config = parseWorkspaceConfig(workspaceWithGitHubMcpOnly());
   const client = new MockMcpClient([
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({ content: {}, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: {}, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: {}, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: {}, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: {}, isError: false }))
   ]);
@@ -178,7 +185,7 @@ test('runtime MCP wiring fails readiness when a configured tool is not allowlist
   const config = parseWorkspaceConfig(workspaceWithGitHubMcpOnly());
   const client = createRuntimeMcpClients().github;
   const allowlistWithoutCreateBranch = collectRuntimeMcpRequirements(config).filter(
-    (rule) => rule.action !== 'createBranch'
+    (rule) => rule.toolName !== defaultGitHubMcpToolNames.createBranch
   );
 
   await assert.rejects(
@@ -233,12 +240,17 @@ function createRuntimeMcpClients(): Record<string, MockMcpClient> {
       defaultJiraMcpToolNames.comment
     ])),
     github: new MockMcpClient([
+      createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({
+        content: { branches: [] },
+        isError: false
+      })),
       createMockMcpTool('github', defaultGitHubMcpToolNames.createBranch, () => ({
         content: { branch: { name: 'agent/runtime-mcp', baseBranch: 'develop', headSha: 'runtime-sha' } },
         isError: false
       })),
       ...createTools('github', [
         defaultGitHubMcpToolNames.openPullRequest,
+        defaultGitHubMcpToolNames.listPullRequests,
         defaultGitHubMcpToolNames.getChecks,
         defaultGitHubMcpToolNames.commentOnPullRequest
       ])

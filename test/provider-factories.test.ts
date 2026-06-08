@@ -88,6 +88,7 @@ test('GitHub factory keeps mock default and selects the injected MCP adapter in 
   });
 
   const client = new MockMcpClient([
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({ content: { branches: [] }, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.createBranch, () => ({ content: { branch: { name: 'agent/test', baseBranch: 'develop', headSha: 'sha-default-create' } }, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: { pullRequest: { number: 9, title: 'Default tool names', sourceBranch: 'agent/test', targetBranch: 'develop', url: 'https://github.com/agentic/frontend/pull/9', status: 'open' } }, isError: false }))
   ]);
@@ -125,6 +126,7 @@ test('GitHub factory keeps mock default and selects the injected MCP adapter in 
   assert.equal(createdBranch.headSha, 'sha-default-create');
   assert.equal(pullRequest.number, 9);
   assert.deepEqual(client.toolCallRequests.map((call: { readonly toolName: string }) => call.toolName), [
+    defaultGitHubMcpToolNames.listBranches,
     defaultGitHubMcpToolNames.createBranch,
     defaultGitHubMcpToolNames.openPullRequest
   ]);

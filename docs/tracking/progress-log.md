@@ -1,5 +1,23 @@
 # Progress Log
 
+## 2026-06-09
+
+Implemented Milestone AZ GitHub MCP Real Mapping:
+
+- Replaced guessed GitHub MCP defaults with inspected GitHub MCP tools from `docs/reference/github-mcp-tools.md`: `list_branches`, `create_branch`, `list_pull_requests`, `create_pull_request`, `pull_request_read`, and `add_issue_comment`.
+- Preserved the typed `CodeHostPort` boundary while mapping branch readiness, remote branch creation, draft PR creation, PR-number lookup, check reads, and PR comments to documented fake-only inspected schemas.
+- Preserved custom `github.mcp_tools` overrides and mock mode defaults; GitHub branch push remains on the local/native git fallback path.
+- Classified inspected GitHub tools so read-only PR/branch/check reads are allowed by `read_only`, comments and branch creation are writes, PR creation and remote mutation tools are destructive/default-denied, unknown tools remain denied, and `merge_pull_request` remains human-only even under overrides.
+- Updated runtime MCP readiness, provider factory wiring, worker MCP fixtures, and registry/policy tests so fake clients must expose required inspected GitHub tools before typed provider construction.
+- Preserved AZ scope only: no BA GitHub PR handoff workflow, real GitHub calls, live MCP/Docker/OAuth/network calls, branch push, real PR creation, staging verification, operator-agent sandbox, worker daemon, Telegram/dashboard/Sentry/PostHog/Notion ingestion, production merge, or production deployment work was added.
+
+Verification commands run for AZ:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm test` (`370/370`)
+- `git diff --check`
+
 ## 2026-06-08
 
 Implemented Milestone AY Railway MCP Real Mapping:

@@ -25,7 +25,7 @@
 21. Milestone AX0 - Atlassian Naming And Init Realignment is complete as the prerequisite setup/naming pass.
 22. Milestone AX - Atlassian MCP Real Mapping is implemented in this pass and awaiting acceptance. Jira `TicketPort` now maps to the documented Atlassian MCP tools from `docs/reference/atlassian-mcp-tools.md`: `search_jira_issues`, `read_jira_issue`, and `add_jira_comment` with the documented argument schemas.
 23. Milestone AY - Railway MCP Real Mapping is implemented in this pass and awaiting acceptance. Railway `DeploymentPort` now maps to inspected read-only Railway MCP deployment evidence tools from `docs/reference/railway-mcp-tools.md`: `environment_status` and `list_deployments`. Optional inspected read tools such as `get_service_config`, `list_projects`, `list_services`, `get_logs`, and `service_metrics` remain parsed/classified for future typed use but are not globally required for current `DeploymentPort` readiness. Custom `railway.mcp_tools` overrides remain supported; service URLs must come from deployment evidence or explicit safe URL configuration. `list_variables` is secret-sensitive/redacted/denied, source/link mutation tools are denied by default, and `whoami` plus Railway HTTP observability tools remain unmapped and denied by default.
-24. AZ - GitHub MCP Real Mapping is planned after AY acceptance only. Use `docs/reference/github-mcp-tools.md` as the authoritative inspected GitHub MCP tool reference. Do not implement AZ or later GitHub PR handoff, staging verification, operator-agent sandbox, worker daemon, Telegram, dashboard, Sentry/PostHog/Notion ingestion, or production automation work until AZ is explicitly approved.
+24. Milestone AZ - GitHub MCP Real Mapping is implemented in this pass and awaiting acceptance. GitHub `CodeHostPort` now maps to inspected tools from `docs/reference/github-mcp-tools.md`: `list_branches`, `create_branch`, `list_pull_requests`, `create_pull_request`, `pull_request_read`, and `add_issue_comment`. `create_pull_request` is destructive-classified and policy-gated, `merge_pull_request` remains human-only, destructive branch/file/repo/workflow/secret operations are denied by default, branch push remains a local/native git fallback, mock mode remains the default, and tests remain fake-only with no live GitHub/MCP/Docker/OAuth/network calls.
 
 ## OpenCode Prompt
 
@@ -183,7 +183,7 @@ Continue in this order:
 6. AX0 - Atlassian Naming And Init Realignment. Completed.
 7. AX - Atlassian MCP Real Mapping. Implemented in this pass; awaiting acceptance.
 8. AY - Railway MCP Real Mapping. Implemented in this pass; awaiting acceptance.
-9. AZ - GitHub MCP Real Mapping. Planned after AY acceptance only. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
+9. AZ - GitHub MCP Real Mapping. Implemented in this pass; awaiting acceptance.
 10. BA - GitHub PR Handoff v1. Planned after AZ acceptance only.
 11. BB - Real Staging Verification v1. Planned after BA acceptance only.
 12. BC - Operator Agent Action Sandbox. Planned after BB acceptance only.
@@ -238,8 +238,8 @@ The next milestones should move in this order:
 26. AX0 - Atlassian Naming And Init Realignment. Completed.
 27. AX - Atlassian MCP Real Mapping. Implemented; awaiting acceptance.
 28. AY - Railway MCP Real Mapping. Implemented; awaiting acceptance.
-29. AZ - GitHub MCP Real Mapping. Planned after AY acceptance. Use `docs/reference/github-mcp-tools.md`; do not guess tool names.
-30. BA - GitHub PR Handoff v1. Planned after AZ.
+29. AZ - GitHub MCP Real Mapping. Implemented; awaiting acceptance.
+30. BA - GitHub PR Handoff v1. Planned after AZ acceptance.
 31. BB - Real Staging Verification v1. Planned after BA.
 32. BC - Operator Agent Action Sandbox. Planned after BB.
 

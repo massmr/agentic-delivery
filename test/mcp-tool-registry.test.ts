@@ -130,15 +130,37 @@ test('MCP tool registry classifies real Railway variables observability and muta
 
 test('MCP tool registry classifies GitHub inspection data and preserves output metadata', () => {
   const registry = createGitHubMcpToolRegistry('github', [
+    tool('list_branches'),
+    tool('list_commits'),
+    tool('list_pull_requests'),
+    tool('pull_request_read'),
+    tool('add_issue_comment'),
+    tool('create_branch'),
     tool('search_repositories'),
     tool('create_pull_request', {}, { contentType: 'application/json', example: { number: 123 } }),
-    tool('merge_pull_request')
+    tool('merge_pull_request'),
+    tool('create_or_update_file'),
+    tool('push_files'),
+    tool('delete_branch'),
+    tool('update_secret'),
+    tool('mystery_github_magic')
   ]);
 
-  assertEntry(registry.entries[0], 'search_repositories', 'read', 'code_hosting');
-  assertEntry(registry.entries[1], 'create_pull_request', 'destructive', 'code_hosting');
-  assert.deepEqual(registry.entries[1]?.outputMetadata, { contentType: 'application/json', example: { number: 123 } });
-  assertEntry(registry.entries[2], 'merge_pull_request', 'destructive', 'code_hosting');
+  assertEntry(registry.entries[0], 'list_branches', 'read', 'code_hosting');
+  assertEntry(registry.entries[1], 'list_commits', 'read', 'code_hosting');
+  assertEntry(registry.entries[2], 'list_pull_requests', 'read', 'code_hosting');
+  assertEntry(registry.entries[3], 'pull_request_read', 'read', 'code_hosting');
+  assertEntry(registry.entries[4], 'add_issue_comment', 'write', 'code_hosting');
+  assertEntry(registry.entries[5], 'create_branch', 'write', 'code_hosting');
+  assertEntry(registry.entries[6], 'search_repositories', 'read', 'code_hosting');
+  assertEntry(registry.entries[7], 'create_pull_request', 'destructive', 'code_hosting');
+  assert.deepEqual(registry.entries[7]?.outputMetadata, { contentType: 'application/json', example: { number: 123 } });
+  assertEntry(registry.entries[8], 'merge_pull_request', 'destructive', 'code_hosting');
+  assertEntry(registry.entries[9], 'create_or_update_file', 'destructive', 'code_hosting');
+  assertEntry(registry.entries[10], 'push_files', 'destructive', 'code_hosting');
+  assertEntry(registry.entries[11], 'delete_branch', 'destructive', 'code_hosting');
+  assertEntry(registry.entries[12], 'update_secret', 'secret_sensitive', 'code_hosting');
+  assertEntry(registry.entries[13], 'mystery_github_magic', 'unknown', 'unknown');
 });
 
 test('MCP tool registry represents custom and unknown tools explicitly', () => {

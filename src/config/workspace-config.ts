@@ -25,7 +25,9 @@ export interface JiraMcpToolNameConfig {
 }
 
 export interface GitHubMcpToolNameConfig {
+  readonly listBranches: string;
   readonly createBranch: string;
+  readonly listPullRequests: string;
   readonly openPullRequest: string;
   readonly getChecks: string;
   readonly commentOnPullRequest: string;
@@ -148,10 +150,12 @@ const defaultJiraMcpToolNames: JiraMcpToolNameConfig = {
   comment: 'add_jira_comment'
 };
 const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
-  createBranch: 'createGitHubBranch',
-  openPullRequest: 'openGitHubPullRequest',
-  getChecks: 'getGitHubChecks',
-  commentOnPullRequest: 'commentOnGitHubPullRequest'
+  listBranches: 'list_branches',
+  createBranch: 'create_branch',
+  listPullRequests: 'list_pull_requests',
+  openPullRequest: 'create_pull_request',
+  getChecks: 'pull_request_read',
+  commentOnPullRequest: 'add_issue_comment'
 };
 const defaultDevRunnerTimeoutMs = 30 * 60 * 1000;
 export const defaultDevRunnerEnvVarNames = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP'] as const;
@@ -396,16 +400,18 @@ function parseGitHubMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[])
     issues.push({
       path: 'github.mcp_tools',
       message: 'github.mcp_tools must be a YAML mapping when provided.',
-      action: 'Set github.mcp_tools.create_branch, open_pull_request, get_checks, and comment_pull_request to MCP tool names, or remove github.mcp_tools to use defaults.'
+      action: 'Set github.mcp_tools entries to inspected GitHub MCP tool names, or remove github.mcp_tools to use defaults.'
     });
     return defaultGitHubMcpToolNames;
   }
 
   return {
+    listBranches: readOptionalNonEmptyString(value.list_branches, 'github.mcp_tools.list_branches', 'Set github.mcp_tools.list_branches to the GitHub MCP branch-listing tool name.', issues) ?? defaultGitHubMcpToolNames.listBranches,
     createBranch: readOptionalNonEmptyString(value.create_branch, 'github.mcp_tools.create_branch', 'Set github.mcp_tools.create_branch to the GitHub MCP branch-creation tool name.', issues) ?? defaultGitHubMcpToolNames.createBranch,
-    openPullRequest: readOptionalNonEmptyString(value.open_pull_request, 'github.mcp_tools.open_pull_request', 'Set github.mcp_tools.open_pull_request to the GitHub MCP pull-request tool name.', issues) ?? defaultGitHubMcpToolNames.openPullRequest,
-    getChecks: readOptionalNonEmptyString(value.get_checks, 'github.mcp_tools.get_checks', 'Set github.mcp_tools.get_checks to the GitHub MCP checks tool name.', issues) ?? defaultGitHubMcpToolNames.getChecks,
-    commentOnPullRequest: readOptionalNonEmptyString(value.comment_pull_request, 'github.mcp_tools.comment_pull_request', 'Set github.mcp_tools.comment_pull_request to the GitHub MCP comment tool name.', issues) ?? defaultGitHubMcpToolNames.commentOnPullRequest
+    listPullRequests: readOptionalNonEmptyString(value.list_pull_requests, 'github.mcp_tools.list_pull_requests', 'Set github.mcp_tools.list_pull_requests to the GitHub MCP pull-request listing tool name.', issues) ?? defaultGitHubMcpToolNames.listPullRequests,
+    openPullRequest: readOptionalNonEmptyString(value.open_pull_request, 'github.mcp_tools.open_pull_request', 'Set github.mcp_tools.open_pull_request to the GitHub MCP pull-request creation tool name.', issues) ?? defaultGitHubMcpToolNames.openPullRequest,
+    getChecks: readOptionalNonEmptyString(value.get_checks, 'github.mcp_tools.get_checks', 'Set github.mcp_tools.get_checks to the GitHub MCP pull-request read tool name.', issues) ?? defaultGitHubMcpToolNames.getChecks,
+    commentOnPullRequest: readOptionalNonEmptyString(value.comment_pull_request, 'github.mcp_tools.comment_pull_request', 'Set github.mcp_tools.comment_pull_request to the GitHub MCP issue comment tool name.', issues) ?? defaultGitHubMcpToolNames.commentOnPullRequest
   };
 }
 

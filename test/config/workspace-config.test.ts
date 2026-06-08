@@ -244,10 +244,12 @@ test('workspace config accepts GitHub MCP settings', () => {
   assert.equal(config.github.mode, 'mcp');
   assert.equal(config.github.mcpServerId, 'github');
   assert.deepEqual(config.github.mcpToolNames, {
+    listBranches: 'github.listBranches',
     createBranch: 'github.createBranch',
-    openPullRequest: 'github.openPullRequest',
-    getChecks: 'github.getChecks',
-    commentOnPullRequest: 'github.commentOnPullRequest'
+    listPullRequests: 'github.listPullRequests',
+    openPullRequest: 'github.createPullRequest',
+    getChecks: 'github.pullRequestRead',
+    commentOnPullRequest: 'github.addIssueComment'
   });
   assert.equal(config.mcpServers[0]?.id, 'github');
 });
@@ -302,7 +304,7 @@ mcp_policy:
       decision: deny
       reason: Railway writes are paused.
   tools:
-    github.openGitHubPullRequest:
+    create_pull_request:
       decision: allow
       reason: Staging PRs are allowed.
 `);
@@ -310,7 +312,7 @@ mcp_policy:
   assert.equal(config.mcpPolicy.mode, 'custom');
   assert.deepEqual(config.mcpPolicy.providers?.atlassian, { decision: 'require_human' });
   assert.deepEqual(config.mcpPolicy.servers?.railway, { decision: 'deny', reason: 'Railway writes are paused.' });
-  assert.deepEqual(config.mcpPolicy.tools?.['github.openGitHubPullRequest'], { decision: 'allow', reason: 'Staging PRs are allowed.' });
+  assert.deepEqual(config.mcpPolicy.tools?.create_pull_request, { decision: 'allow', reason: 'Staging PRs are allowed.' });
 });
 
 test('workspace config defaults omitted MCP policy to read_only', () => {
@@ -451,10 +453,12 @@ github:
   organization: agentic
   mcp_server: github
   mcp_tools:
+    list_branches: github.listBranches
     create_branch: github.createBranch
-    open_pull_request: github.openPullRequest
-    get_checks: github.getChecks
-    comment_pull_request: github.commentOnPullRequest
+    list_pull_requests: github.listPullRequests
+    open_pull_request: github.createPullRequest
+    get_checks: github.pullRequestRead
+    comment_pull_request: github.addIssueComment
 railway:
   mode: mock
   staging_branch: develop

@@ -188,9 +188,11 @@ function createWorkerMcpClients(options: { readonly omitGitHubCreateBranch?: boo
     createMockMcpTool('atlassian', defaultJiraMcpToolNames.comment, () => ({ content: { ok: true }, isError: false }))
   ]);
   const githubTools = [
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({ content: { branches: [] }, isError: false })),
     ...(options.omitGitHubCreateBranch
       ? []
       : [createMockMcpTool('github', defaultGitHubMcpToolNames.createBranch, () => ({ content: { branch: { headSha: 'mcp-worker-sha' } }, isError: false }))]),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: { pull_requests: [] }, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({
       content: { pullRequest: { number: 501, url: 'https://github.example.test/pr/501' } },
       isError: false

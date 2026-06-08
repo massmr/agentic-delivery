@@ -26,17 +26,32 @@ test('read_only allows Atlassian read tools and denies writes by default', () =>
 });
 
 test('supervised mode requires human approval for GitHub writes unless explicitly overridden', () => {
-  const entry = githubEntry('commentOnGitHubPullRequest');
+  const entry = githubEntry('add_issue_comment');
   const supervised = evaluateMcpToolPolicy({ entry, policy: policy('supervised') });
   const explicitAllow = evaluateMcpToolPolicy({
     entry,
-    policy: policy('supervised', { tools: { 'github.commentOnGitHubPullRequest': { decision: 'allow', reason: 'review comments are staging-safe' } } })
+    policy: policy('supervised', { tools: { 'github.add_issue_comment': { decision: 'allow', reason: 'review comments are staging-safe' } } })
   });
 
   assert.equal(supervised.decision, 'require_human');
   assert.equal(supervised.humanApprovalRequired, true);
   assert.equal(explicitAllow.decision, 'allow');
-  assert.equal(explicitAllow.matchedOverride?.key, 'github.commentOnGitHubPullRequest');
+  assert.equal(explicitAllow.matchedOverride?.key, 'github.add_issue_comment');
+});
+
+test('read_only allows inspected GitHub reads and denies writes or destructive tools by default', () => {
+  for (const toolName of ['list_branches', 'list_pull_requests', 'pull_request_read']) {
+    const evaluation = evaluateMcpToolPolicy({ entry: githubEntry(toolName) });
+    assert.equal(evaluation.decision, 'allow');
+  }
+
+  const writeEvaluation = evaluateMcpToolPolicy({ entry: githubEntry('add_issue_comment') });
+  const destructiveEvaluation = evaluateMcpToolPolicy({ entry: githubEntry('create_pull_request') });
+
+  assert.equal(writeEvaluation.decision, 'deny');
+  assert.match(writeEvaluation.reason, /Read-only mode denies non-read/u);
+  assert.equal(destructiveEvaluation.decision, 'deny');
+  assert.match(destructiveEvaluation.reason, /Destructive tools are denied by default/u);
 });
 
 test('trusted mode allows Railway read/status tools but denies secret-sensitive tools by default', () => {
@@ -123,17 +138,30 @@ test('production merge or deploy tools cannot be autonomously allowed', () => {
 
 test('destructive delete tools cannot be autonomously allowed but staging-safe destructive overrides can be explicit', () => {
   const deleteEvaluation = evaluateMcpToolPolicy({
-    entry: githubEntry('deleteBranch'),
-    policy: policy('custom', { tools: { deleteBranch: { decision: 'allow' } } })
+    entry: githubEntry('delete_branch'),
+    policy: policy('custom', { tools: { delete_branch: { decision: 'allow' } } })
   });
   const openPullRequestEvaluation = evaluateMcpToolPolicy({
-    entry: githubEntry('openGitHubPullRequest'),
-    policy: policy('custom', { tools: { openGitHubPullRequest: { decision: 'allow', reason: 'staging PR handoff is safe' } } })
+    entry: githubEntry('create_pull_request'),
+    policy: policy('custom', { tools: { create_pull_request: { decision: 'allow', reason: 'staging PR handoff is safe' } } })
   });
 
   assert.equal(deleteEvaluation.decision, 'deny');
   assert.match(deleteEvaluation.reason, /delete\/remove/u);
   assert.equal(openPullRequestEvaluation.decision, 'allow');
+});
+
+test('GitHub merge_pull_request cannot be autonomously allowed', () => {
+  const entry = githubEntry('merge_pull_request');
+  const custom = evaluateMcpToolPolicy({
+    entry,
+    policy: policy('custom', { tools: { merge_pull_request: { decision: 'allow' } } })
+  });
+  const trusted = evaluateMcpToolPolicy({ entry, policy: policy('trusted') });
+
+  assert.equal(custom.decision, 'require_human');
+  assert.match(custom.reason, /merge_pull_request requires human approval/u);
+  assert.equal(trusted.decision, 'deny');
 });
 
 test('policy reports summarize allow redacted human and denied decisions', () => {

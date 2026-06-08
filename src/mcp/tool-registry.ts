@@ -127,6 +127,13 @@ function classifyTool(toolName: string, provider: McpToolRegistryProvider): McpT
     }
   }
 
+  if (provider === 'github') {
+    const githubClassification = classifyGitHubTool(normalized);
+    if (githubClassification !== undefined) {
+      return githubClassification;
+    }
+  }
+
   if (hasSecretSensitiveName(toolName, normalized)) {
     return 'secret_sensitive';
   }
@@ -169,6 +176,26 @@ function classifyRailwayTool(normalized: string): McpToolRegistryClassification 
 
   if (/^(deploy|deploytemplate|generatedomain|connectservicesource|disconnectservicesource|linkservice|linkenvironment)$/u.test(normalized) || /^(create|remove|update)/u.test(normalized) || /(removeservice|scaleservice|scaledeployment)/u.test(normalized)) {
     return 'destructive';
+  }
+
+  return undefined;
+}
+
+function classifyGitHubTool(normalized: string): McpToolRegistryClassification | undefined {
+  if (/^(listbranches|listcommits|listpullrequests|pullrequestread|searchrepositories|searchcode|getfilecontents|getissue|getpullrequest|getcommit|getrelease|listissues|listreleases)$/u.test(normalized)) {
+    return 'read';
+  }
+
+  if (/^(addissuecomment|createbranch)$/u.test(normalized)) {
+    return 'write';
+  }
+
+  if (/^(createpullrequest|updatepullrequest|mergepullrequest|deletefile|createorupdatefile|pushfiles|forkrepository|createissue|updateissue|deletebranch)$/u.test(normalized)) {
+    return 'destructive';
+  }
+
+  if (/(workflow|secret|token|credential|password|auth)/u.test(normalized)) {
+    return 'secret_sensitive';
   }
 
   return undefined;
