@@ -20,6 +20,7 @@ export interface DevToolSetupAdapterDependencies {
   readonly workspaceRoot: string;
   readonly fileExists: (path: string) => boolean;
   readonly readFile: (path: string) => string | undefined;
+  readonly readDirectory?: ((path: string) => readonly string[]) | undefined;
   readonly commandExists: (command: string) => boolean;
   readonly runCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
 }
@@ -33,6 +34,8 @@ export interface DevToolDetectionResult {
   readonly globalConfigPresent: boolean;
   readonly projectConfigPath: string;
   readonly projectConfigPresent: boolean;
+  readonly configPathsPresent?: readonly string[] | undefined;
+  readonly configSourcesPresent?: readonly string[] | undefined;
   readonly authPath: string;
   readonly authPresent: boolean;
   readonly authListChecked: boolean;

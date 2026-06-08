@@ -666,10 +666,11 @@ Build:
 - Ask whether to use oh-my-openagent; detect existing local config when possible and write only Ewokbot-owned config or documented instructions unless explicit mutation is approved.
 - Ask for model/provider environment variables needed by the selected OpenCode setup and write them to `.ewokbot/.env`; never print secret values back to stdout/stderr.
 - Ask for ticket provider, with Jira MCP as the only supported real provider for now and mock mode as an explicit option.
-- Configure Jira MCP server settings, including server id, command, args, base URL, and project keys.
+- Configure Jira MCP through maintained Ewokbot connector presets, starting with the local `mcp-atlassian` stdio server, so normal users enter only Jira URL, project keys, email, and API token instead of MCP server id, command, args, or env allowlists.
 - Ask for code host provider, with GitHub MCP as the first real target and mock mode as an explicit option.
 - Configure GitHub MCP server settings when selected, but do not require GitHub for `run-dev`.
 - Ask for deployment/CI monitor, supporting Railway MCP, Vercel placeholder/mock, both, or none where appropriate. Railway remains the first real staging target; Vercel may be captured as config intent if real support is not implemented yet.
+- Configure Railway MCP through maintained Ewokbot connector presets, starting with the local Railway CLI stdio server (`railway mcp`), so normal users do not enter MCP server id, command, args, env allowlists, or Railway API tokens for that default path.
 - Keep repository discovery as the default: watch all direct sibling Git repositories from the launch directory unless the operator chooses explicit repos.
 - Generate `.ewokbot/.env.example` from the chosen providers and `.ewokbot/.env` from entered values or blank placeholders when the operator skips a secret.
 - Load `.ewokbot/.env` in runtime commands that need environment variables, before constructing providers or OpenCode runners.

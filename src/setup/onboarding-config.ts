@@ -1,5 +1,6 @@
 import { parseWorkspaceConfig } from '../config/index.js';
 import { defaultDevRunnerEnvVarNames } from '../config/workspace-config.js';
+import { atlassianJiraMcpPreset, railwayCliMcpPreset } from './connector-presets.js';
 import { defaultSetupSelections, getDeploymentMonitors, getRequiredEnvPlaceholders, type McpServerSelection, type SetupSelections } from './provider-capability.js';
 
 export interface OnboardingFiles {
@@ -125,12 +126,12 @@ function normalizeSelections(selections: SetupSelections): NormalizedSetupSelect
     ticketProvider: selections.ticketProvider ?? defaultSetupSelections.ticketProvider ?? 'mock',
     jiraBaseUrl: nonEmpty(selections.jiraBaseUrl, defaultSetupSelections.jiraBaseUrl ?? 'https://jira.example.test'),
     jiraProjectKeys: nonEmptyList(selections.jiraProjectKeys, defaultSetupSelections.jiraProjectKeys ?? ['AD']),
-    jiraMcpServer: selections.jiraMcpServer ?? { id: 'jira', command: 'jira-mcp', args: [], envVarNames: ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] },
+    jiraMcpServer: selections.jiraMcpServer ?? atlassianJiraMcpPreset.server,
     codeHostProvider: selections.codeHostProvider ?? defaultSetupSelections.codeHostProvider ?? 'mock',
     githubOrganization: nonEmpty(selections.githubOrganization, defaultSetupSelections.githubOrganization ?? 'agentic'),
     githubMcpServer: selections.githubMcpServer ?? { id: 'github', command: 'github-mcp-server', args: [], envVarNames: ['GITHUB_TOKEN'] },
     railwayProvider: selections.railwayProvider ?? defaultSetupSelections.railwayProvider ?? 'mock',
-    railwayMcpServer: selections.railwayMcpServer ?? { id: 'railway', command: 'railway-mcp', args: [], envVarNames: ['RAILWAY_TOKEN'] },
+    railwayMcpServer: selections.railwayMcpServer ?? railwayCliMcpPreset.server,
     envValues: selections.envValues ?? {}
   };
 }
@@ -156,11 +157,11 @@ function collectMcpServers(selections: NormalizedSetupSelections): readonly McpS
 function collectEnvNames(normalized: NormalizedSetupSelections, selections: SetupSelections): readonly string[] {
   const names = [
     'OPENCODE_COMMAND',
-    'JIRA_BASE_URL',
+    normalized.ticketProvider === 'jira-mcp' ? undefined : 'JIRA_BASE_URL',
     'GITHUB_ORG',
     ...getRequiredEnvPlaceholders(selections),
     ...collectMcpServers(normalized).flatMap((server) => server.envVarNames)
-  ];
+  ].filter((name): name is string => name !== undefined);
 
   return uniqueNames(names);
 }
@@ -182,7 +183,7 @@ function defaultNonSecretEnvValue(name: string, selections: NormalizedSetupSelec
     return selections.opencodeCommand;
   }
 
-  if (name === 'JIRA_BASE_URL') {
+  if (name === 'JIRA_BASE_URL' || name === 'ATLASSIAN_BASE_URL') {
     return selections.jiraBaseUrl;
   }
 

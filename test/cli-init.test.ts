@@ -148,7 +148,7 @@ test('agentic init creates non-interactive onboarding files in the current direc
   assert.deepEqual(config.repos, []);
   assert.equal(config.repositoryDiscovery?.discovery, 'sibling-git-directories');
   assert.match(readFileSync(envPath, 'utf8'), /OPENCODE_COMMAND=opencode\n/u);
-  assert.match(readFileSync(envExamplePath, 'utf8'), /RAILWAY_TOKEN=\n/u);
+  assert.doesNotMatch(readFileSync(envExamplePath, 'utf8'), /RAILWAY_TOKEN=\n/u);
   assert.equal(existsSync(join(workspaceDir, 'xdg-config', 'ewokbot')), true);
   assert.equal(existsSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'auth.json')), true);
   assert.equal(existsSync(join(workspaceDir, 'xdg-data', 'ewokbot', 'state')), true);
@@ -245,7 +245,7 @@ test('ewokbot init generates Railway-only onboarding config and placeholders', a
   assert.equal(captured.stderr, '');
   assert.match(readFileSync(join(workspaceDir, '.ewokbot', 'workspace.yml'), 'utf8'), /deployment_monitors:\n    - railway/u);
   const envExample = readFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'utf8');
-  assert.match(envExample, /^RAILWAY_TOKEN=$/mu);
+  assert.doesNotMatch(envExample, /^RAILWAY_TOKEN=/mu);
   assert.doesNotMatch(envExample, /^VERCEL_TOKEN=/mu);
   assert.doesNotMatch(envExample, /secret|example-token|changeme/iu);
 });
@@ -310,8 +310,8 @@ test('ewokbot init generates both Railway and Vercel onboarding config', async (
   assert.match(config, /deployment_monitors:\n    - railway\n    - vercel/u);
   assert.match(config, /optional_tools:\n    - oh-my-openagent/u);
   const envExample = readFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'utf8');
-  assert.match(envExample, /^RAILWAY_TOKEN=$/mu);
   assert.match(envExample, /^VERCEL_TOKEN=$/mu);
+  assert.doesNotMatch(envExample, /^RAILWAY_TOKEN=/mu);
 });
 
 test('ewokbot init injected wizard answers generate MCP workspace and secret-safe env files', async () => {
@@ -334,13 +334,13 @@ test('ewokbot init injected wizard answers generate MCP workspace and secret-saf
       ticketProvider: 'jira-mcp',
       jiraBaseUrl: 'https://jira.example.test',
       jiraProjectKeys: ['AJ', 'OPS'],
-      jiraMcpServer: { id: 'atlassian', command: 'jira-mcp', args: ['--stdio'], envVarNames: ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] },
+      jiraMcpServer: { id: 'atlassian', command: 'mcp-atlassian', args: [], envVarNames: ['ATLASSIAN_BASE_URL', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'] },
       codeHostProvider: 'github-mcp',
       githubOrganization: 'ewokbot',
       githubMcpServer: { id: 'github', command: 'github-mcp', args: [], envVarNames: ['GITHUB_TOKEN'] },
       railwayProvider: 'railway-mcp',
-      railwayMcpServer: { id: 'railway', command: 'railway-mcp', args: [], envVarNames: ['RAILWAY_TOKEN'] },
-      envValues: { JIRA_API_TOKEN: secretValue }
+      railwayMcpServer: { id: 'railway', command: 'railway', args: ['mcp'], envVarNames: [] },
+      envValues: { ATLASSIAN_API_TOKEN: secretValue }
     })
   }).run(['node', 'ewokbot', 'init']);
 
@@ -361,11 +361,11 @@ test('ewokbot init injected wizard answers generate MCP workspace and secret-saf
 
   const env = readFileSync(join(workspaceDir, '.ewokbot', '.env'), 'utf8');
   const envExample = readFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'utf8');
-  assert.match(env, new RegExp(`^JIRA_API_TOKEN=${secretValue}$`, 'mu'));
+  assert.match(env, new RegExp(`^ATLASSIAN_API_TOKEN=${secretValue}$`, 'mu'));
   assert.match(env, /^OPENCODE_COMMAND=opencode$/mu);
   assert.doesNotMatch(env, /^OPENCODE_API_KEY=/mu);
   assert.doesNotMatch(env, /^ANTHROPIC_API_KEY=/mu);
-  assert.match(envExample, /^JIRA_API_TOKEN=$/mu);
+  assert.match(envExample, /^ATLASSIAN_API_TOKEN=$/mu);
   assert.doesNotMatch(envExample, /^OPENCODE_API_KEY=/mu);
   assert.doesNotMatch(envExample, /^ANTHROPIC_API_KEY=/mu);
   assert.doesNotMatch(envExample, new RegExp(secretValue, 'u'));
@@ -391,10 +391,6 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     'AJ,OPS',
     secrets.jiraEmail,
     secrets.jiraToken,
-    'company-jira',
-    'company-jira-mcp',
-    '--stdio,--tenant company',
-    'JIRA_BASE_URL,JIRA_EMAIL,JIRA_API_TOKEN',
     'github-mcp',
     'ewokbot-org',
     secrets.github,
@@ -404,11 +400,6 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     'GITHUB_TOKEN',
     ['railway', 'vercel'],
     'railway-mcp',
-    secrets.railway,
-    'company-railway',
-    'railway-mcp',
-    '--stdio',
-    'RAILWAY_TOKEN',
     secrets.vercel
   ]);
 
@@ -424,6 +415,8 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
 
   assert.equal(exitCode, 0);
   assert.equal(captured.stderr, '');
+  assert.doesNotMatch(captured.stdout, /OpenCode readiness:/u);
+  assert.doesNotMatch(captured.stdout, /OpenCode config file/u);
   for (const secret of Object.values(secrets)) {
     assert.doesNotMatch(captured.stdout, new RegExp(secret, 'u'));
     assert.doesNotMatch(captured.stderr, new RegExp(secret, 'u'));
@@ -434,22 +427,28 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.equal(prompts.calls.some((call) => call.kind === 'select' && call.message === 'Ticket provider'), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'checkbox' && call.message === 'Deployment/CI monitors'), true);
   assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message.includes('oh-my-openagent')), true);
-  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('JIRA_EMAIL value')), true);
-  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP server id')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('ATLASSIAN_EMAIL value')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('ATLASSIAN_API_TOKEN value')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP server id')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP command')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Jira MCP env_var_names')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('GitHub MCP command')), true);
-  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Railway MCP env_var_names')), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('RAILWAY_TOKEN value')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Railway MCP server id')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Railway MCP command')), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('Railway MCP env_var_names')), false);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message.includes('VERCEL_TOKEN value')), true);
 
   const configYaml = readFileSync(join(workspaceDir, '.ewokbot', 'workspace.yml'), 'utf8');
   const config = parseWorkspaceConfig(configYaml);
   assert.equal(config.devRunner.mode, 'real');
-  assert.equal(config.jira.mcpServerId, 'company-jira');
+  assert.equal(config.jira.mcpServerId, 'atlassian');
   assert.equal(config.github.mcpServerId, 'company-github');
-  assert.equal(config.railway.mcpServerId, 'company-railway');
+  assert.equal(config.railway.mcpServerId, 'railway');
   assert.deepEqual(config.mcpServers.map((server) => ({ id: server.id, command: server.command, args: server.args, envVarNames: server.envVarNames })), [
-    { id: 'company-jira', command: 'company-jira-mcp', args: ['--stdio', '--tenant company'], envVarNames: ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] },
+    { id: 'atlassian', command: 'mcp-atlassian', args: [], envVarNames: ['ATLASSIAN_BASE_URL', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'] },
     { id: 'company-github', command: 'github-mcp', args: ['--stdio'], envVarNames: ['GITHUB_TOKEN'] },
-    { id: 'company-railway', command: 'railway-mcp', args: ['--stdio'], envVarNames: ['RAILWAY_TOKEN'] }
+    { id: 'railway', command: 'railway', args: ['mcp'], envVarNames: [] }
   ]);
   assert.deepEqual(config.devRunner.envVarNames, ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP']);
 
@@ -457,20 +456,22 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   const envExample = readFileSync(join(workspaceDir, '.ewokbot', '.env.example'), 'utf8');
   assert.doesNotMatch(env, /^OPENCODE_API_KEY=/mu);
   assert.doesNotMatch(env, /^ANTHROPIC_API_KEY=/mu);
-  assert.match(env, /^JIRA_EMAIL=agent@example\.test$/mu);
-  assert.match(env, /^JIRA_API_TOKEN=jira-secret-value$/mu);
+  assert.match(env, /^ATLASSIAN_BASE_URL=https:\/\/jira\.company\.test$/mu);
+  assert.match(env, /^ATLASSIAN_EMAIL=agent@example\.test$/mu);
+  assert.match(env, /^ATLASSIAN_API_TOKEN=jira-secret-value$/mu);
   assert.match(env, /^GITHUB_TOKEN=github-secret-value$/mu);
-  assert.match(env, /^RAILWAY_TOKEN=railway-secret-value$/mu);
+  assert.doesNotMatch(env, /^RAILWAY_TOKEN=/mu);
   assert.match(env, /^VERCEL_TOKEN=vercel-secret-value$/mu);
   for (const secret of Object.values(secrets)) {
     assert.doesNotMatch(envExample, new RegExp(secret, 'u'));
   }
   assert.doesNotMatch(envExample, /^OPENCODE_API_KEY=/mu);
   assert.doesNotMatch(envExample, /^ANTHROPIC_API_KEY=/mu);
-  assert.match(envExample, /^JIRA_EMAIL=$/mu);
-  assert.match(envExample, /^JIRA_API_TOKEN=$/mu);
+  assert.match(envExample, /^ATLASSIAN_BASE_URL=$/mu);
+  assert.match(envExample, /^ATLASSIAN_EMAIL=$/mu);
+  assert.match(envExample, /^ATLASSIAN_API_TOKEN=$/mu);
   assert.match(envExample, /^GITHUB_TOKEN=$/mu);
-  assert.match(envExample, /^RAILWAY_TOKEN=$/mu);
+  assert.doesNotMatch(envExample, /^RAILWAY_TOKEN=/mu);
   assert.match(envExample, /^VERCEL_TOKEN=$/mu);
 });
 
@@ -522,12 +523,13 @@ test('ewokbot init interactive wizard offers missing OpenCode instructions witho
 
   assert.equal(exitCode, 0);
   assert.equal(captured.stderr, '');
-  assert.match(captured.stdout, /OpenCode readiness: opencode is not installed/u);
+  assert.doesNotMatch(captured.stdout, /OpenCode readiness:/u);
   assert.match(captured.stdout, /OpenCode setup instructions for opencode/u);
   assert.match(captured.stdout, /Ewokbot did not run installers, auth flows, or OpenCode commands for setup/u);
   assert.deepEqual(runCommands, []);
   assert.equal(config.devRunner.mode, 'mock');
   assert.equal(prompts.calls.some((call) => call.kind === 'select' && call.message === 'Development runner' && call.choices.includes('Enter custom OpenCode command path')), true);
+  assert.doesNotMatch(captured.stdout, /OpenCode readiness:/u);
 });
 
 test('ewokbot init interactive wizard requires acknowledgement for not-authenticated OpenCode', async () => {
@@ -560,8 +562,8 @@ test('ewokbot init interactive wizard requires acknowledgement for not-authentic
 
   assert.equal(exitCode, 0);
   assert.equal(captured.stderr, '');
-  assert.match(captured.stdout, /OpenCode readiness: opencode is installed but not authenticated/u);
-  assert.match(captured.stdout, /OpenCode readiness warning: installed_not_authenticated/u);
+  assert.doesNotMatch(captured.stdout, /OpenCode readiness:/u);
+  assert.doesNotMatch(captured.stdout, /OpenCode readiness warning/u);
   assert.equal(config.devRunner.mode, 'real');
   assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message.includes('Continue with OpenCode state installed_not_authenticated')), true);
   assert.equal(prompts.calls.some((call) => call.message.includes('OpenCode-specific env vars')), false);
@@ -592,13 +594,35 @@ test('ewokbot init interactive wizard accepts a ready custom OpenCode command pa
 
   assert.equal(exitCode, 0);
   assert.equal(captured.stderr, '');
-  assert.match(captured.stdout, /OpenCode readiness: opencode is not installed/u);
-  assert.match(captured.stdout, /OpenCode readiness: \/opt\/local\/bin\/opencode is ready/u);
+  assert.doesNotMatch(captured.stdout, /OpenCode readiness:/u);
   assert.equal(config.devRunner.mode, 'real');
   assert.match(env, /^OPENCODE_COMMAND=\/opt\/local\/bin\/opencode$/mu);
   assert.equal(prompts.calls.some((call) => call.kind === 'input' && call.message === 'OpenCode command path'), true);
   assert.equal(prompts.calls.some((call) => call.message.includes('OpenCode-specific env vars')), false);
   assert.equal(prompts.calls.some((call) => call.message.includes('Model/provider API key env vars')), false);
+});
+
+test('ewokbot init --debug renders OpenCode readiness diagnostics on request', async () => {
+  const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-debug-opencode-'));
+  const captured = createCapturedIO();
+  const opencodeHomeDirectory = prepareReadyOpenCodeHome(workspaceDir);
+  const prompts = createFakePromptAdapter(['opencode', false, 'mock', 'mock', []]);
+
+  const exitCode = await createCliProgram({
+    cwd: workspaceDir,
+    io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
+    initOpenCodeHomeDirectory: opencodeHomeDirectory,
+    initCommandExists: (command) => command === 'opencode',
+    initRunCommand: (_command, args) => args[0] === '--version' ? { exitCode: 0, stdout: 'opencode 1.0.0', stderr: '' } : { exitCode: 0, stdout: 'authenticated', stderr: '' },
+    initPrompter: async (defaults, context) => promptForSelectionsWithPromptAdapter({ ...defaults, deploymentMonitor: 'none' }, prompts, context)
+  }).run(['node', 'ewokbot', 'init', '--debug']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(captured.stderr, '');
+  assert.match(captured.stdout, /OpenCode readiness: opencode is ready/u);
+  assert.match(captured.stdout, /OpenCode config file\(s\) detected/u);
+  assert.match(captured.stdout, /OpenCode model configuration was detected without exposing values/u);
 });
 
 test('ewokbot init stops real OpenCode setup when the command is missing', async () => {

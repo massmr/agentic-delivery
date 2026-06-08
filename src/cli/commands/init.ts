@@ -4,7 +4,7 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { checkbox, confirm, input as promptInput, select } from '@inquirer/prompts';
 
-import { createOnboardingFiles, defaultSetupSelections, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
+import { atlassianJiraMcpPreset, createOnboardingFiles, defaultSetupSelections, railwayCliMcpPreset, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
 import { OpenCodeSetupAdapter, type DevToolCommandResult, type DevToolDetectionResult, type DevToolReadinessState } from '../../setup/index.js';
 import { createEwokbotUserLayout, type ResolveEwokbotUserLayoutOptions } from '../../user-layout.js';
 import { ewokbotCacheDirectory, ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotLogsDirectory, ewokbotRunsDirectory, ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
@@ -26,6 +26,7 @@ export type InitPrompter = (defaults: SetupSelections, context: InitPromptContex
 export interface InitPromptContext {
   readonly opencodeDetection: DevToolDetectionResult;
   readonly detectOpenCode: (command?: string | undefined) => DevToolDetectionResult;
+  readonly debug: boolean;
   readonly io: CliProgramIO;
 }
 
@@ -49,9 +50,7 @@ class InitArgumentError extends Error {
   }
 }
 
-const defaultJiraMcpServer: McpServerSelection = { id: 'jira', command: 'jira-mcp', args: [], envVarNames: ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'] };
 const defaultGitHubMcpServer: McpServerSelection = { id: 'github', command: 'github-mcp-server', args: [], envVarNames: ['GITHUB_TOKEN'] };
-const defaultRailwayMcpServer: McpServerSelection = { id: 'railway', command: 'railway-mcp', args: [], envVarNames: ['RAILWAY_TOKEN'] };
 
 export async function runInitCommand(options: InitCommandOptions): Promise<number> {
   const cwd = options.cwd ?? process.cwd();
@@ -87,7 +86,9 @@ export async function runInitCommand(options: InitCommandOptions): Promise<numbe
       return 1;
     }
 
-    if (detection.state === 'installed_not_authenticated' || detection.state === 'installed_authenticated_no_model') {
+    const parsed = parseInitArgs(options.args ?? []);
+
+    if (parsed.debug && (detection.state === 'installed_not_authenticated' || detection.state === 'installed_authenticated_no_model')) {
       options.io.stdout(`OpenCode readiness warning: ${detection.state}. Continue setup, then finish OpenCode auth/model configuration outside Ewokbot before real development runs.\n`);
     }
   }
@@ -125,7 +126,7 @@ async function resolveSelections(options: InitCommandOptions): Promise<SetupSele
     return parsed.selections;
   }
 
-  const context = createInitPromptContext(cwd, options, parsed.selections.opencodeCommand);
+  const context = createInitPromptContext(cwd, options, parsed.selections.opencodeCommand, parsed.debug);
 
   if (options.prompter !== undefined) {
     return options.prompter(parsed.selections, context);
@@ -138,10 +139,11 @@ async function resolveSelections(options: InitCommandOptions): Promise<SetupSele
   return parsed.selections;
 }
 
-function createInitPromptContext(cwd: string, options: InitCommandOptions, command: string | undefined): InitPromptContext {
+function createInitPromptContext(cwd: string, options: InitCommandOptions, command: string | undefined, debug: boolean): InitPromptContext {
   return {
     opencodeDetection: detectOpenCode(cwd, options, command),
     detectOpenCode: (customCommand) => detectOpenCode(cwd, options, customCommand ?? command),
+    debug,
     io: options.io
   };
 }
@@ -159,8 +161,9 @@ function detectOpenCode(cwd: string, options: InitCommandOptions, command: strin
   }).detect();
 }
 
-function parseInitArgs(args: readonly string[]): { readonly nonInteractive: boolean; readonly selections: SetupSelections } {
+function parseInitArgs(args: readonly string[]): { readonly nonInteractive: boolean; readonly debug: boolean; readonly selections: SetupSelections } {
   let nonInteractive = false;
+  let debug = false;
   let deploymentMonitor = defaultSetupSelections.deploymentMonitor;
   let includeOhMyOpenAgent = defaultSetupSelections.includeOhMyOpenAgent;
   let ticketProvider = defaultSetupSelections.ticketProvider;
@@ -173,6 +176,11 @@ function parseInitArgs(args: readonly string[]): { readonly nonInteractive: bool
 
     if (arg === '--non-interactive' || arg === '--yes') {
       nonInteractive = true;
+      continue;
+    }
+
+    if (arg === '--debug' || arg === '--verbose') {
+      debug = true;
       continue;
     }
 
@@ -217,7 +225,7 @@ function parseInitArgs(args: readonly string[]): { readonly nonInteractive: bool
     }
   }
 
-  return { nonInteractive, selections: { ...defaultSetupSelections, deploymentMonitor, includeOhMyOpenAgent, ticketProvider, codeHostProvider, railwayProvider, devRunnerMode } };
+  return { nonInteractive, debug, selections: { ...defaultSetupSelections, deploymentMonitor, includeOhMyOpenAgent, ticketProvider, codeHostProvider, railwayProvider, devRunnerMode } };
 }
 
 function parseDeploymentMonitor(value: string | undefined): DeploymentMonitorSelection {
@@ -292,9 +300,9 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
   if (ticketProvider === 'jira-mcp') {
     jiraBaseUrl = nonEmptyPromptValue(await prompts.input({ message: 'Jira base URL', defaultValue: defaults.jiraBaseUrl ?? 'https://jira.example.test' }), defaults.jiraBaseUrl);
     jiraProjectKeys = withDefaultList(parseCsv(await prompts.input({ message: 'Jira project keys, comma-separated', defaultValue: (defaults.jiraProjectKeys ?? ['AD']).join(',') })), defaults.jiraProjectKeys);
-    envValues.JIRA_EMAIL = await askSecret(prompts, 'JIRA_EMAIL value');
-    envValues.JIRA_API_TOKEN = await askSecret(prompts, 'JIRA_API_TOKEN value');
-    jiraMcpServer = await promptForMcpServer(prompts, 'Jira MCP', defaults.jiraMcpServer ?? defaultJiraMcpServer);
+    envValues.ATLASSIAN_EMAIL = await askSecret(prompts, 'ATLASSIAN_EMAIL value');
+    envValues.ATLASSIAN_API_TOKEN = await askSecret(prompts, 'ATLASSIAN_API_TOKEN value');
+    jiraMcpServer = defaults.jiraMcpServer ?? atlassianJiraMcpPreset.server;
   }
 
   const codeHostProvider = await prompts.select({ message: 'Code host provider', choices: [
@@ -328,8 +336,7 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
     ], defaultValue: defaults.railwayProvider ?? 'mock' });
 
     if (railwayProvider === 'railway-mcp') {
-      envValues.RAILWAY_TOKEN = await askSecret(prompts, 'RAILWAY_TOKEN value');
-      railwayMcpServer = await promptForMcpServer(prompts, 'Railway MCP', defaults.railwayMcpServer ?? defaultRailwayMcpServer);
+      railwayMcpServer = defaults.railwayMcpServer ?? railwayCliMcpPreset.server;
     }
   }
 
@@ -365,7 +372,9 @@ async function promptForOpenCodeSelection(
 ): Promise<{ readonly devRunnerMode: DevRunnerModeSelection; readonly opencodeCommand: string | undefined }> {
   const detection = context.opencodeDetection;
 
-  context.io.stdout(renderOpenCodeReadiness(detection));
+  if (context.debug) {
+    context.io.stdout(renderOpenCodeReadiness(detection));
+  }
 
   if (detection.state === 'installed_ready') {
     const devRunnerMode = await prompts.select({ message: 'Development runner', choices: [
@@ -417,7 +426,9 @@ async function promptForOpenCodeSelection(
     const customCommand = nonEmptyPromptValue(await prompts.input({ message: 'OpenCode command path', defaultValue: defaults.opencodeCommand ?? 'opencode' }), defaults.opencodeCommand ?? 'opencode');
     const customDetection = context.detectOpenCode(customCommand);
 
-    context.io.stdout(renderOpenCodeReadiness(customDetection));
+    if (context.debug) {
+      context.io.stdout(renderOpenCodeReadiness(customDetection));
+    }
 
     if (customDetection.state === 'installed_ready') {
       return { devRunnerMode: 'opencode', opencodeCommand: customDetection.command };

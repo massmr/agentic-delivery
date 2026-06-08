@@ -15,6 +15,7 @@ import { runInitCommand } from './commands/init.js';
 import { runDoctorCommand } from './commands/doctor.js';
 import { runHarnessCommand } from './commands/harness.js';
 import { runPlanCommand } from './commands/plan.js';
+import { runMcpCommand } from './commands/mcp.js';
 import { parseQualityCommandOptions, runQualityCommand } from './commands/quality.js';
 import { parseRunDevCommandOptions, runRunDevCommand } from './commands/run-dev.js';
 import type { RunDevCommandDeliveryOptions } from './commands/run-dev.js';
@@ -48,6 +49,7 @@ const HELP_TEXT = [
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
   '  ewokbot run-dev <ticket-key> --confirm-dev-execution [--run-id <run-id>]',
   '  ewokbot smoke <ticket-key> --confirm-real-provider-smoke [--run-id <run-id>]',
+  '  ewokbot mcp inspect <server-id>',
   '  ewokbot runs',
   '  ewokbot inspect <run-id>',
   '  ewokbot pause',
@@ -71,6 +73,7 @@ const HELP_TEXT = [
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
   '  run-dev     Execute one explicitly confirmed Jira ticket through local branch, OpenCode, and quality only.',
   '  smoke       Execute one explicitly confirmed real-provider single-ticket smoke run.',
+  '  mcp         Inspect configured MCP servers without calling tools.',
   '  runs        List persisted local runs without contacting providers.',
   '  inspect     Show detailed local run state, reports, control intent, and next action.',
   `  pause       Pause workspace worker processing using ${getEwokbotWorkspaceControlFilePath()}.`,
@@ -248,6 +251,16 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
           doctorOptions: options.doctorOptions,
           runtimeMcp: options.runtimeMcp,
           delivery: options.smokeDelivery
+        });
+      }
+
+      if (args[0] === 'mcp') {
+        return runMcpCommand({
+          args: args.slice(1),
+          cwd: options.cwd,
+          configPath: options.configPath,
+          io,
+          runtimeMcp: options.runtimeMcp
         });
       }
 

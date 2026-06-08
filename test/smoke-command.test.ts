@@ -176,7 +176,7 @@ test('smoke command reads one Jira MCP ticket and stays on local checks only', a
 
 test('smoke command ignores non-AT provider env readiness and does not call their MCP clients', async (t) => {
   const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml(), {
-    envLines: ['JIRA_BASE_URL=redacted', 'JIRA_EMAIL=redacted', 'JIRA_API_TOKEN=redacted']
+    envLines: ['ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted']
   });
   const captured = createCapturedIO();
   const clients = createSmokeMcpClients();
@@ -394,12 +394,12 @@ async function createTempRoot(t: TestContext): Promise<string> {
 async function createSmokeWorkspace(t: TestContext, configYaml: string, options: { readonly envLines?: readonly string[] | undefined } = {}): Promise<string> {
   const rootPath = await createTempRoot(t);
   const repoPath = join(rootPath, 'frontend');
-  const envLines = options.envLines ?? ['GITHUB_ORG=redacted', 'GITHUB_TOKEN=redacted', 'JIRA_BASE_URL=redacted', 'JIRA_EMAIL=redacted', 'JIRA_API_TOKEN=redacted', 'RAILWAY_TOKEN=redacted'];
+  const envLines = options.envLines ?? ['GITHUB_ORG=redacted', 'GITHUB_TOKEN=redacted', 'ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted', 'RAILWAY_TOKEN=redacted'];
 
   await mkdir(join(rootPath, '.ewokbot'), { recursive: true });
   await mkdir(repoPath, { recursive: true });
   await writeFile(join(rootPath, '.ewokbot', 'workspace.yml'), configYaml, 'utf8');
-  await writeFile(join(rootPath, '.ewokbot', '.env.example'), ['GITHUB_ORG=', 'GITHUB_TOKEN=', 'JIRA_BASE_URL=', 'JIRA_EMAIL=', 'JIRA_API_TOKEN=', 'RAILWAY_TOKEN=', ''].join('\n'), 'utf8');
+  await writeFile(join(rootPath, '.ewokbot', '.env.example'), ['GITHUB_ORG=', 'GITHUB_TOKEN=', 'ATLASSIAN_BASE_URL=', 'ATLASSIAN_EMAIL=', 'ATLASSIAN_API_TOKEN=', 'RAILWAY_TOKEN=', ''].join('\n'), 'utf8');
   await writeFile(join(rootPath, '.ewokbot', '.env'), [...envLines, ''].join('\n'), 'utf8');
   await writeFile(join(repoPath, '.agent-quality.yml'), ['commands:', '  test: mock test', 'required:', '  - test', ''].join('\n'), 'utf8');
   return rootPath;
@@ -686,8 +686,13 @@ quality:
   default_profile: node
 mcp_servers:
   atlassian:
-    display_name: Atlassian MCP
-    url: https://mcp.example.test/atlassian
+    transport: stdio
+    command: mcp-atlassian
+    args: []
+    env_var_names:
+      - ATLASSIAN_BASE_URL
+      - ATLASSIAN_EMAIL
+      - ATLASSIAN_API_TOKEN
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend
@@ -734,8 +739,13 @@ quality:
   default_profile: node
 mcp_servers:
   atlassian:
-    display_name: Atlassian MCP
-    url: https://mcp.example.test/atlassian
+    transport: stdio
+    command: mcp-atlassian
+    args: []
+    env_var_names:
+      - ATLASSIAN_BASE_URL
+      - ATLASSIAN_EMAIL
+      - ATLASSIAN_API_TOKEN
   github:
     display_name: GitHub MCP
     url: https://mcp.example.test/github

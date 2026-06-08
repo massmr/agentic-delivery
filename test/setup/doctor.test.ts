@@ -102,6 +102,38 @@ test('doctor fails missing provider secrets when provider mode is non-mock', asy
   assert.equal(report.checks.some((check) => check.status === 'fail' && check.label === 'GitHub' && /GITHUB_TOKEN/u.test(check.message)), true);
 });
 
+test('doctor validates Railway MCP through the Railway CLI preset instead of env tokens', async () => {
+  const cwd = await createWorkspace('ewokbot-doctor-railway-mcp-cli-');
+  const files = createOnboardingFiles({
+    deploymentMonitor: 'railway',
+    includeOhMyOpenAgent: false,
+    railwayProvider: 'railway-mcp'
+  });
+  mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
+  writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), files.workspaceYaml, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env'), files.env, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env.example'), files.envExample, 'utf8');
+
+  const missingCliReport = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
+  });
+  assert.equal(missingCliReport.ok, false);
+  assert.equal(missingCliReport.checks.some((check) => check.label === 'Railway' && check.status === 'fail' && /railway command was not found/u.test(check.message)), true);
+
+  const readyCliReport = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode' || command === 'railway',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
+  });
+  assert.equal(readyCliReport.checks.some((check) => check.label === 'Railway' && check.status === 'pass' && /railway command is available/u.test(check.message)), true);
+});
+
 test('doctor validates repository branch and quality readiness statically', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ab-repo-');
   const repoPath = join(cwd, 'frontend');

@@ -21,6 +21,8 @@ export type {
 } from './provider-capability.js';
 export { createOnboardingFiles, renderEnv, renderEnvExample, renderOnboardingWorkspaceConfig } from './onboarding-config.js';
 export type { OnboardingFiles } from './onboarding-config.js';
+export { atlassianJiraMcpPreset, jiraMcpConnectorPresets, railwayCliMcpPreset, railwayMcpConnectorPresets } from './connector-presets.js';
+export type { McpConnectorPreset } from './connector-presets.js';
 export { runLocalDoctor } from './doctor.js';
 export type { DoctorCheck, DoctorCheckStatus, DoctorIssue, DoctorProbeOptions, DoctorReport } from './doctor.js';
 export { OpenCodeSetupAdapter } from './opencode-setup-adapter.js';

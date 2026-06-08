@@ -7,19 +7,26 @@ import { OpenCodeSetupAdapter, type DevToolCommandResult } from '../../src/index
 interface FakeAdapterInput {
   readonly commandExists?: boolean | undefined;
   readonly files?: Readonly<Record<string, string>> | undefined;
+  readonly directories?: Readonly<Record<string, readonly string[]>> | undefined;
   readonly includeRunCommand?: boolean | undefined;
   readonly version?: DevToolCommandResult | undefined;
   readonly authList?: DevToolCommandResult | undefined;
   readonly command?: string | undefined;
   readonly envCommand?: string | undefined;
   readonly configCommand?: string | undefined;
+  readonly env?: NodeJS.ProcessEnv | undefined;
 }
 
 const workspaceRoot = '/workspace';
 const homeDirectory = '/home/agent';
 const globalConfigPath = join(homeDirectory, '.config', 'opencode', 'opencode.json');
+const globalConfigJsoncPath = join(homeDirectory, '.config', 'opencode', 'opencode.jsonc');
+const ohMyOpenAgentConfigPath = join(homeDirectory, '.config', 'opencode', 'oh-my-openagent.json');
 const authPath = join(homeDirectory, '.local', 'share', 'opencode', 'auth.json');
 const projectConfigPath = join(workspaceRoot, 'opencode.json');
+const projectConfigJsoncPath = join(workspaceRoot, 'opencode.jsonc');
+const childRepoPath = join(workspaceRoot, 'frontend');
+const childRepoConfigPath = join(childRepoPath, 'opencode.json');
 
 test('OpenCode adapter reports not_installed without running OpenCode', () => {
   const calls: string[] = [];
@@ -99,6 +106,130 @@ test('OpenCode adapter reports installed_ready without runCommand when auth file
   assert.match(detection.details.join('\n'), /model configuration was detected/u);
   assert.doesNotMatch(rendered, new RegExp(authSecret, 'u'));
   assert.doesNotMatch(rendered, new RegExp(modelName, 'u'));
+});
+
+test('OpenCode adapter detects model config from JSONC global config', () => {
+  const adapter = createAdapter({
+    includeRunCommand: false,
+    files: {
+      [authPath]: '{"token":"secret-opencode-token"}\n',
+      [globalConfigJsoncPath]: '{\n  // private model name is not rendered\n  "model": "anthropic/claude-sonnet-4"\n}\n'
+    }
+  });
+
+  const detection = adapter.detect();
+  const rendered = JSON.stringify([detection, adapter.doctor(), adapter.getConfigSummary()]);
+
+  assert.equal(detection.state, 'installed_ready');
+  assert.equal(detection.modelConfigured, true);
+  assert.deepEqual(adapter.getConfigSummary().configFilesPresent, [globalConfigJsoncPath]);
+  assert.doesNotMatch(rendered, /claude-sonnet/u);
+});
+
+test('OpenCode adapter treats small_model as model readiness for working OpenCode configs', () => {
+  const adapter = createAdapter({
+    includeRunCommand: false,
+    files: {
+      [authPath]: '{"token":"secret-opencode-token"}\n',
+      [globalConfigPath]: [
+        '{',
+        '  "small_model": "private-small-model",',
+        '  "plugin": [',
+        '    "oh-my-openagent",',
+        '  ]',
+        '}'
+      ].join('\n')
+    }
+  });
+
+  const detection = adapter.detect();
+  const rendered = JSON.stringify([detection, adapter.doctor(), adapter.getConfigSummary()]);
+
+  assert.equal(detection.state, 'installed_ready');
+  assert.equal(detection.modelConfigured, true);
+  assert.deepEqual(adapter.getConfigSummary().configFilesPresent, [globalConfigPath]);
+  assert.doesNotMatch(rendered, /private-small-model/u);
+});
+
+test('OpenCode adapter detects model readiness from oh-my-openagent companion config', () => {
+  const adapter = createAdapter({
+    includeRunCommand: false,
+    files: {
+      [authPath]: '{"token":"secret-opencode-token"}\n',
+      [ohMyOpenAgentConfigPath]: JSON.stringify({
+        default: {
+          model: 'private-oh-my-openagent-model'
+        }
+      })
+    }
+  });
+
+  const detection = adapter.detect();
+  const rendered = JSON.stringify([detection, adapter.doctor(), adapter.getConfigSummary()]);
+
+  assert.equal(detection.state, 'installed_ready');
+  assert.equal(detection.modelConfigured, true);
+  assert.deepEqual(adapter.getConfigSummary().configFilesPresent, [ohMyOpenAgentConfigPath]);
+  assert.doesNotMatch(rendered, /private-oh-my-openagent-model/u);
+});
+
+test('OpenCode adapter detects custom OPENCODE_CONFIG model config', () => {
+  const customConfigPath = '/custom/opencode-config.json';
+  const adapter = createAdapter({
+    includeRunCommand: false,
+    env: { OPENCODE_CONFIG: customConfigPath },
+    files: {
+      [authPath]: '{"token":"secret-opencode-token"}\n',
+      [customConfigPath]: JSON.stringify({ provider: 'anthropic', model: 'private-custom-model' })
+    }
+  });
+
+  const detection = adapter.detect();
+  const rendered = JSON.stringify([detection, adapter.doctor(), adapter.getConfigSummary()]);
+
+  assert.equal(detection.state, 'installed_ready');
+  assert.equal(detection.modelConfigured, true);
+  assert.deepEqual(adapter.getConfigSummary().configFilesPresent, [customConfigPath]);
+  assert.doesNotMatch(rendered, /private-custom-model/u);
+});
+
+test('OpenCode adapter detects inline OPENCODE_CONFIG_CONTENT model config without printing values', () => {
+  const adapter = createAdapter({
+    includeRunCommand: false,
+    env: { OPENCODE_CONFIG_CONTENT: JSON.stringify({ model: 'private-inline-model' }) },
+    files: {
+      [authPath]: '{"token":"secret-opencode-token"}\n'
+    }
+  });
+
+  const detection = adapter.detect();
+  const rendered = JSON.stringify([detection, adapter.doctor(), adapter.getConfigSummary()]);
+
+  assert.equal(detection.state, 'installed_ready');
+  assert.equal(detection.modelConfigured, true);
+  assert.deepEqual(adapter.getConfigSummary().configFilesPresent, ['OPENCODE_CONFIG_CONTENT']);
+  assert.doesNotMatch(rendered, /private-inline-model/u);
+});
+
+test('OpenCode adapter detects project config inside direct sibling git repositories', () => {
+  const adapter = createAdapter({
+    includeRunCommand: false,
+    directories: { [workspaceRoot]: ['frontend', 'notes'] },
+    files: {
+      [authPath]: '{"token":"secret-opencode-token"}\n',
+      [join(childRepoPath, '.git')]: '',
+      [childRepoConfigPath]: JSON.stringify({ model: 'private-child-model' })
+    }
+  });
+
+  const detection = adapter.detect();
+  const rendered = JSON.stringify([detection, adapter.doctor(), adapter.getConfigSummary()]);
+
+  assert.equal(detection.state, 'installed_ready');
+  assert.equal(detection.projectConfigPresent, true);
+  assert.equal(detection.modelConfigured, true);
+  assert.deepEqual(adapter.getConfigSummary().configFilesPresent, [childRepoConfigPath]);
+  assert.doesNotMatch(rendered, /private-child-model/u);
 });
 
 test('OpenCode adapter reports installed_authenticated_no_model without runCommand when auth file is present and model config is absent', () => {
@@ -181,14 +312,16 @@ test('OpenCode adapter launchSetup returns confirmed operator actions without in
 
 function createAdapter(input: FakeAdapterInput, calls: string[] = []): OpenCodeSetupAdapter {
   const files = input.files ?? {};
+  const directories = input.directories ?? {};
   return new OpenCodeSetupAdapter({
     workspaceRoot,
     homeDirectory,
-    env: input.envCommand === undefined ? {} : { OPENCODE_COMMAND: input.envCommand },
+    env: input.env ?? (input.envCommand === undefined ? {} : { OPENCODE_COMMAND: input.envCommand }),
     command: input.command,
     configCommand: input.configCommand,
     fileExists: (path) => Object.hasOwn(files, path),
     readFile: (path) => files[path],
+    readDirectory: (path) => directories[path] ?? [],
     commandExists: () => input.commandExists ?? true,
     runCommand: input.includeRunCommand === false ? undefined : (command, args) => {
       calls.push(`${command} ${args.join(' ')}`);

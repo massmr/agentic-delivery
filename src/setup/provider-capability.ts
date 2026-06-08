@@ -1,4 +1,5 @@
 import type { WorkspaceConfig } from '../config/index.js';
+import { atlassianJiraMcpPreset } from './connector-presets.js';
 import { OpenCodeSetupAdapter } from './opencode-setup-adapter.js';
 
 export type DeploymentMonitorSelection = 'none' | 'railway' | 'vercel' | 'both';
@@ -195,11 +196,11 @@ const jiraCapability = createCapability({
   label: 'Jira',
   category: 'ticket-provider',
   order: 40,
-  installSteps: ['Create a Jira API token before leaving mock mode.'],
+  installSteps: ['Install mcp-atlassian and create an Atlassian API token before leaving mock mode.'],
   nonSecretConfigKeys: ['jira.base_url', 'jira.project_keys'],
-  requiredSecretEnvVars: ['JIRA_EMAIL', 'JIRA_API_TOKEN'],
+  requiredSecretEnvVars: ['ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN'],
   detectExistingSetup(input) {
-    return allEnvPresent(input, ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN']);
+    return allEnvPresent(input, ['ATLASSIAN_BASE_URL', 'ATLASSIAN_EMAIL', 'ATLASSIAN_API_TOKEN']);
   },
   validateGeneratedConfig(config) {
     return validationResult([
@@ -215,11 +216,15 @@ const railwayCapability = createCapability({
   label: 'Railway',
   category: 'deployment-monitor',
   order: 50,
-  installSteps: ['Create a Railway token before enabling Railway staging checks.'],
+  installSteps: ['Install the Railway CLI and run railway login before enabling Railway MCP staging checks.'],
   nonSecretConfigKeys: ['railway.staging_branch', 'railway.production_branch'],
-  requiredSecretEnvVars: ['RAILWAY_TOKEN'],
+  requiredSecretEnvVars: [],
   detectExistingSetup(input) {
-    return allEnvPresent(input, ['RAILWAY_TOKEN']);
+    if (input.commandExists?.('railway') === true) {
+      return { configured: true, details: ['railway command is available. Run railway login outside Ewokbot if the Railway MCP session is not authenticated.'] };
+    }
+
+    return { configured: false, details: ['railway command is not available. Install the Railway CLI before enabling Railway MCP.'] };
   },
   validateGeneratedConfig(config) {
     return validationResult([
@@ -307,5 +312,10 @@ export function getDeploymentMonitors(selection: DeploymentMonitorSelection): re
 
 export function getRequiredEnvPlaceholders(selections: SetupSelections): readonly string[] {
   const names = getSetupCapabilitiesForSelections(selections).flatMap((capability) => capability.requiredSecretEnvVars);
+
+  if (selections.ticketProvider === 'jira-mcp') {
+    names.push(...(selections.jiraMcpServer ?? atlassianJiraMcpPreset.server).envVarNames);
+  }
+
   return [...new Set(names)].sort();
 }

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { delimiter, join } from 'node:path';
 
@@ -22,6 +22,7 @@ export interface OpenCodeSetupAdapterOptions {
   readonly workspaceRoot: string;
   readonly fileExists?: ((path: string) => boolean) | undefined;
   readonly readFile?: ((path: string) => string | undefined) | undefined;
+  readonly readDirectory?: ((path: string) => readonly string[]) | undefined;
   readonly commandExists?: ((command: string) => boolean) | undefined;
   readonly runCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
   readonly minimumMajorVersion?: number | undefined;
@@ -45,6 +46,7 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
       workspaceRoot: options.workspaceRoot,
       fileExists: options.fileExists ?? defaultFileExists,
       readFile: options.readFile ?? defaultReadFile,
+      readDirectory: options.readDirectory ?? defaultReadDirectory,
       commandExists: options.commandExists ?? defaultCommandExists,
       runCommand: options.runCommand
     };
@@ -104,9 +106,9 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
   getConfigSummary(): DevToolConfigSummary {
     const detection = this.detect();
     const configFilesPresent = [
-      detection.globalConfigPresent ? detection.globalConfigPath : undefined,
-      detection.projectConfigPresent ? detection.projectConfigPath : undefined
-    ].filter((path): path is string => path !== undefined);
+      ...(detection.configPathsPresent ?? []),
+      ...(detection.configSourcesPresent ?? [])
+    ];
 
     return {
       tool: detection.tool,
@@ -122,8 +124,13 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
     const globalConfigPath = join(this.dependencies.homeDirectory, '.config', 'opencode', 'opencode.json');
     const authPath = join(this.dependencies.homeDirectory, '.local', 'share', 'opencode', 'auth.json');
     const projectConfigPath = join(this.dependencies.workspaceRoot, 'opencode.json');
-    const globalConfigPresent = this.dependencies.fileExists(globalConfigPath);
-    const projectConfigPresent = this.dependencies.fileExists(projectConfigPath);
+    const configCandidates = buildOpenCodeConfigCandidates(this.dependencies);
+    const configPathsPresent = configCandidates
+      .filter((candidate) => this.dependencies.fileExists(candidate.path))
+      .map((candidate) => candidate.path);
+    const configSourcesPresent = buildOpenCodeAuxiliarySources(this.dependencies);
+    const globalConfigPresent = configCandidates.some((candidate) => candidate.kind === 'global' && this.dependencies.fileExists(candidate.path));
+    const projectConfigPresent = configCandidates.some((candidate) => candidate.kind === 'project' && this.dependencies.fileExists(candidate.path));
     const authPresent = this.dependencies.fileExists(authPath);
     const base = {
       tool: 'opencode',
@@ -132,6 +139,8 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
       globalConfigPresent,
       projectConfigPath,
       projectConfigPresent,
+      configPathsPresent,
+      configSourcesPresent,
       authPath,
       authPresent
     };
@@ -163,7 +172,7 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
     }
 
     if (versionResult.kind === 'unavailable') {
-      const modelConfigured = this.hasModelConfiguration(globalConfigPath) || this.hasModelConfiguration(projectConfigPath);
+      const modelConfigured = this.hasModelConfiguration(configPathsPresent) || hasInlineModelConfiguration(this.dependencies.env.OPENCODE_CONFIG_CONTENT);
       const state = resolveInstalledState(authPresent, modelConfigured);
       return {
         ...base,
@@ -171,7 +180,7 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
         authListChecked: false,
         authListAuthenticated: false,
         modelConfigured,
-        details: buildDetails({ globalConfigPresent, projectConfigPresent, authPresent, authListAuthenticated: false, modelConfigured }),
+        details: buildDetails({ configPathsPresent, configSourcesPresent, authPresent, authListAuthenticated: false, modelConfigured }),
         nextSteps: buildNextSteps(state)
       };
     }
@@ -195,7 +204,7 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
     const authListResult = this.safeRun(['auth', 'list']);
     const authListChecked = authListResult.kind !== 'unavailable';
     const authListAuthenticated = authListResult.kind === 'ok' && authListResult.result.exitCode === 0;
-    const modelConfigured = this.hasModelConfiguration(globalConfigPath) || this.hasModelConfiguration(projectConfigPath);
+    const modelConfigured = this.hasModelConfiguration(configPathsPresent) || hasInlineModelConfiguration(this.dependencies.env.OPENCODE_CONFIG_CONTENT);
     const authenticated = authPresent || authListAuthenticated;
     const state = resolveInstalledState(authenticated, modelConfigured);
 
@@ -206,24 +215,21 @@ export class OpenCodeSetupAdapter implements DevToolSetupAdapter {
       authListChecked,
       authListAuthenticated,
       modelConfigured,
-      details: buildDetails({ globalConfigPresent, projectConfigPresent, authPresent, authListAuthenticated, modelConfigured }),
+      details: buildDetails({ configPathsPresent, configSourcesPresent, authPresent, authListAuthenticated, modelConfigured }),
       nextSteps: buildNextSteps(state)
     };
   }
 
-  private hasModelConfiguration(path: string): boolean {
-    const source = this.dependencies.readFile(path);
+  private hasModelConfiguration(paths: readonly string[]): boolean {
+    return paths.some((path) => {
+      const source = this.dependencies.readFile(path);
 
-    if (source === undefined) {
-      return false;
-    }
+      if (source === undefined) {
+        return false;
+      }
 
-    try {
-      const parsed = JSON.parse(source) as unknown;
-      return containsModelConfiguration(parsed);
-    } catch {
-      return /"(?:model|provider)"\s*:/u.test(source);
-    }
+      return sourceContainsModelConfiguration(source);
+    });
   }
 
   private safeRun(args: readonly string[]): { readonly kind: 'ok'; readonly result: DevToolCommandResult } | { readonly kind: 'failed' } | { readonly kind: 'unavailable' } {
@@ -266,16 +272,95 @@ function resolveInstalledState(authenticated: boolean, modelConfigured: boolean)
   return modelConfigured ? 'installed_ready' : 'installed_authenticated_no_model';
 }
 
+interface OpenCodeConfigCandidate {
+  readonly kind: 'global' | 'custom' | 'project';
+  readonly path: string;
+}
+
+function buildOpenCodeConfigCandidates(dependencies: DevToolSetupAdapterDependencies): readonly OpenCodeConfigCandidate[] {
+  const globalDirectory = join(dependencies.homeDirectory, '.config', 'opencode');
+  const candidates: OpenCodeConfigCandidate[] = [
+    { kind: 'global', path: join(globalDirectory, 'opencode.json') },
+    { kind: 'global', path: join(globalDirectory, 'opencode.jsonc') },
+    { kind: 'global', path: join(globalDirectory, 'oh-my-openagent.json') }
+  ];
+
+  const customConfigPath = dependencies.env.OPENCODE_CONFIG?.trim();
+  if (customConfigPath !== undefined && customConfigPath.length > 0) {
+    candidates.push({ kind: 'custom', path: customConfigPath });
+  }
+
+  for (const root of discoverOpenCodeProjectRoots(dependencies)) {
+    candidates.push({ kind: 'project', path: join(root, 'opencode.json') });
+    candidates.push({ kind: 'project', path: join(root, 'opencode.jsonc') });
+  }
+
+  return dedupeCandidates(candidates);
+}
+
+function discoverOpenCodeProjectRoots(dependencies: DevToolSetupAdapterDependencies): readonly string[] {
+  const roots = [dependencies.workspaceRoot];
+
+  for (const entry of dependencies.readDirectory?.(dependencies.workspaceRoot) ?? []) {
+    const candidate = join(dependencies.workspaceRoot, entry);
+    if (dependencies.fileExists(join(candidate, '.git'))) {
+      roots.push(candidate);
+    }
+  }
+
+  return [...new Set(roots)];
+}
+
+function buildOpenCodeAuxiliarySources(dependencies: DevToolSetupAdapterDependencies): readonly string[] {
+  const sources: string[] = [];
+  const globalDirectory = join(dependencies.homeDirectory, '.config', 'opencode');
+  const globalDotOpenCode = join(globalDirectory, '.opencode');
+  const workspaceDotOpenCode = join(dependencies.workspaceRoot, '.opencode');
+  const customConfigDir = dependencies.env.OPENCODE_CONFIG_DIR?.trim();
+
+  if (dependencies.fileExists(globalDotOpenCode)) {
+    sources.push(globalDotOpenCode);
+  }
+
+  if (dependencies.fileExists(workspaceDotOpenCode)) {
+    sources.push(workspaceDotOpenCode);
+  }
+
+  if (customConfigDir !== undefined && customConfigDir.length > 0 && dependencies.fileExists(customConfigDir)) {
+    sources.push(customConfigDir);
+  }
+
+  if (dependencies.env.OPENCODE_CONFIG_CONTENT !== undefined && dependencies.env.OPENCODE_CONFIG_CONTENT.trim().length > 0) {
+    sources.push('OPENCODE_CONFIG_CONTENT');
+  }
+
+  return [...new Set(sources)];
+}
+
+function dedupeCandidates(candidates: readonly OpenCodeConfigCandidate[]): readonly OpenCodeConfigCandidate[] {
+  const seen = new Set<string>();
+  const result: OpenCodeConfigCandidate[] = [];
+
+  for (const candidate of candidates) {
+    if (!seen.has(candidate.path)) {
+      seen.add(candidate.path);
+      result.push(candidate);
+    }
+  }
+
+  return result;
+}
+
 function buildDetails(input: {
-  readonly globalConfigPresent: boolean;
-  readonly projectConfigPresent: boolean;
+  readonly configPathsPresent: readonly string[];
+  readonly configSourcesPresent: readonly string[];
   readonly authPresent: boolean;
   readonly authListAuthenticated: boolean;
   readonly modelConfigured: boolean;
 }): readonly string[] {
   return [
-    input.globalConfigPresent ? 'Global OpenCode config is present.' : 'Global OpenCode config was not found.',
-    input.projectConfigPresent ? 'Project OpenCode config is present.' : 'Project OpenCode config was not found.',
+    input.configPathsPresent.length > 0 ? `OpenCode config file(s) detected: ${input.configPathsPresent.join(', ')}.` : 'OpenCode config file was not found in global, custom, workspace, or sibling repository locations.',
+    input.configSourcesPresent.length > 0 ? `OpenCode auxiliary config source(s) detected: ${input.configSourcesPresent.join(', ')}.` : 'OpenCode auxiliary config sources were not found.',
     input.authPresent || input.authListAuthenticated ? 'OpenCode authentication was detected without reading secrets.' : 'OpenCode authentication was not detected.',
     input.modelConfigured ? 'OpenCode model configuration was detected without exposing values.' : 'OpenCode model configuration was not detected.'
   ];
@@ -308,12 +393,29 @@ function containsModelConfiguration(value: unknown): boolean {
 
   return Object.entries(value).some(([key, nested]) => {
     const normalizedKey = key.toLowerCase();
-    if ((normalizedKey === 'model' || normalizedKey === 'provider') && typeof nested === 'string' && nested.trim().length > 0) {
+    if ((normalizedKey === 'model' || normalizedKey === 'small_model' || normalizedKey === 'provider') && typeof nested === 'string' && nested.trim().length > 0) {
       return true;
     }
 
     return containsModelConfiguration(nested);
   });
+}
+
+function hasInlineModelConfiguration(source: string | undefined): boolean {
+  if (source === undefined || source.trim().length === 0) {
+    return false;
+  }
+
+  return sourceContainsModelConfiguration(source);
+}
+
+function sourceContainsModelConfiguration(source: string): boolean {
+  try {
+    const parsed = JSON.parse(source) as unknown;
+    return containsModelConfiguration(parsed);
+  } catch {
+    return /"(?:model|small_model|provider)"\s*:/u.test(source);
+  }
 }
 
 function extractVersion(stdout: string, stderr: string): string | undefined {
@@ -346,6 +448,14 @@ function defaultReadFile(path: string): string | undefined {
     return readFileSync(path, 'utf8');
   } catch {
     return undefined;
+  }
+}
+
+function defaultReadDirectory(path: string): readonly string[] {
+  try {
+    return readdirSync(path);
+  } catch {
+    return [];
   }
 }
 

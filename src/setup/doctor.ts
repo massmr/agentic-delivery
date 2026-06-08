@@ -125,7 +125,7 @@ export function runLocalDoctor(cwd: string, options: DoctorProbeOptions = {}): D
   checks.push(...checkTools(config, metadata, cwd, envProbes));
   checks.push(...checkEnvExample(envExamplePath, selections, probes));
   checks.push(checkEnvFile(envFile));
-  checks.push(...checkProviderReadiness(config, selections, envFile.values, mergedEnv));
+  checks.push(...checkProviderReadiness(config, selections, envFile.values, mergedEnv, envProbes));
   checks.push(...checkBranchPolicy(config));
   checks.push(...checkRepositoryReadiness(cwd, config, probes));
 
@@ -311,13 +311,13 @@ function checkEnvFile(envFile: { readonly exists: boolean; readonly values: EnvV
   return passCheck(ewokbotEnvPath, `${ewokbotEnvPath} is present; values are treated as [redacted].`);
 }
 
-function checkProviderReadiness(config: WorkspaceConfig, selections: SetupSelections, envFileValues: EnvValueMap, processEnv: NodeJS.ProcessEnv): readonly DoctorCheck[] {
+function checkProviderReadiness(config: WorkspaceConfig, selections: SetupSelections, envFileValues: EnvValueMap, processEnv: NodeJS.ProcessEnv, probes: DoctorProbeSet): readonly DoctorCheck[] {
   const checks: DoctorCheck[] = [];
   checks.push(checkProviderEnv('GitHub', config.github.mode, ['GITHUB_ORG', 'GITHUB_TOKEN'], envFileValues, processEnv));
-  checks.push(checkProviderEnv('Jira', config.jira.mode, ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'], envFileValues, processEnv));
+  checks.push(checkProviderEnv('Jira', config.jira.mode, jiraProviderEnvNames(config), envFileValues, processEnv));
 
   if (selections.deploymentMonitor === 'railway' || selections.deploymentMonitor === 'both') {
-    checks.push(checkProviderEnv('Railway', config.railway.mode, ['RAILWAY_TOKEN'], envFileValues, processEnv));
+    checks.push(checkRailwayReadiness(config, probes));
   }
 
   if (selections.deploymentMonitor === 'vercel' || selections.deploymentMonitor === 'both') {
@@ -325,6 +325,26 @@ function checkProviderReadiness(config: WorkspaceConfig, selections: SetupSelect
   }
 
   return checks;
+}
+
+function checkRailwayReadiness(config: WorkspaceConfig, probes: DoctorProbeSet): DoctorCheck {
+  if (config.railway.mode !== 'mcp') {
+    return passCheck('Railway', 'Railway MCP is not enabled; no Railway CLI session is required for mock mode.');
+  }
+
+  if (probes.commandExists('railway')) {
+    return passCheck('Railway', 'railway command is available for the configured local Railway MCP server. Ewokbot did not inspect Railway auth; run railway login if MCP startup fails.');
+  }
+
+  return failCheck('Railway', 'railway command was not found for Railway MCP mode.', 'Install the Railway CLI and run railway login before using Railway MCP.');
+}
+
+function jiraProviderEnvNames(config: WorkspaceConfig): readonly string[] {
+  if (config.jira.mode !== 'mcp' || config.jira.mcpServerId === undefined) {
+    return ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'];
+  }
+
+  return config.mcpServers.find((server) => server.id === config.jira.mcpServerId)?.envVarNames ?? ['JIRA_BASE_URL', 'JIRA_EMAIL', 'JIRA_API_TOKEN'];
 }
 
 function checkProviderEnv(label: string, mode: ProviderMode | 'mcp', names: readonly string[], envFileValues: EnvValueMap, processEnv: NodeJS.ProcessEnv): DoctorCheck {
