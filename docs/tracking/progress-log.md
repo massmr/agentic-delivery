@@ -18,6 +18,15 @@ Completed GitHub MCP Docker preset unblocker:
 - A local playground smoke confirmed `ewokbot mcp inspect github` can start the GitHub MCP server, list 43 tools, and apply the default `read_only` policy without calling provider tools.
 - This was an unblocker for real setup confidence, not AZ or BA implementation. GitHub real mapping and PR handoff remain future milestones.
 
+Completed Atlassian setup realignment unblocker:
+
+- Re-centered the roadmap around Atlassian rather than Jira-only while keeping Jira as the first work-item surface.
+- Made Jira project keys an optional backlog constraint in onboarding and config rather than a required setup field.
+- `ewokbot init` now prompts `Constrain to Jira project keys, comma-separated (optional; leave blank for all projects)`.
+- Empty project-key input writes `project_keys: []`.
+- Jira MCP backlog search now omits `project in (...)` when `project_keys` is empty, so the MCP session can scan all visible Jira projects.
+- This was an onboarding/config unblocker, not AX implementation. Real Atlassian tool-name/schema mapping remains the next planned milestone and is not started.
+
 Implemented Milestone AW MCP Policy Modes review candidate:
 
 - Added typed MCP policy modes `read_only`, `supervised`, `trusted`, and `custom`, plus policy decisions `allow`, `allow_redacted`, `require_human`, and `deny`.
