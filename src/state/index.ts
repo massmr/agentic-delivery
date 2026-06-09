@@ -8,6 +8,7 @@ export {
   recordBranchCreated,
   recordBranchPushed,
   recordDevRunResult,
+  recordDevelopHandoffCommit,
   recordPullRequestOpened,
   recordProductionPullRequestOpened,
   recordStagingDeploying,

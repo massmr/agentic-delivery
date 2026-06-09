@@ -1,4 +1,4 @@
-import type { BranchRef, CoreSafetyReport, DeliveryTicket, DeploymentResult, MeaningfulDiffEvidence, PullRequestRef, QualityReport, RepositoryRef, TestRelevanceReport, TicketAnalysis } from '../../domain/index.js';
+import type { BranchRef, CoreSafetyReport, DeliveryTicket, DeploymentResult, DevelopHandoffCommit, MeaningfulDiffEvidence, PullRequestRef, QualityReport, RepositoryRef, TestRelevanceReport, TicketAnalysis } from '../../domain/index.js';
 
 export interface BuildDevelopPullRequestBodyInput {
   readonly ticket: DeliveryTicket;
@@ -6,6 +6,7 @@ export interface BuildDevelopPullRequestBodyInput {
   readonly runId: string;
   readonly repository: RepositoryRef;
   readonly branch: BranchRef;
+  readonly handoffCommit?: DevelopHandoffCommit | undefined;
   readonly qualityReport: QualityReport;
   readonly meaningfulDiff?: MeaningfulDiffEvidence | undefined;
   readonly coreSafety?: CoreSafetyReport | undefined;
@@ -85,6 +86,8 @@ export function buildDevelopPullRequestBody(input: BuildDevelopPullRequestBodyIn
     `- Run ID: ${input.runId}`,
     `- Repository: ${input.repository.owner}/${input.repository.name}`,
     `- Branch: ${input.branch.name}`,
+    `- Scoped Agent Diff Commit: ${input.handoffCommit?.commitSha ?? input.branch.headSha ?? 'not recorded'}`,
+    `- Scoped Agent Diff Files: ${formatInlineList(input.handoffCommit?.stagedFiles ?? [])}`,
     `- Target: develop`,
     '',
     '## Quality',
@@ -107,7 +110,7 @@ export function buildDevelopPullRequestBody(input: BuildDevelopPullRequestBodyIn
     '',
     '## Local-Only Handoff Notes',
     '',
-    'This develop draft PR handoff is based on local evidence. Branch push uses the local git/native fallback; GitHub handoff uses typed CodeHostPort operations and requires explicit MCP policy for develop PR creation.',
+    'This develop draft PR handoff is based on local evidence. Ewokbot stages only the scoped agent product files recorded by meaningful-diff evidence, creates a local commit, pushes with the local git/native fallback, and uses typed CodeHostPort operations for GitHub handoff.',
     'No production PR, merge, deployment, production branch push, or production approval bypass is performed by this handoff.',
     ''
   ].join('\n');

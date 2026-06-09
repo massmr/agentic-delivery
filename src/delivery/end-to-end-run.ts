@@ -268,6 +268,10 @@ function createMockGitCommandRunner(repository: RepositoryRef, branchName: strin
       return { stdout: `${headSha}\n`, stderr: '', exitCode: 0 };
     }
 
+    if (input.args.join(' ') === 'diff --cached --name-only') {
+      return { stdout: 'src/mock-implementation.ts\n', stderr: '', exitCode: 0 };
+    }
+
     return { stdout: '', stderr: '', exitCode: 0 };
   };
 }

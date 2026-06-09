@@ -266,6 +266,7 @@ export {
   recordBranchCreated,
   recordBranchPushed,
   recordDevRunResult,
+  recordDevelopHandoffCommit,
   recordPullRequestOpened,
   recordProductionPullRequestOpened,
   recordStagingDeploying,
@@ -316,6 +317,7 @@ export type {
   DeliveryRunFailure,
   DeliveryRunState,
   DeliveryRunStateRecord,
+  DevelopHandoffCommit,
   DevRunAttemptResult,
   DevRunInput,
   DevRunProvider,
@@ -404,7 +406,7 @@ export type {
   RunStagingVerificationInput,
   SmokeQualityRunner
 } from './delivery/index.js';
-export type { BuildWorkingBranchNameInput, CaptureDiffAdditionsInput, CaptureMeaningfulDiffSnapshotInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, InspectMeaningfulDiffInput, PushLocalBranchInput } from './git/index.js';
+export type { BuildWorkingBranchNameInput, CaptureDiffAdditionsInput, CaptureMeaningfulDiffSnapshotInput, CommitScopedAgentDiffInput, CreateLocalBranchInput, GitCommandInput, GitCommandResult, GitCommandRunner, InspectMeaningfulDiffInput, PushLocalBranchInput } from './git/index.js';
 export type {
   CreateMcpToolCallAuditRecordInput,
   CreateMcpToolRegistryInput,

@@ -20,6 +20,7 @@ import {
   parseWorkspaceConfig,
   recordBranchCreated,
   recordBranchPushed,
+  recordDevelopHandoffCommit,
   recordPullRequestOpened,
   runDevelopPullRequestHandoff,
   runRuntimeDevelopPullRequestHandoff,
@@ -190,6 +191,10 @@ test('LocalGitAdapter uses argument-array git commands and injected command runn
       return { stdout: '', stderr: '', exitCode: 1 };
     }
 
+    if (input.args.join(' ') === 'diff --cached --name-only') {
+      return { stdout: 'src/delivery/develop-pr-handoff.ts\n', stderr: '', exitCode: 0 };
+    }
+
     if (input.args[0] === 'rev-parse') {
       return { stdout: 'abc123\n', stderr: '', exitCode: 0 };
     }
@@ -235,6 +240,94 @@ test('LocalGitAdapter pushes branches through local git fallback without real re
   ]);
   assert.equal(commands.every((command) => command.command === 'git'), true);
   assert.equal(branch.headSha, 'pushed123');
+});
+
+test('LocalGitAdapter commits only scoped agent product files with deterministic git arguments', async () => {
+  const commands: GitCommandInput[] = [];
+  const adapter = new LocalGitAdapter(async (input) => {
+    commands.push(input);
+
+    if (input.args.join(' ') === 'diff --cached --name-only') {
+      return { stdout: 'src/app.ts\ntest/app.test.js\n', stderr: '', exitCode: 0 };
+    }
+
+    if (input.args[0] === 'rev-parse') {
+      return { stdout: 'commit123\n', stderr: '', exitCode: 0 };
+    }
+
+    return { stdout: '', stderr: '', exitCode: 0 };
+  });
+  const commit = await adapter.commitScopedAgentDiff({
+    repository: repositoryRef,
+    localPath: '/repo',
+    branch: createBranchRef('agent/AD-123-github-pr-handoff'),
+    files: ['test/app.test.js', 'src/app.ts', 'src/app.ts'],
+    message: '  AD-123:   Add scoped diff  '
+  });
+
+  assert.deepEqual(commands.map((command) => command.args), [
+    ['reset', '--'],
+    ['add', '--', 'src/app.ts', 'test/app.test.js'],
+    ['diff', '--cached', '--name-only'],
+    ['-c', 'user.name=Ewokbot', '-c', 'user.email=ewokbot@example.invalid', 'commit', '-m', 'AD-123: Add scoped diff'],
+    ['rev-parse', 'HEAD']
+  ]);
+  assert.equal(commands.every((command) => command.command === 'git'), true);
+  assert.equal(commit.commitSha, 'commit123');
+  assert.equal(commit.branchName, 'agent/AD-123-github-pr-handoff');
+  assert.equal(commit.message, 'AD-123: Add scoped diff');
+  assert.deepEqual(commit.stagedFiles, ['src/app.ts', 'test/app.test.js']);
+});
+
+test('LocalGitAdapter refuses unexpected staged files after resetting and staging scoped files', async () => {
+  const commands: GitCommandInput[] = [];
+  const adapter = new LocalGitAdapter(async (input) => {
+    commands.push(input);
+
+    if (input.args.join(' ') === 'diff --cached --name-only') {
+      return { stdout: 'src/app.ts\npackage.json\n', stderr: '', exitCode: 0 };
+    }
+
+    return { stdout: '', stderr: '', exitCode: 0 };
+  });
+
+  await assert.rejects(
+    adapter.commitScopedAgentDiff({
+      repository: repositoryRef,
+      localPath: '/repo',
+      branch: createBranchRef('agent/AD-123-github-pr-handoff'),
+      files: ['src/app.ts'],
+      message: 'AD-123: Add scoped diff'
+    }),
+    /Scoped agent diff commit staged unexpected files/u
+  );
+
+  assert.deepEqual(commands.map((command) => command.args), [
+    ['reset', '--'],
+    ['add', '--', 'src/app.ts'],
+    ['diff', '--cached', '--name-only']
+  ]);
+});
+
+test('LocalGitAdapter refuses unsafe scoped commit file paths before staging', async () => {
+  const commands: GitCommandInput[] = [];
+  const adapter = new LocalGitAdapter(async (input) => {
+    commands.push(input);
+    return { stdout: '', stderr: '', exitCode: 0 };
+  });
+
+  await assert.rejects(
+    adapter.commitScopedAgentDiff({
+      repository: repositoryRef,
+      localPath: '/repo',
+      branch: createBranchRef('agent/AD-123-github-pr-handoff'),
+      files: ['src/app.ts', '../secret.txt'],
+      message: 'AD-123: Add scoped diff'
+    }),
+    /Unsafe scoped git file path/u
+  );
+
+  assert.deepEqual(commands, []);
 });
 
 test('LocalGitAdapter creates a harmless local branch in a temporary git repository', async (t) => {
@@ -296,6 +389,13 @@ test('buildDevelopPullRequestBody includes Jira, run, branch, quality, evidence,
     runId: 'run-1',
     repository: repositoryRef,
     branch: createBranchRef('agent/AD-123-github-pr-handoff'),
+    handoffCommit: {
+      repository: repositoryRef,
+      branchName: 'agent/AD-123-github-pr-handoff',
+      commitSha: 'commit123',
+      message: 'AD-123: Add GitHub PR handoff flow',
+      stagedFiles: ['src/delivery/develop-pr-handoff.ts']
+    },
     qualityReport,
     meaningfulDiff,
     coreSafety,
@@ -305,6 +405,8 @@ test('buildDevelopPullRequestBody includes Jira, run, branch, quality, evidence,
   assert.match(body, /\[AD-123\]\(https:\/\/jira\.example\.test\/browse\/AD-123\)/u);
   assert.match(body, /Run ID: run-1/u);
   assert.match(body, /Branch: agent\/AD-123-github-pr-handoff/u);
+  assert.match(body, /Scoped Agent Diff Commit: commit123/u);
+  assert.match(body, /Scoped Agent Diff Files: src\/delivery\/develop-pr-handoff\.ts/u);
   assert.match(body, /Status: PASSED/u);
   assert.match(body, /typecheck: PASSED - typecheck passed\./u);
   assert.match(body, /coverage: SKIPPED - coverage skipped/u);
@@ -312,8 +414,8 @@ test('buildDevelopPullRequestBody includes Jira, run, branch, quality, evidence,
   assert.match(body, /Core Safety: PASS - No core safety findings/u);
   assert.match(body, /Test Relevance: PASS - Relevant git and GitHub tests were reported/u);
   assert.match(body, /Mock behavior could drift/u);
-  assert.match(body, /Branch push uses the local git\/native fallback/u);
-  assert.match(body, /requires explicit MCP policy for develop PR creation/u);
+  assert.match(body, /pushes with the local git\/native fallback/u);
+  assert.match(body, /uses typed CodeHostPort operations for GitHub handoff/u);
   assert.match(body, /No production PR, merge, deployment, production branch push/u);
 });
 
@@ -321,11 +423,21 @@ test('state helpers idempotently replace matching branch and PR entries while tr
   const initial = createState('PLANNED');
   const branch = createBranchRef('agent/AD-123-github-pr-handoff');
   const firstBranchState = recordBranchCreated(initial, branch, '2026-06-03T10:01:00.000Z');
-  const pushedBranchState = recordBranchPushed(firstBranchState, { ...branch, headSha: 'def456' }, '2026-06-03T10:02:00.000Z');
+  const committedBranchState = recordDevelopHandoffCommit(firstBranchState, {
+    repository: repositoryRef,
+    branchName: branch.name,
+    commitSha: 'commit123',
+    message: 'AD-123: Add GitHub PR handoff flow',
+    stagedFiles: ['src/delivery/develop-pr-handoff.ts']
+  }, '2026-06-03T10:02:00.000Z');
+  const pushedBranchState = recordBranchPushed(committedBranchState, { ...branch, headSha: 'def456' }, '2026-06-03T10:03:00.000Z');
   const pullRequest = createPullRequest('agent/AD-123-github-pr-handoff', 12);
-  const firstPrState = recordPullRequestOpened(pushedBranchState, pullRequest, '2026-06-03T10:03:00.000Z');
-  const replacedPrState = recordPullRequestOpened(firstPrState, { ...pullRequest, number: 13 }, '2026-06-03T10:04:00.000Z');
+  const firstPrState = recordPullRequestOpened(pushedBranchState, pullRequest, '2026-06-03T10:04:00.000Z');
+  const replacedPrState = recordPullRequestOpened(firstPrState, { ...pullRequest, number: 13 }, '2026-06-03T10:05:00.000Z');
 
+  assert.equal(committedBranchState.state, 'BRANCH_CREATED');
+  assert.equal(committedBranchState.developHandoffCommit?.commitSha, 'commit123');
+  assert.equal(committedBranchState.branches[0]?.headSha, 'commit123');
   assert.equal(pushedBranchState.state, 'PUSHED');
   assert.equal(pushedBranchState.branches.length, 1);
   assert.equal(pushedBranchState.branches[0]?.headSha, 'def456');
@@ -351,7 +463,9 @@ test('runDevelopPullRequestHandoff uses CodeHostPort actions and local push afte
     now: fixedClock()
   });
 
-  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED', 'PUSHED', 'PR_TO_DEVELOP_OPENED', 'DEVELOP_CHECKS_PASSED']);
+  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED', 'BRANCH_CREATED', 'PUSHED', 'PR_TO_DEVELOP_OPENED', 'DEVELOP_CHECKS_PASSED']);
+  assert.deepEqual(commands.map((command) => command.args[0]), ['show-ref', 'checkout', 'rev-parse', 'reset', 'add', 'diff', '-c', 'rev-parse', 'push', 'rev-parse']);
+  assert.deepEqual(commands.find((command) => command.args[0] === 'add')?.args, ['add', '--', 'src/delivery/develop-pr-handoff.ts']);
   assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'push'), [
     ['push', 'origin', 'agent/AD-123-github-pr-handoff']
   ]);
@@ -362,6 +476,7 @@ test('runDevelopPullRequestHandoff uses CodeHostPort actions and local push afte
   assert.equal(connector.checkCount, 1);
   assert.equal(result.pullRequests.length, 1);
   assert.equal(result.pullRequests[0]?.targetBranch, 'develop');
+  assert.equal(result.developHandoffCommit?.commitSha, 'abc123');
   assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
 });
 
@@ -400,6 +515,9 @@ test('runDevelopPullRequestHandoff without a ledger root ignores stale cwd ledge
   assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'push'), [
     ['push', 'origin', 'agent/AD-123-github-pr-handoff']
   ]);
+  assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'add'), [
+    ['add', '--', 'src/delivery/develop-pr-handoff.ts']
+  ]);
   assert.equal(getOperationLedgerFilePath(ticket.ref.key, 'run-1'), '.ewokbot/runs/AD-123/run-1/operation-ledger.json');
 });
 
@@ -429,14 +547,72 @@ test('runDevelopPullRequestHandoff ledger prevents duplicate GitHub handoff side
   assert.equal(connector.pullRequestCount, 1);
   assert.equal(connector.commentCount, 1);
   assert.equal(connector.checkCount, 1);
+  assert.equal(commands.filter((command) => command.args[0] === 'add').length, 1);
+  assert.equal(commands.filter((command) => command.args[0] === '-c').length, 1);
   assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
   assert.deepEqual((await ledger.listOperations()).filter((record) => record.status === 'succeeded').map((record) => `${record.provider}:${record.port}.${record.action}`).sort(), [
+    'git:LocalGitAdapter.commitScopedAgentDiff',
     'git:LocalGitAdapter.pushBranch',
     'github:CodeHostPort.commentOnPullRequest',
     'github:CodeHostPort.createBranch',
     'github:CodeHostPort.getChecks',
     'github:CodeHostPort.openPullRequest'
   ]);
+});
+
+test('runDevelopPullRequestHandoff refuses a ledgered scoped commit when local HEAD drifted', async () => {
+  const store = new MemoryRunStateStore();
+  const commands: GitCommandInput[] = [];
+  const connector = new CountingGitHubConnector();
+  const ledger = new InMemoryOperationLedger();
+  const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
+  let revParseCalls = 0;
+  const commandRunner = createSuccessfulGitCommandRunner(commands, {
+    revParse: () => {
+      revParseCalls += 1;
+      return revParseCalls === 5 ? 'base456' : 'abc123';
+    }
+  });
+  const input = {
+    state,
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-github-pr-handoff',
+    git: new LocalGitAdapter(commandRunner),
+    github: connector,
+    operationLedger: ledger,
+    stateStore: store,
+    now: fixedClock()
+  };
+
+  await runDevelopPullRequestHandoff(input);
+  await assert.rejects(runDevelopPullRequestHandoff(input), /not the current local HEAD/u);
+
+  assert.equal(commands.filter((command) => command.args[0] === 'add').length, 1);
+  assert.equal(commands.filter((command) => command.args[0] === '-c').length, 1);
+  assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
+  assert.equal(connector.pullRequestCount, 1);
+});
+
+test('runDevelopPullRequestHandoff redacts secret-like values from scoped commit messages', async () => {
+  const commands: GitCommandInput[] = [];
+
+  await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket: {
+      ...ticket,
+      summary: 'Add API token OPENAI_API_KEY=sk-secret123456'
+    },
+    repository,
+    branchName: 'agent/AD-123-github-pr-handoff',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+    github: new CountingGitHubConnector(),
+    stateStore: new MemoryRunStateStore(),
+    now: fixedClock()
+  });
+
+  const commitMessage = commands.find((command) => command.args[0] === '-c')?.args.at(-1);
+  assert.equal(commitMessage, 'AD-123: Add API token OPENAI_API_KEY=[redacted]');
 });
 
 test('runDevelopPullRequestHandoff uses persisted ledger state on rerun with a new ledger instance', async (t) => {
@@ -470,6 +646,8 @@ test('runDevelopPullRequestHandoff uses persisted ledger state on rerun with a n
   assert.equal(connector.pullRequestCount, 1);
   assert.equal(connector.commentCount, 1);
   assert.equal(connector.checkCount, 1);
+  assert.equal(commands.filter((command) => command.args[0] === 'add').length, 1);
+  assert.equal(commands.filter((command) => command.args[0] === '-c').length, 1);
   assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
 });
 
@@ -672,7 +850,7 @@ test('runRuntimeDevelopPullRequestHandoff keeps mock GitHub mode working without
   });
 
   assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
-  assert.deepEqual(commands.map((command) => command.args[0]), ['show-ref', 'checkout', 'rev-parse', 'push', 'rev-parse']);
+  assert.deepEqual(commands.map((command) => command.args[0]), ['show-ref', 'checkout', 'rev-parse', 'reset', 'add', 'diff', '-c', 'rev-parse', 'push', 'rev-parse']);
 });
 
 async function createTempRoot(t: TestContext, prefix: string): Promise<string> {
@@ -807,7 +985,7 @@ function mockGithubWorkspaceConfig(): string {
 `).replace('mode: mcp\n  organization: agentic\n  mcp_server: github', 'mode: mock\n  organization: agentic');
 }
 
-function createSuccessfulGitCommandRunner(commands: GitCommandInput[] = []): (input: GitCommandInput) => Promise<GitCommandResult> {
+function createSuccessfulGitCommandRunner(commands: GitCommandInput[] = [], options: { readonly revParse?: (() => string) | undefined } = {}): (input: GitCommandInput) => Promise<GitCommandResult> {
   return async (input) => {
     commands.push(input);
 
@@ -815,8 +993,12 @@ function createSuccessfulGitCommandRunner(commands: GitCommandInput[] = []): (in
       return { stdout: '', stderr: '', exitCode: 1 };
     }
 
+    if (input.args.join(' ') === 'diff --cached --name-only') {
+      return { stdout: 'src/delivery/develop-pr-handoff.ts\n', stderr: '', exitCode: 0 };
+    }
+
     if (input.args[0] === 'rev-parse') {
-      return { stdout: 'abc123\n', stderr: '', exitCode: 0 };
+      return { stdout: `${options.revParse?.() ?? 'abc123'}\n`, stderr: '', exitCode: 0 };
     }
 
     return { stdout: '', stderr: '', exitCode: 0 };

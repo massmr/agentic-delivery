@@ -138,6 +138,10 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
           )
           .join('\n'),
     '',
+    '## Develop Handoff Commit',
+    '',
+    renderDevelopHandoffCommit(state.developHandoffCommit),
+    '',
     '## Meaningful Diff',
     '',
     renderMeaningfulDiff(state.meaningfulDiff),
@@ -227,6 +231,19 @@ function renderMeaningfulDiff(evidence: DeliveryRunStateRecord['meaningfulDiff']
     `- Agent-New Changed Files: ${summarizeFiles(evidence.newChangedFiles)}`,
     `- Agent Product Changed Files: ${summarizeFiles(evidence.productFiles)}`,
     `- Agent Ignored Files: ${summarizeFiles(evidence.ignoredFiles)}`
+  ].join('\n');
+}
+
+function renderDevelopHandoffCommit(commit: DeliveryRunStateRecord['developHandoffCommit']): string {
+  if (commit === undefined) {
+    return '- None';
+  }
+
+  return [
+    `- Commit SHA: ${commit.commitSha}`,
+    `- Branch: ${commit.branchName}`,
+    `- Message: ${commit.message}`,
+    `- Staged Files: ${summarizeFiles(commit.stagedFiles)}`
   ].join('\n');
 }
 

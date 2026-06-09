@@ -156,6 +156,13 @@ test('renderRunStatus summarizes state, repositories, branches, PRs, quality, st
       reason: 'Review failed smoke check.',
       requestedAt: '2026-06-03T10:04:00.000Z'
     },
+    developHandoffCommit: {
+      repository,
+      branchName: branch.name,
+      commitSha: 'abc123',
+      message: 'LK-101: Improve frontend onboarding empty state',
+      stagedFiles: ['src/app.ts']
+    },
     meaningfulDiff: {
       decision: 'failed',
       reason: 'OpenCode reported success, but new changes after the pre-OpenCode baseline were only ignored agent/runtime artifacts and no product file changes.',
@@ -180,6 +187,9 @@ test('renderRunStatus summarizes state, repositories, branches, PRs, quality, st
   assert.match(rendered, /agentic\/frontend \(develop\)/u);
   assert.match(rendered, /agent\/LK-101-empty-state from develop @ abc123/u);
   assert.match(rendered, /#101: agent\/LK-101-empty-state -> develop \(open\)/u);
+  assert.match(rendered, /Develop Handoff Commit/u);
+  assert.match(rendered, /Commit SHA: abc123/u);
+  assert.match(rendered, /Staged Files: src\/app\.ts/u);
   assert.match(rendered, /Status: PASSED/u);
   assert.match(rendered, /test PASSED/u);
   assert.match(rendered, /Meaningful Diff/u);

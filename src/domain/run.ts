@@ -33,6 +33,14 @@ export interface BranchRef {
   readonly headSha?: string;
 }
 
+export interface DevelopHandoffCommit {
+  readonly repository: RepositoryRef;
+  readonly branchName: string;
+  readonly commitSha: string;
+  readonly message: string;
+  readonly stagedFiles: readonly string[];
+}
+
 export interface RunTimestamps {
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -209,6 +217,7 @@ export interface DeliveryRunStateRecord {
   readonly devRuns: readonly DevRunResult[];
   readonly timestamps: RunTimestamps;
   readonly meaningfulDiff?: MeaningfulDiffEvidence;
+  readonly developHandoffCommit?: DevelopHandoffCommit;
   readonly agentCompletion?: AgentCompletionReport;
   readonly coreSafety?: CoreSafetyReport;
   readonly testRelevance?: TestRelevanceReport;

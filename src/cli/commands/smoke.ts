@@ -167,6 +167,7 @@ function renderSmokeResult(io: CliProgramIO, ticketKey: string, result: RealProv
   if (result.state.testRelevance !== undefined) {
     io.stdout(`Test Relevance: ${result.state.testRelevance.decision.toUpperCase()} - ${result.state.testRelevance.reason}\n`);
   }
+  io.stdout(`Develop Handoff Commit: ${result.state.developHandoffCommit?.commitSha ?? 'n/a'}\n`);
   io.stdout(`Staging Report: ${result.stagingReportPath ?? 'n/a'}\n`);
   if (result.state.failure !== undefined) {
     io.stdout(`Failure Reason: ${result.state.failure.reason}\n`);
@@ -190,6 +191,8 @@ function formatSmokeFailure(ticketKey: string, error: unknown): string {
 }
 
 function formatSmokeFailureReason(ticketKey: string, kind: ReturnType<typeof mapMcpError>['kind'], message: string): string {
+  const providerContext = inferSmokeFailureProviderContext(message);
+
   switch (kind) {
     case 'tool_not_found':
       return `missing required runtime MCP tool for the Jira/GitHub/Railway smoke path (${message})`;
@@ -197,14 +200,43 @@ function formatSmokeFailureReason(ticketKey: string, kind: ReturnType<typeof map
       return `runtime MCP tool is not allowlisted for the Jira/GitHub/Railway smoke path (${message})`;
     case 'auth':
     case 'session':
+      if (providerContext !== undefined) {
+        return `${providerContext}; MCP auth/session is not ready (${message})`;
+      }
       return `unable to read Jira work item ${ticketKey}; MCP auth/session is not ready (${message})`;
     case 'timeout':
+      if (providerContext !== undefined) {
+        return `${providerContext}; MCP tool call timed out (${message})`;
+      }
       return `unable to read Jira work item ${ticketKey}; MCP tool call timed out (${message})`;
     case 'provider_error':
+      if (providerContext !== undefined) {
+        return `${providerContext} (${message})`;
+      }
       return `unable to read Jira work item ${ticketKey}; check the configured MCP client/server and work-item access (${message})`;
     case 'unknown':
       return message;
   }
+}
+
+function inferSmokeFailureProviderContext(message: string): string | undefined {
+  const lowerMessage = message.toLowerCase();
+
+  if (
+    lowerMessage.includes('github') ||
+    lowerMessage.includes('codehostport') ||
+    lowerMessage.includes('openpullrequest') ||
+    lowerMessage.includes('create_pull_request') ||
+    lowerMessage.includes('pull request')
+  ) {
+    return 'GitHub develop PR handoff failed';
+  }
+
+  if (lowerMessage.includes('railway') || lowerMessage.includes('deploymentport') || lowerMessage.includes('waitfordeployment')) {
+    return 'Railway staging verification failed';
+  }
+
+  return undefined;
 }
 
 function renderDoctorReport(io: CliProgramIO, checks: readonly DoctorCheck[]): void {

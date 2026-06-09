@@ -2,6 +2,25 @@
 
 ## 2026-06-09
 
+Implemented Milestone BB1 Commit Scoped Agent Diff Before Develop PR Handoff:
+
+- Added a scoped local commit step after meaningful diff, agent completion, core safety, local quality gates, and test relevance pass, and before local branch push or develop PR creation.
+- Limited the commit operation to the meaningful-diff product files, rejected unsafe relative paths before staging, normalized the deterministic commit message, and kept local git execution behind the native/subprocess fallback with argument-array commands.
+- Preserved operation-ledger idempotency for the new `git:LocalGitAdapter.commitScopedAgentDiff` operation so reruns reuse the recorded commit metadata instead of duplicating commits, pushes, or PR side effects.
+- Persisted and surfaced the scoped agent diff commit SHA in run state, branch head metadata, smoke output, develop PR body/comment, status output, and final reports.
+- Fixed the real-provider smoke failure formatter so GitHub develop PR handoff errors such as `create_pull_request` failures are reported as GitHub handoff failures instead of misleading Jira read failures.
+- Added fake-only regression coverage for scoped staging, unsafe file refusal, commit-before-push ordering, ledger replay, smoke success evidence, smoke GitHub handoff failure wording, status output, and final reports.
+- Preserved BB1 scope only: no BB2 review adapter, BC operator sandbox, production PR automation, production merge, production deployment, dashboard, Telegram, WhatsApp, live provider/MCP/Docker/OAuth/network calls in tests, or real remote git endpoints were added.
+
+Verification commands run for BB1:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm run build`
+- `node --test dist/test/git-github.test.js dist/test/smoke-command.test.js dist/test/status.test.js dist/test/milestone-i.test.js` (`43/43`)
+- `pnpm test` (`383/383`)
+- `git diff --check`
+
 Implemented Milestone BB Real Staging Verification v1:
 
 - Changed the confirmed real-provider smoke path to preserve the BA local evidence gates before provider handoff: meaningful diff, agent completion, core safety, local quality, and test relevance evidence are written before develop PR side effects.

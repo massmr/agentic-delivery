@@ -169,6 +169,7 @@ test('smoke command uses fake GitHub and Railway MCP tools for staging verificat
   assert.equal(exitCode, 0, captured.stderr + captured.stdout);
   assert.match(captured.stdout, /Final State: STAGING_VERIFIED/u);
   assert.match(captured.stdout, /Staging Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/staging-report\.md/u);
+  assert.match(captured.stdout, /Develop Handoff Commit: local-head/u);
   assert.doesNotMatch(captured.stdout, /FAIL: GitHub/u);
   assert.doesNotMatch(captured.stdout, /FAIL: Railway/u);
   assert.doesNotMatch(captured.stdout, /FAIL: Vercel/u);
@@ -188,7 +189,7 @@ test('smoke command uses fake GitHub and Railway MCP tools for staging verificat
   ]);
   assertNoRailwayMutatingToolCalls(clients.railway.toolCallRequests.map((call) => call.toolName));
   assert.equal(auditRecords.some((record) => record.port === 'DeploymentPort' && record.action === 'waitForDeployment' && record.status === 'succeeded'), true);
-  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff', 'show-ref', 'checkout', 'rev-parse', 'push', 'rev-parse']);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff', 'show-ref', 'checkout', 'rev-parse', 'reset', 'add', 'diff', '-c', 'rev-parse', 'push', 'rev-parse']);
   assert.equal(devRunner.calls.length, 1);
   assert.equal(qualityCalls, 1);
 
@@ -196,10 +197,66 @@ test('smoke command uses fake GitHub and Railway MCP tools for staging verificat
   assert.equal(state.state, 'STAGING_VERIFIED');
   assert.equal(state.pullRequests.length, 1);
   assert.equal(state.pullRequests[0]?.targetBranch, 'develop');
+  assert.equal(state.developHandoffCommit?.commitSha, 'local-head');
+  assert.deepEqual(state.developHandoffCommit?.stagedFiles, ['src/app.ts']);
   assert.equal(state.stagingDeployments.length, 1);
   assert.equal(state.stagingDeployments[0]?.serviceUrl, 'https://frontend.example.test');
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md'))).isFile(), true);
   assert.equal((await stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1')))).isFile(), true);
+});
+
+test('smoke command reports GitHub handoff failures without Jira read wrapper', async (t) => {
+  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml());
+  const captured = createCapturedIO();
+  const clients = createSmokeMcpClients();
+  const gitCalls: GitCommandInput[] = [];
+  const devRunner = createFakeDevRunner(completionLog({
+    status: 'completed',
+    changedFiles: 'src/app.ts',
+    testsRun: 'pnpm test',
+    knownLimits: 'none',
+    blockers: 'none',
+    backgroundAgents: 'none'
+  }));
+  let qualityCalls = 0;
+  clients.github = new MockMcpClient([
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({ content: { branches: [] }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.createBranch, () => ({ content: { branch: { headSha: 'github-branch-head' } }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: { error: 'create_pull_request failed with 422: no commits between develop and agent branch' }, isError: true })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: { pullRequests: [] }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: { checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false }))
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
+    runtimeMcp: { mcpClients: clients },
+    smokeDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({ calls: gitCalls }),
+      devRunner,
+      smokeVerifier: new MockSmokeUrlVerifier(),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'), 'pnpm test');
+      }
+    }
+  }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke', '--run-id', 'smoke-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stderr, /GitHub develop PR handoff failed/u);
+  assert.doesNotMatch(captured.stderr, /unable to read Jira work item/u);
+  assert.deepEqual(clients.github.toolCallRequests.map((call) => call.toolName), [
+    defaultGitHubMcpToolNames.listBranches,
+    defaultGitHubMcpToolNames.createBranch,
+    defaultGitHubMcpToolNames.openPullRequest
+  ]);
+  assert.deepEqual(clients.railway.toolCallRequests, []);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff', 'show-ref', 'checkout', 'rev-parse', 'reset', 'add', 'diff', '-c', 'rev-parse', 'push', 'rev-parse']);
+  assert.equal(devRunner.calls.length, 1);
+  assert.equal(qualityCalls, 1);
 });
 
 test('smoke command needs human before provider handoff when agent completion needs credentials', async (t) => {
@@ -542,6 +599,10 @@ function createFakeGitRunner(output: { readonly calls?: GitCommandInput[] | unde
     }
 
     if (input.args[0] === 'diff') {
+      if (input.args.join(' ') === 'diff --cached --name-only') {
+        return fakeGitResult(input, { diffStat: 'src/app.ts\n' });
+      }
+
       if (input.args.includes('--unified=0')) {
         return fakeGitResult(input, { diffPatch: diffPatch('src/app.ts', ['export const smoke = true;']) });
       }

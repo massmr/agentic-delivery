@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import type { DevRunResult } from '../domain/dev-runner.js';
 import type { DeploymentResult } from '../domain/deployment.js';
 import type { PullRequestRef } from '../domain/pull-request.js';
-import type { BranchRef } from '../domain/run.js';
+import type { BranchRef, DevelopHandoffCommit } from '../domain/run.js';
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
 import { getEwokbotRunDirectoryPath, getEwokbotRunStateFilePath } from '../workspace-layout.js';
 
@@ -85,6 +85,26 @@ export function recordBranchPushed(state: DeliveryRunStateRecord, branch: Branch
     'PUSHED',
     updatedAt
   );
+}
+
+export function recordDevelopHandoffCommit(state: DeliveryRunStateRecord, commit: DevelopHandoffCommit, updatedAt: string): DeliveryRunStateRecord {
+  const branch = state.branches.find(
+    (candidate) =>
+      candidate.repository.owner === commit.repository.owner && candidate.repository.name === commit.repository.name && candidate.name === commit.branchName
+  );
+  const stateWithCommit: DeliveryRunStateRecord = {
+    ...state,
+    developHandoffCommit: commit,
+    branches:
+      branch === undefined
+        ? state.branches
+        : replaceBranch(state.branches, {
+            ...branch,
+            headSha: commit.commitSha
+          })
+  };
+
+  return transitionDeliveryRunState(stateWithCommit, state.state, updatedAt);
 }
 
 export function recordPullRequestOpened(state: DeliveryRunStateRecord, pullRequest: PullRequestRef, updatedAt: string): DeliveryRunStateRecord {

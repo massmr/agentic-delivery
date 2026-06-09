@@ -238,6 +238,10 @@ export function renderFinalReportMarkdown(
     '',
     renderBranches(state.branches),
     '',
+    '## Develop Handoff Commit',
+    '',
+    renderDevelopHandoffCommit(state),
+    '',
     '## Plan',
     '',
     `- Plan Report: ${options.planReportPath ?? 'not recorded'}`,
@@ -305,6 +309,22 @@ function renderBranches(branches: readonly BranchRef[]): string {
   }
 
   return branches.map((branch) => `- ${branch.repository.owner}/${branch.repository.name}: ${branch.name} from ${branch.baseBranch} at ${branch.headSha ?? 'unknown head'}`).join('\n');
+}
+
+function renderDevelopHandoffCommit(state: DeliveryRunStateRecord): string {
+  const commit = state.developHandoffCommit;
+
+  if (commit === undefined) {
+    return '- No scoped agent diff commit recorded.';
+  }
+
+  return [
+    `- Repository: ${commit.repository.owner}/${commit.repository.name}`,
+    `- Branch: ${commit.branchName}`,
+    `- Commit SHA: ${commit.commitSha}`,
+    `- Message: ${commit.message}`,
+    `- Staged Files: ${renderInlineList(commit.stagedFiles)}`
+  ].join('\n');
 }
 
 function renderDevRun(devRun: DevRunResult | undefined, implementationLogPath: string | undefined): string {

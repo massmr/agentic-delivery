@@ -25,6 +25,7 @@ export type {
   DeliveryRunFailure,
   DeliveryRunState,
   DeliveryRunStateRecord,
+  DevelopHandoffCommit,
   HumanActionRequest,
   MeaningfulDiffDecision,
   MeaningfulDiffEvidence,

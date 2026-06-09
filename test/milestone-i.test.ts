@@ -211,6 +211,13 @@ test('MarkdownReportWriter writes final report with all major run evidence', asy
   const writer = new MarkdownReportWriter(rootPath);
   const state = {
     ...recordProductionPullRequestOpened(createState('STAGING_VERIFIED'), createProductionPullRequest(201), '2026-06-03T10:04:00.000Z'),
+    developHandoffCommit: {
+      repository: repositoryRef,
+      branchName: branch.name,
+      commitSha: 'abc123',
+      message: 'LK-101: Improve frontend onboarding empty state',
+      stagedFiles: ['src/app.ts']
+    },
     meaningfulDiff: {
       decision: 'passed',
       reason: 'Meaningful agent product diff detected in 1 file after the pre-OpenCode baseline.',
@@ -245,6 +252,9 @@ test('MarkdownReportWriter writes final report with all major run evidence', asy
   }));
   assert.match(body, /Final State: PRODUCTION_PR_OPENED/u);
   assert.match(body, /Selected Repositories/u);
+  assert.match(body, /Develop Handoff Commit/u);
+  assert.match(body, /Commit SHA: abc123/u);
+  assert.match(body, /Staged Files: src\/app\.ts/u);
   assert.match(body, /Implementation Log: .ewokbot\/runs\/LK-101\/run-1\/implementation-log\.md/u);
   assert.match(body, /Evidence: .ewokbot\/runs\/LK-101\/run-1\/meaningful-diff\.json/u);
   assert.match(body, /Baseline Changed Files: \.omo\/session\.json/u);
@@ -389,6 +399,13 @@ function createState(state: DeliveryRunStateRecord['state']): DeliveryRunStateRe
     ...transitionDeliveryRunState(initial, state, '2026-06-03T10:00:00.000Z'),
     branches: [branch],
     pullRequests: [developPullRequest],
+    developHandoffCommit: {
+      repository: repositoryRef,
+      branchName: branch.name,
+      commitSha: 'abc123',
+      message: 'LK-101: Improve frontend onboarding empty state',
+      stagedFiles: ['src/app.ts']
+    },
     stagingDeployments: [deployment],
     qualityReports: [qualityReport],
     devRuns: [

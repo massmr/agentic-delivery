@@ -2,12 +2,13 @@ import type { OperationLedger } from '../agent/index.js';
 import { InMemoryOperationLedger, JsonOperationLedger } from '../agent/index.js';
 import type { GitHubConnector } from '../connectors/github/index.js';
 import { buildDevelopPullRequestBody } from '../connectors/github/index.js';
-import type { BranchRef, DeliveryRunStateRecord, DeliveryTicket, PullRequestCheckSummary, PullRequestRef, QualityReport, RepositoryConfig } from '../domain/index.js';
+import type { BranchRef, DeliveryRunStateRecord, DeliveryTicket, DevelopHandoffCommit, PullRequestCheckSummary, PullRequestRef, QualityReport, RepositoryConfig } from '../domain/index.js';
 import type { LocalGitAdapter } from '../git/index.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
 import { createRuntimeCodeHostPort } from '../providers/index.js';
 import type { RunStateStore } from '../state/index.js';
-import { recordBranchCreated, recordBranchPushed, recordPullRequestOpened, transitionDeliveryRunState } from '../state/index.js';
+import { recordBranchCreated, recordBranchPushed, recordDevelopHandoffCommit, recordPullRequestOpened, transitionDeliveryRunState } from '../state/index.js';
+import { redactSensitiveText } from '../runners/opencode/redaction.js';
 
 export interface DevelopPullRequestHandoffInput {
   readonly state: DeliveryRunStateRecord;
@@ -53,8 +54,17 @@ export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHand
 
   await input.stateStore.write(branchCreatedState);
   const codeHostBranch = await createCodeHostBranch({ state: branchCreatedState, input, operationLedger, now, branch });
-  const pushedBranch = await pushLocalBranch({ state: branchCreatedState, input, operationLedger, now, branch: codeHostBranch });
-  const pushedState = recordBranchPushed(branchCreatedState, pushedBranch, now().toISOString());
+  const handoffCommit = await commitScopedAgentDiff({ state: branchCreatedState, input, operationLedger, now, branch: codeHostBranch });
+  const committedState = recordDevelopHandoffCommit(branchCreatedState, handoffCommit, now().toISOString());
+  const committedBranch = {
+    ...codeHostBranch,
+    headSha: handoffCommit.commitSha
+  };
+
+  await input.stateStore.write(committedState);
+
+  const pushedBranch = await pushLocalBranch({ state: committedState, input, operationLedger, now, branch: committedBranch });
+  const pushedState = recordBranchPushed(committedState, pushedBranch, now().toISOString());
 
   await input.stateStore.write(pushedState);
 
@@ -64,6 +74,7 @@ export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHand
     operationLedger,
     now,
     branch: pushedBranch,
+    handoffCommit,
     qualityReport: latestQualityReport
   });
   const pullRequestState = recordPullRequestOpened(pushedState, pullRequest, now().toISOString());
@@ -151,7 +162,46 @@ async function pushLocalBranch(input: WorkflowInput & { readonly branch: BranchR
   });
 }
 
-async function openDevelopPullRequest(input: WorkflowInput & { readonly branch: BranchRef; readonly qualityReport: QualityReport }): Promise<PullRequestRef> {
+async function commitScopedAgentDiff(input: WorkflowInput & { readonly branch: BranchRef }): Promise<DevelopHandoffCommit> {
+  const files = getScopedAgentProductFiles(input.state);
+  const message = buildScopedAgentDiffCommitMessage(input.input.ticket);
+  const operationInput = {
+    repository: input.input.repository.ref,
+    branchName: input.branch.name,
+    files,
+    message
+  };
+  const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'git', 'LocalGitAdapter', 'commitScopedAgentDiff', operationInput));
+
+  if (existing?.result !== undefined) {
+    const commit = existing.result as DevelopHandoffCommit;
+    const headSha = await input.input.git.getHeadSha(input.input.repository.localPath);
+
+    if (headSha !== commit.commitSha) {
+      throw new Error(`Recorded scoped agent diff commit ${commit.commitSha} is not the current local HEAD (${headSha}). Reset or restore the agent branch before reusing the develop PR handoff ledger.`);
+    }
+
+    return commit;
+  }
+
+  return runLedgeredOperation({
+    workflow: input,
+    provider: 'git',
+    port: 'LocalGitAdapter',
+    action: 'commitScopedAgentDiff',
+    operationInput,
+    run: async () => input.input.git.commitScopedAgentDiff({
+      repository: input.input.repository.ref,
+      localPath: input.input.repository.localPath,
+      branch: input.branch,
+      files,
+      message
+    }),
+    external: (commit) => ({ externalId: commit.commitSha, result: commit })
+  });
+}
+
+async function openDevelopPullRequest(input: WorkflowInput & { readonly branch: BranchRef; readonly handoffCommit: DevelopHandoffCommit; readonly qualityReport: QualityReport }): Promise<PullRequestRef> {
   const operationInput = {
     repository: input.input.repository.ref,
     title: `${input.input.ticket.ref.key} ${input.input.ticket.summary}`,
@@ -161,6 +211,7 @@ async function openDevelopPullRequest(input: WorkflowInput & { readonly branch: 
       runId: input.state.runId,
       repository: input.input.repository.ref,
       branch: input.branch,
+      handoffCommit: input.handoffCommit,
       qualityReport: input.qualityReport,
       meaningfulDiff: input.state.meaningfulDiff,
       coreSafety: input.state.coreSafety,
@@ -282,8 +333,26 @@ function buildDevelopPullRequestComment(state: DeliveryRunStateRecord, qualityRe
   return [
     `Ewokbot run ${state.runId} prepared this develop pull request.`,
     `Quality status: ${qualityReport.status.toUpperCase()}.`,
+    `Scoped agent diff commit: ${state.developHandoffCommit?.commitSha ?? 'not recorded'}.`,
     'Actual branch push used the local git/native fallback; GitHub actions use typed CodeHostPort operations.'
   ].join('\n');
+}
+
+function getScopedAgentProductFiles(state: DeliveryRunStateRecord): readonly string[] {
+  const files = state.meaningfulDiff?.productFiles ?? [];
+
+  if (files.length === 0) {
+    throw new Error('Develop PR handoff requires scoped agent product files before commit, push, or PR creation.');
+  }
+
+  return [...new Set(files)].sort();
+}
+
+function buildScopedAgentDiffCommitMessage(ticket: DeliveryTicket): string {
+  const summary = redactSensitiveText(ticket.summary).replace(/\s+/gu, ' ').trim();
+  const suffix = summary.length === 0 ? 'Commit scoped agent diff' : summary;
+
+  return `${ticket.ref.key}: ${suffix}`;
 }
 
 export function assertReadyForDevelopPullRequestHandoff(state: DeliveryRunStateRecord): void {
