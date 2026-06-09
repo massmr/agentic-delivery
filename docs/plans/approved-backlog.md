@@ -1328,7 +1328,85 @@ Explicit safety constraints:
 - Do not deploy, rollback, scale, mutate variables, create domains, or delete resources in BB.
 - Do not merge production or deploy production.
 
-### Milestone BC: Operator Agent Action Sandbox
+### Milestone BB1: Commit Scoped Agent Diff Before Develop PR Handoff
+
+Goal:
+
+Fix the real GitHub handoff bug discovered by `ewokbot smoke`: OpenCode changes are left in the working tree, while the remote agent branch is pushed at the base `develop` SHA, causing GitHub PR creation to fail with `No commits between develop and agent/<ticket>`.
+
+Build:
+
+- After OpenCode execution and all local evidence gates pass, stage only files that are part of the allowed agent product diff.
+- Refuse to stage ignored artifacts such as `.omo/`, `.ewokbot/`, logs, caches, run evidence, or files rejected by core safety.
+- Create a deterministic local commit before pushing the agent branch.
+- Use a commit message derived from the ticket key and ticket goal, without leaking secrets or raw provider payloads.
+- Push the committed branch, then create or reuse the develop draft PR through the existing GitHub handoff path.
+- Preserve operation-ledger idempotency for branch creation, local commit, push, PR creation, and PR comments.
+- Fix the misleading smoke error wrapper so GitHub handoff failures are reported as GitHub handoff failures, not Jira ticket read failures.
+
+Acceptance:
+
+- A fake integration proves that OpenCode-modified files are committed before push and PR creation.
+- A fake integration proves that no commit/push/PR occurs when meaningful diff, agent completion, core safety, test relevance, or quality gates fail.
+- A fake integration proves ignored-only diffs are not committed.
+- A fake integration proves forbidden/secret-like files are not staged or committed.
+- Re-running the handoff does not create duplicate commits, duplicate PRs, or duplicate comments when the existing pushed branch/PR already represents the same run.
+- `ewokbot status` and run reports show the local commit SHA used for the develop PR handoff.
+- Tests remain fake-only and do not call live GitHub, live MCP servers, Docker, OpenCode, OAuth, or networks.
+
+Explicit safety constraints:
+
+- Do not commit files outside the scoped allowed agent diff.
+- Do not bypass core safety, meaningful diff, agent completion, test relevance, or quality gates.
+- Do not merge PRs automatically.
+- Do not open production PRs in BB1.
+- Do not perform real remote pushes in tests.
+- Production merge and production deployment remain human-only.
+
+### Milestone BC: Cubic Review Provider
+
+Goal:
+
+Add Cubic as Ewokbot's first full review provider. Operators should be able to select Cubic during `ewokbot init`; Ewokbot should use `cubic-cli` to review the scoped agent diff after local evidence gates pass and before commit/PR handoff; and after the develop PR is opened, Ewokbot should verify the expected Cubic review result/evidence.
+
+Build:
+
+- Add review-provider workspace configuration with at least `none` and `cubic`.
+- Update `ewokbot init` so the operator can choose Cubic as the review provider.
+- When Cubic is selected, detect `cubic-cli`, write review-provider config, and provide setup guidance if `cubic-cli` is missing.
+- Update `ewokbot doctor` to validate Cubic readiness without executing a real review.
+- Introduce a typed `ReviewToolPort` or `DiffReviewPort` for reviewing scoped agent diffs and verifying PR review evidence.
+- Add a `cubic-cli` adapter behind that port, while keeping the port interchangeable for later review providers.
+- Use an injectable subprocess/executor boundary with command, args, working directory, environment allowlist, timeout, cancellation, stdout/stderr capture, and redaction.
+- Pass structured review input containing ticket key, run id, repository, base branch, agent branch, scoped changed files, and diff summary.
+- Run the pre-commit Cubic review only after meaningful diff, agent completion, core safety, test relevance, and quality gates pass.
+- Run the pre-commit Cubic review before local commit, branch push, and PR creation.
+- Parse structured review output into deterministic decisions: `pass`, `warn`, `needs_human`, or `fail`; `fail` blocks, and `needs_human` stops safely.
+- Persist Cubic review evidence under the run directory and expose it in status/final reports.
+- After the develop PR is opened, verify the expected Cubic review result/evidence is present and attach or surface the Cubic report as configured.
+
+Acceptance:
+
+- `ewokbot init` can configure no review provider or Cubic.
+- `ewokbot doctor` reports Cubic readiness when Cubic is configured and gives actionable setup guidance when missing.
+- Unit tests cover review-provider config parsing/rendering, Cubic setup detection, command construction, working-directory scoping, environment allowlist, timeout/cancellation mapping, non-zero exit handling, invalid output handling, and structured pass/warn/needs-human/fail output.
+- Tests prove only scoped agent diff metadata is passed to the adapter.
+- Tests prove secret-looking output is redacted before persistence/reporting.
+- Fake delivery integration proves Cubic runs before local commit/push/PR and blocks unsafe review outcomes.
+- Fake delivery integration proves PR review verification happens after PR creation when Cubic is configured.
+- Tests remain fake-only and do not execute real `cubic-cli`, OpenCode, MCP servers, Docker, OAuth, provider APIs, or networks.
+- The Cubic provider is not a raw shell escape hatch and cannot access provider credentials beyond an explicit allowlist.
+
+Explicit safety constraints:
+
+- Do not expose raw shell access through the review provider.
+- Do not review or stage files outside the scoped allowed agent diff.
+- Do not let `cubic-cli` bypass meaningful diff, agent completion, core safety, test relevance, or quality gates.
+- Do not make Cubic mandatory unless explicitly configured.
+- Do not merge PRs, open production PRs, deploy, or mutate providers in BC.
+- Production merge and production deployment remain human-only.
+
+### Milestone BD: Operator Agent Action Sandbox
 
 Goal:
 
@@ -1357,5 +1435,5 @@ Explicit safety constraints:
 - Do not expose a raw shell to the operator agent.
 - Do not expose raw MCP tool calling to the operator agent.
 - Do not expose provider credentials or OpenCode credentials to the operator agent.
-- Do not implement Telegram, WhatsApp, or dashboard surfaces in AV.
+- Do not implement Telegram, WhatsApp, or dashboard surfaces in BD.
 - Production merge and production deployment remain human-only.
