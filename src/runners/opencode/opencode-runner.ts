@@ -139,13 +139,30 @@ function buildOpenCodeInvocation(workingDirectory: string, commandArgs: readonly
   }
 
   const normalizedCommandArgs = [...commandArgs];
-  const extraArgs = normalizedCommandArgs[0] === 'run'
+  const configuredExtraArgs = normalizedCommandArgs[0] === 'run'
     ? normalizedCommandArgs.slice(1)
     : normalizedCommandArgs;
+  const extraArgs = ensureHeadlessPermissionArgs(configuredExtraArgs);
   const executorArgs = ['run', ...extraArgs, '--dir', workingDirectory, trimmedPrompt];
   const loggedArgs = ['run', ...extraArgs, '--dir', workingDirectory, '<prompt>'];
 
   return { executorArgs, loggedArgs };
+}
+
+function ensureHeadlessPermissionArgs(args: readonly string[]): readonly string[] {
+  const withPure = hasOption(args, '--pure') || hasOption(args, '--no-pure')
+    ? [...args]
+    : ['--pure', ...args];
+
+  if (hasOption(withPure, '--dangerously-skip-permissions')) {
+    return withPure;
+  }
+
+  return ['--dangerously-skip-permissions', ...withPure];
+}
+
+function hasOption(args: readonly string[], option: string): boolean {
+  return args.some((arg) => arg === option || arg.startsWith(`${option}=`));
 }
 
 function buildAllowlistedEnvironment(

@@ -59,11 +59,12 @@ export function buildOpenCodeImplementationPrompt(input: OpenCodePromptInput): s
     'Blockers: unresolved blockers, or none',
     'Background agents: pending background agents/tasks, or none',
     '',
-    '## Local Mock-Only Guardrails',
-    '- Do not call real Jira, GitHub, Railway, OpenCode provider APIs, or any other network service.',
+    '## Local Execution Guardrails',
+    '- Work only in the selected local repository and branch.',
+    '- Do not call Jira, GitHub, Railway, Vercel, deployment, PR, merge, or production APIs.',
     '- Do not read, request, print, or persist credentials or secrets.',
     '- Do not push to production, merge production branches, or change production deployment configuration.',
-    '- Keep this run local and auditable; write implementation evidence into the run folder only.',
+    '- Keep this run local and auditable; Ewokbot will collect implementation evidence and run quality gates after you finish.',
     ''
   ].join('\n');
 }

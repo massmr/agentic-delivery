@@ -130,9 +130,12 @@ test('buildOpenCodeImplementationPrompt renders deterministic ticket, repo, bran
   assert.match(prompt, /Blockers: unresolved blockers, or none/u);
   assert.match(prompt, /Background agents: pending background agents\/tasks, or none/u);
   assert.match(prompt, /Exploration-only work, unfinished todos, unresolved blockers, or pending background agents must not be reported as completed/u);
-  assert.match(prompt, /Do not call real Jira, GitHub, Railway, OpenCode provider APIs/u);
+  assert.match(prompt, /## Local Execution Guardrails/u);
+  assert.match(prompt, /Work only in the selected local repository and branch/u);
+  assert.match(prompt, /Do not call Jira, GitHub, Railway, Vercel, deployment, PR, merge, or production APIs/u);
   assert.match(prompt, /Do not read, request, print, or persist credentials or secrets/u);
   assert.match(prompt, /Do not push to production/u);
+  assert.doesNotMatch(prompt, /Local Mock-Only Guardrails/u);
 });
 
 test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted env', async (t) => {
@@ -168,7 +171,7 @@ test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted e
   });
 
   assert.equal(calls.length, 1);
-  assert.deepEqual(calls[0]?.args, ['run', ...secretArgs, '--dir', workingDirectory, 'mock prompt']);
+  assert.deepEqual(calls[0]?.args, ['run', '--dangerously-skip-permissions', '--pure', ...secretArgs, '--dir', workingDirectory, 'mock prompt']);
   assert.equal(calls[0]?.executable, 'opencode');
   assert.equal(calls[0]?.cwd, workingDirectory);
   assert.equal(calls[0]?.stdin, '');
@@ -177,7 +180,7 @@ test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted e
 
   const log = await readFile(logPath, 'utf8');
   assert.equal(result.status, 'passed');
-  assert.match(result.command, /opencode run --no-network --token \[redacted\] --api_key=\[redacted\] --password \[redacted\] \[redacted\] --dir /u);
+  assert.match(result.command, /opencode run --dangerously-skip-permissions --pure --no-network --token \[redacted\] --api_key=\[redacted\] --password \[redacted\] \[redacted\] --dir /u);
   assert.match(result.command, /<prompt>/u);
   assert.equal(result.attempts[0]?.command, result.command);
   assert.equal(result.attempts.length, 1);
@@ -190,6 +193,70 @@ test('OpenCodeSubprocessRunner builds a safe executor contract and allowlisted e
   assert.doesNotMatch(log, /hunter2/u);
   assert.doesNotMatch(log, /sk-test-secret/u);
   assert.doesNotMatch(result.command, /plain-token-value|abc123|hunter2|sk-test-secret/u);
+});
+
+test('OpenCodeSubprocessRunner does not duplicate configured headless permission flag', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const logPath = join(rootPath, '.ewokbot', 'runs', 'AD-123', 'run-1', 'implementation-log.md');
+  const executor = createSequenceExecutor([{ stdout: 'ok', stderr: '', exitCode: 0 }]);
+
+  await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
+    ticketKey: ticket.ref.key,
+    runId: 'run-1',
+    repository: repository.ref,
+    branchName: branch.name,
+    baseBranch: branch.baseBranch,
+    command: 'opencode',
+    commandArgs: ['run', '--dangerously-skip-permissions', '--pure', '--model', 'openai/gpt-5.4-mini'],
+    workingDirectory: rootPath,
+    workspaceRoot: rootPath,
+    prompt: 'mock prompt',
+    implementationLogPath: logPath,
+    maxAttempts: 1
+  });
+
+  assert.deepEqual(executor.calls[0]?.args, [
+    'run',
+    '--dangerously-skip-permissions',
+    '--pure',
+    '--model',
+    'openai/gpt-5.4-mini',
+    '--dir',
+    rootPath,
+    'mock prompt'
+  ]);
+});
+
+test('OpenCodeSubprocessRunner respects explicit non-pure configuration', async (t) => {
+  const rootPath = await createTempRoot(t);
+  const logPath = join(rootPath, '.ewokbot', 'runs', 'AD-123', 'run-1', 'implementation-log.md');
+  const executor = createSequenceExecutor([{ stdout: 'ok', stderr: '', exitCode: 0 }]);
+
+  await new OpenCodeSubprocessRunner({ now: fixedClock(), executor }).run({
+    ticketKey: ticket.ref.key,
+    runId: 'run-1',
+    repository: repository.ref,
+    branchName: branch.name,
+    baseBranch: branch.baseBranch,
+    command: 'opencode',
+    commandArgs: ['--no-pure', '--model', 'openai/gpt-5.4-mini'],
+    workingDirectory: rootPath,
+    workspaceRoot: rootPath,
+    prompt: 'mock prompt',
+    implementationLogPath: logPath,
+    maxAttempts: 1
+  });
+
+  assert.deepEqual(executor.calls[0]?.args, [
+    'run',
+    '--dangerously-skip-permissions',
+    '--no-pure',
+    '--model',
+    'openai/gpt-5.4-mini',
+    '--dir',
+    rootPath,
+    'mock prompt'
+  ]);
 });
 
 test('nodeOpenCodeSubprocessExecutor returns cancelled without spawning when already aborted', async () => {
