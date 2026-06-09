@@ -5,6 +5,7 @@ import { assertValidJiraProjectKeys } from './jira-project-key-validation.js';
 import type { JiraConnector } from './jira-connector.js';
 
 const portName = 'TicketPort';
+const jiraIssueFields = 'summary,description,status,priority,labels,assignee,reporter,created,updated';
 
 export class JiraMcpProjectKeyValidationError extends Error {
   readonly issues: readonly string[];
@@ -63,13 +64,19 @@ export class JiraMcpTicketPort implements JiraConnector {
   }
 
   async listBacklog(): Promise<readonly DeliveryTicket[]> {
-    const execution = await this.callJiraTool(this.toolNames.listBacklog, 'listBacklog', { jql: this.buildBacklogJql() });
+    const execution = await this.callJiraTool(this.toolNames.listBacklog, 'listBacklog', {
+      jql: this.buildBacklogJql(),
+      fields: jiraIssueFields
+    });
 
     return extractIssueList(execution.result.content).map((issue) => this.toDeliveryTicket(issue));
   }
 
   async getTicket(key: string): Promise<DeliveryTicket> {
-    const execution = await this.callJiraTool(this.toolNames.getTicket, 'getTicket', { issueKey: key });
+    const execution = await this.callJiraTool(this.toolNames.getTicket, 'getTicket', {
+      issueKey: key,
+      expand: 'fields,transitions,changelog'
+    });
 
     return this.toDeliveryTicket(extractIssue(execution.result.content));
   }
@@ -128,7 +135,7 @@ export class JiraMcpTicketPort implements JiraConnector {
       summary: readString(fields.summary, 'issue.fields.summary'),
       description: stringifyDescription(fields.description),
       status: readNamedValue(fields.status, 'issue.fields.status'),
-      priority: toTicketPriority(readNamedValue(fields.priority, 'issue.fields.priority')),
+      priority: toTicketPriority(readOptionalNamedValue(fields.priority) ?? 'medium'),
       labels: readStringList(fields.labels, 'issue.fields.labels'),
       assignee: readOptionalNamedValue(fields.assignee),
       reporter: readOptionalNamedValue(fields.reporter),

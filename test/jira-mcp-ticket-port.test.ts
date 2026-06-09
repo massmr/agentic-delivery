@@ -82,7 +82,10 @@ test('Jira MCP TicketPort lists backlog issues through discovered and allowed MC
   assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
     {
       toolName: defaultJiraMcpToolNames.listBacklog,
-      arguments: { jql: 'project in (LK) ORDER BY updated DESC' }
+      arguments: {
+        jql: 'project in (LK) ORDER BY updated DESC',
+        fields: 'summary,description,status,priority,labels,assignee,reporter,created,updated'
+      }
     }
   ]);
 });
@@ -135,7 +138,10 @@ test('Jira MCP TicketPort builds safe JQL from multiple valid project keys', asy
   assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
     {
       toolName: defaultJiraMcpToolNames.listBacklog,
-      arguments: { jql: 'project in (LK2, LK_API) ORDER BY updated DESC' }
+      arguments: {
+        jql: 'project in (LK2, LK_API) ORDER BY updated DESC',
+        fields: 'summary,description,status,priority,labels,assignee,reporter,created,updated'
+      }
     }
   ]);
 });
@@ -159,9 +165,41 @@ test('Jira MCP TicketPort leaves backlog unconstrained when project keys are emp
   assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
     {
       toolName: defaultJiraMcpToolNames.listBacklog,
-      arguments: { jql: 'ORDER BY updated DESC' }
+      arguments: {
+        jql: 'ORDER BY updated DESC',
+        fields: 'summary,description,status,priority,labels,assignee,reporter,created,updated'
+      }
     }
   ]);
+});
+
+test('Jira MCP TicketPort defaults missing Jira priority to medium', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({
+      content: {
+        issues: [
+          {
+            ...jiraIssue('LK-350'),
+            fields: {
+              ...jiraIssue('LK-350').fields,
+              priority: null
+            }
+          }
+        ]
+      },
+      isError: false
+    }))
+  ]);
+  const port: TicketPort = new JiraMcpTicketPort({
+    client,
+    serverId,
+    baseUrl: 'https://jira.example.test',
+    projectKeys: ['LK']
+  });
+
+  const tickets = await port.listBacklog();
+
+  assert.equal(tickets[0]?.priority, 'medium');
 });
 
 test('Jira MCP TicketPort constructor rejects invalid project keys before any MCP calls', () => {
@@ -235,6 +273,10 @@ test('Jira MCP TicketPort gets one issue and comments through MCP without live c
   assert.equal(liveCallAttempts, 0);
   assert.equal(ticket.ref.key, 'LK-202');
   assert.equal(ticket.description, 'Fetch by key through MCP.');
+  assert.deepEqual(client.toolCallRequests[0]?.arguments, {
+    issueKey: 'LK-202',
+    expand: 'fields,transitions,changelog'
+  });
   assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultJiraMcpToolNames.getTicket, defaultJiraMcpToolNames.comment]);
 });
 
