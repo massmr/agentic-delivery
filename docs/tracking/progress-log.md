@@ -2,6 +2,27 @@
 
 ## 2026-06-09
 
+Implemented Milestone BA GitHub PR Handoff v1:
+
+- Moved develop PR handoff readiness ahead of branch, push, PR, state-write, and operation-ledger side effects.
+- Required passed local evidence before develop handoff: `LOCAL_CHECKS_PASSED`, latest required local quality passed, meaningful diff passed, agent completion passed, core safety passed, and test relevance passed.
+- Added scoped GitHub runtime readiness for typed `CodeHostPort` construction so missing or denied `create_pull_request` MCP policy fails before local git push, GitHub PR creation, or operation-ledger mutation; the error points operators to the BA policy override.
+- Corrected the production BA orchestration path to construct the GitHub `CodeHostPort` through `createRuntimeCodeHostPort` after local BA evidence passes and before any handoff side effects; scoped readiness requires only the BA handoff action `openPullRequest`/`create_pull_request`, and mock GitHub mode bypasses MCP readiness as intended.
+- Preserved operation-ledger idempotency for GitHub branch readiness/creation, local git push fallback, and develop draft PR creation across reruns.
+- Updated develop draft PR bodies to include ticket, repo, branch, run id, quality summary, meaningful diff summary, core safety summary, test relevance summary, and local-only handoff notes that exclude production PRs, merges, deployments, production branch pushes, and production approval bypasses.
+- Updated legacy fake mock delivery evidence so existing fake-only end-to-end and worker tests still provide local evidence before their mock develop handoff.
+- Preserved BA scope only: no production PR handoff expansion, production merge, production deployment, BB staging verification, BC operator sandbox, live GitHub calls, live MCP/Docker/OAuth/network calls, remote git endpoints, provider CLIs, or test remotes were added.
+
+Verification commands run for BA:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm run build`
+- `node --test dist/test/git-github.test.js dist/test/runtime-mcp-wiring.test.js dist/test/milestone-i.test.js dist/test/worker-runtime.test.js dist/test/worker-mcp-mode.test.js` (`44/44`)
+- `node --test dist/test/git-github.test.js dist/test/runtime-mcp-wiring.test.js` (`27/27`)
+- `pnpm test` (`376/376`)
+- `git diff --check`
+
 Implemented Milestone AZ GitHub MCP Real Mapping:
 
 - Replaced guessed GitHub MCP defaults with inspected GitHub MCP tools from `docs/reference/github-mcp-tools.md`: `list_branches`, `create_branch`, `list_pull_requests`, `create_pull_request`, `pull_request_read`, and `add_issue_comment`.

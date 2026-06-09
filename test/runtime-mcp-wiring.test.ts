@@ -14,6 +14,7 @@ import {
   RuntimeMcpClientResolutionError,
   RuntimeMcpPolicyError,
   collectRuntimeMcpRequirements,
+  createRuntimeCodeHostPort,
   createMockMcpTool,
   createRuntimeTicketPort,
   createRuntimeWorkspaceAdapters,
@@ -143,6 +144,51 @@ test('runtime TicketPort wiring blocks read_only Jira comments before provider t
   );
 
   assert.deepEqual(clients.atlassian.toolCallRequests, []);
+});
+
+test('runtime CodeHostPort wiring blocks develop PR handoff when create_pull_request policy is missing', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `mcp_policy:
+  mode: read_only
+`));
+  const clients = createRuntimeMcpClients();
+
+  await assert.rejects(
+    () => createRuntimeCodeHostPort({
+      config,
+      createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+      requiredGitHubMcpActions: ['openPullRequest']
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.provider, 'GitHub');
+      assert.equal(error.serverId, 'github');
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.openPullRequest);
+      assert.equal(error.decision, 'deny');
+      assert.match(error.message, /Develop PR handoff is allowed after local evidence/u);
+      return true;
+    }
+  );
+
+  assert.deepEqual(clients.github.toolCallRequests, []);
+});
+
+test('runtime CodeHostPort wiring allows develop PR handoff with explicit create_pull_request policy', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], developPullRequestPolicyBlock()));
+  const clients = createRuntimeMcpClients();
+  const createdServers: string[] = [];
+
+  await createRuntimeCodeHostPort({
+    config,
+    createMcpClient: (server: McpServerConfig): McpClient => {
+      createdServers.push(server.id);
+      return clients[server.id] ?? new MockMcpClient();
+    },
+    requiredGitHubMcpActions: ['openPullRequest']
+  });
+
+  assert.deepEqual(createdServers, ['github']);
+  assert.deepEqual(clients.github.listToolRequests, [{ serverId: 'github' }]);
+  assert.deepEqual(clients.github.toolCallRequests, []);
 });
 
 test('runtime MCP wiring fails before delivery side effects when an MCP client cannot be resolved', async () => {
@@ -334,6 +380,16 @@ function trustedRuntimePolicyBlock(): string {
     ${defaultRailwayMcpToolNames.waitForDeployment}:
       decision: allow
       reason: Waiting for a staging deployment is allowed by the runtime fixture.
+`;
+}
+
+function developPullRequestPolicyBlock(): string {
+  return `mcp_policy:
+  mode: trusted
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+      reason: Develop PR handoff is allowed after local evidence.
 `;
 }
 

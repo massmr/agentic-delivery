@@ -1,4 +1,5 @@
 import type { WorkspaceConfig } from '../config/index.js';
+import type { GitHubConnector } from '../connectors/github/index.js';
 import { createGitHubMcpToolRequirements } from '../connectors/github/index.js';
 import { createJiraMcpToolRequirements } from '../connectors/jira/index.js';
 import { createRailwayMcpToolRequirements } from '../connectors/railway/index.js';
@@ -6,12 +7,13 @@ import type { DeliveryTicket } from '../domain/index.js';
 import type { McpClient, McpPolicyConfig, McpPolicyDecision, McpServerConfig, McpToolAllowlistRule, McpToolCallAuditRecord } from '../mcp/index.js';
 import { assertMcpToolAllowed, createMcpToolRegistry, discoverMcpTools, evaluateMcpToolPolicy, inferMcpToolRegistryProvider, requireDiscoveredMcpTool } from '../mcp/index.js';
 import type { TicketPort } from '../ports/index.js';
-import { createJiraConnector, createWorkspaceAdapters } from './adapter-factory.js';
+import { createGitHubConnector, createJiraConnector, createWorkspaceAdapters } from './adapter-factory.js';
 import type { ProviderFactoryEnvironment, WorkspaceAdapters } from './adapter-factory.js';
 
 export type RuntimeMcpClientFactory = (server: McpServerConfig) => McpClient | Promise<McpClient>;
 export type RuntimeMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
 export type RuntimeJiraMcpAction = 'listBacklog' | 'getTicket' | 'comment';
+export type RuntimeGitHubMcpAction = 'createBranch' | 'openPullRequest' | 'getChecks' | 'commentOnPullRequest';
 
 export interface RuntimeProviderFactoryOptions {
   readonly config: WorkspaceConfig;
@@ -22,6 +24,7 @@ export interface RuntimeProviderFactoryOptions {
   readonly mcpAllowlist?: readonly McpToolAllowlistRule[] | undefined;
   readonly mcpAuditSink?: RuntimeMcpAuditSink | undefined;
   readonly requiredJiraMcpActions?: readonly RuntimeJiraMcpAction[] | undefined;
+  readonly requiredGitHubMcpActions?: readonly RuntimeGitHubMcpAction[] | undefined;
 }
 
 export class RuntimeMcpClientResolutionError extends Error {
@@ -55,7 +58,7 @@ export class RuntimeMcpPolicyError extends Error {
   readonly decision: McpPolicyDecision;
 
   constructor(input: { readonly provider: string; readonly serverId: string; readonly toolName: string; readonly decision: McpPolicyDecision; readonly reason: string }) {
-    super(`${input.provider} MCP runtime tool '${input.toolName}' on server '${input.serverId}' is blocked by MCP policy (${input.decision}): ${input.reason}`);
+    super(`${input.provider} MCP runtime tool '${input.toolName}' on server '${input.serverId}' is blocked by MCP policy (${input.decision}): ${input.reason}${formatPolicyNextAction(input)}`);
     this.name = 'RuntimeMcpPolicyError';
     this.provider = input.provider;
     this.serverId = input.serverId;
@@ -116,7 +119,35 @@ export async function createRuntimeTicketPort(options: RuntimeProviderFactoryOpt
   });
 }
 
+export async function createRuntimeCodeHostPort(options: RuntimeProviderFactoryOptions): Promise<GitHubConnector> {
+  const binding = collectRuntimeGitHubMcpBinding(options.config);
+
+  if (binding === undefined) {
+    return createGitHubConnector({
+      config: options.config,
+      environment: options.environment,
+      mcpClients: options.mcpClients,
+      githubMcpAuditSink: options.mcpAuditSink
+    });
+  }
+
+  const scopedBinding = scopeMcpBinding(binding, options.requiredGitHubMcpActions);
+  const mcpClients = await resolveRuntimeMcpClients(options, [scopedBinding]);
+  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements, options.config.mcpPolicy);
+
+  return createGitHubConnector({
+    config: options.config,
+    environment: options.environment,
+    mcpClients,
+    githubMcpAuditSink: options.mcpAuditSink
+  });
+}
+
 function scopeJiraMcpBinding(binding: RuntimeMcpBinding, actions: readonly RuntimeJiraMcpAction[] | undefined): RuntimeMcpBinding {
+  return scopeMcpBinding(binding, actions);
+}
+
+function scopeMcpBinding(binding: RuntimeMcpBinding, actions: readonly string[] | undefined): RuntimeMcpBinding {
   if (actions === undefined) {
     return binding;
   }
@@ -160,6 +191,20 @@ function collectRuntimeMcpBindings(config: WorkspaceConfig): readonly RuntimeMcp
   }
 
   return bindings;
+}
+
+function collectRuntimeGitHubMcpBinding(config: WorkspaceConfig): RuntimeMcpBinding | undefined {
+  if (config.github.mode !== 'mcp') {
+    return undefined;
+  }
+
+  const serverId = requireRuntimeServerId('GitHub', config.github.mcpServerId);
+
+  return {
+    provider: 'GitHub',
+    serverId,
+    requirements: createGitHubMcpToolRequirements(serverId, config.github.mcpToolNames)
+  };
 }
 
 function collectRuntimeJiraMcpBinding(config: WorkspaceConfig): RuntimeMcpBinding | undefined {
@@ -286,4 +331,12 @@ function requireRuntimeServerId(provider: string, serverId: string | undefined):
   }
 
   return serverId;
+}
+
+function formatPolicyNextAction(input: { readonly provider: string; readonly toolName: string }): string {
+  if (input.provider !== 'GitHub' || input.toolName !== 'create_pull_request') {
+    return '';
+  }
+
+  return ' To allow BA develop PR handoff, configure mcp_policy.tools.create_pull_request.decision: allow with reason: Develop PR handoff is allowed after local evidence.';
 }

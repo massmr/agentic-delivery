@@ -1,4 +1,4 @@
-import type { BranchRef, DeliveryTicket, DeploymentResult, PullRequestRef, QualityReport, RepositoryRef, TicketAnalysis } from '../../domain/index.js';
+import type { BranchRef, CoreSafetyReport, DeliveryTicket, DeploymentResult, MeaningfulDiffEvidence, PullRequestRef, QualityReport, RepositoryRef, TestRelevanceReport, TicketAnalysis } from '../../domain/index.js';
 
 export interface BuildDevelopPullRequestBodyInput {
   readonly ticket: DeliveryTicket;
@@ -7,6 +7,9 @@ export interface BuildDevelopPullRequestBodyInput {
   readonly repository: RepositoryRef;
   readonly branch: BranchRef;
   readonly qualityReport: QualityReport;
+  readonly meaningfulDiff?: MeaningfulDiffEvidence | undefined;
+  readonly coreSafety?: CoreSafetyReport | undefined;
+  readonly testRelevance?: TestRelevanceReport | undefined;
   readonly risks?: readonly string[];
 }
 
@@ -92,13 +95,20 @@ export function buildDevelopPullRequestBody(input: BuildDevelopPullRequestBodyIn
     '- Optional:',
     ...formatQualityResults(input.qualityReport.optional),
     '',
+    '## Local Evidence',
+    '',
+    `- Meaningful Diff: ${formatMeaningfulDiff(input.meaningfulDiff)}`,
+    `- Core Safety: ${formatCoreSafety(input.coreSafety)}`,
+    `- Test Relevance: ${formatTestRelevance(input.testRelevance)}`,
+    '',
     '## Risks',
     '',
     ...formatList(risks, 'No known risks recorded.'),
     '',
-    '## Local/Mock-Only Note',
+    '## Local-Only Handoff Notes',
     '',
-    'This handoff was produced with local git and mock GitHub interfaces only. No real remote push, GitHub API call, credentials, or production branch action was performed.',
+    'This develop draft PR handoff is based on local evidence. Branch push uses the local git/native fallback; GitHub handoff uses typed CodeHostPort operations and requires explicit MCP policy for develop PR creation.',
+    'No production PR, merge, deployment, production branch push, or production approval bypass is performed by this handoff.',
     ''
   ].join('\n');
 }
@@ -117,6 +127,38 @@ function formatList(items: readonly string[], emptyMessage: string): readonly st
   }
 
   return items.map((item) => `- ${item}`);
+}
+
+function formatMeaningfulDiff(evidence: MeaningfulDiffEvidence | undefined): string {
+  if (evidence === undefined) {
+    return 'MISSING - no meaningful diff evidence recorded.';
+  }
+
+  return `${evidence.decision.toUpperCase()} - ${evidence.reason}; ${evidence.productFiles.length} product file(s). ${evidence.diffSummary}`;
+}
+
+function formatCoreSafety(report: CoreSafetyReport | undefined): string {
+  if (report === undefined) {
+    return 'MISSING - no core safety report recorded.';
+  }
+
+  return `${report.decision.toUpperCase()} - ${report.reason}; ${report.changedFileCount} changed file(s), ${report.addedLineCount} added line(s).`;
+}
+
+function formatTestRelevance(report: TestRelevanceReport | undefined): string {
+  if (report === undefined) {
+    return 'MISSING - no test relevance report recorded.';
+  }
+
+  return `${report.decision.toUpperCase()} - ${report.reason}; tests reported: ${formatInlineList(report.testsReported)}.`;
+}
+
+function formatInlineList(items: readonly string[]): string {
+  if (items.length === 0) {
+    return 'none';
+  }
+
+  return items.join(', ');
 }
 
 function summarizeSmokeStatus(deployment: DeploymentResult): string {

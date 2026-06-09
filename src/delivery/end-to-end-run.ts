@@ -6,7 +6,18 @@ import { MockGitHubConnector, buildDevelopPullRequestBody } from '../connectors/
 import { MockJiraConnector } from '../connectors/jira/index.js';
 import { MockRailwayConnector } from '../connectors/railway/index.js';
 import { MockSmokeUrlVerifier } from '../deployment/index.js';
-import type { BranchRef, DeliveryRunStateRecord, DeliveryTicket, QualityReport, RepositoryConfig, RepositoryRef } from '../domain/index.js';
+import type {
+  AgentCompletionReport,
+  BranchRef,
+  CoreSafetyReport,
+  DeliveryRunStateRecord,
+  DeliveryTicket,
+  MeaningfulDiffEvidence,
+  QualityReport,
+  RepositoryConfig,
+  RepositoryRef,
+  TestRelevanceReport
+} from '../domain/index.js';
 import { LocalGitAdapter, buildWorkingBranchName } from '../git/index.js';
 import type { GitCommandInput, GitCommandResult } from '../git/index.js';
 import { createTicketPlan, toRepositoryRef } from '../planning/index.js';
@@ -142,12 +153,21 @@ export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInpu
   await stateStore.write(localChecksRunningState);
 
   const qualityReport = buildMockQualityReport(ticket.ref.key, runId, repository, now);
+  const testRelevance = buildMockTestRelevanceReport(qualityReport);
+  const qualityReportWithEvidence: QualityReport = {
+    ...qualityReport,
+    testRelevance
+  };
   await writeMockQualityLogs(rootPath, ticket.ref.key, runId);
-  const qualityReportPath = await reportWriter.writeQuality(ticket.ref.key, runId, qualityReport);
+  const qualityReportPath = await reportWriter.writeQuality(ticket.ref.key, runId, qualityReportWithEvidence);
   const localChecksPassedState = transitionDeliveryRunState(
     {
       ...localChecksRunningState,
-      qualityReports: [...localChecksRunningState.qualityReports, qualityReport]
+      meaningfulDiff: buildMockMeaningfulDiffEvidence(repository, branch),
+      agentCompletion: buildMockAgentCompletionReport(branch),
+      coreSafety: buildMockCoreSafetyReport(),
+      qualityReports: [...localChecksRunningState.qualityReports, qualityReportWithEvidence],
+      testRelevance
     },
     'LOCAL_CHECKS_PASSED',
     now().toISOString()
@@ -285,6 +305,77 @@ function buildMockQualityReport(ticketKey: string, runId: string, repository: Re
       }
     ],
     optional: []
+  };
+}
+
+function buildMockMeaningfulDiffEvidence(repository: RepositoryConfig, branch: BranchRef): MeaningfulDiffEvidence {
+  const changedFile = 'src/mock-implementation.ts';
+
+  return {
+    decision: 'passed',
+    reason: 'Mock run produced a local product diff for develop handoff evidence.',
+    baselineChangedFiles: [],
+    afterAgentChangedFiles: [changedFile],
+    newChangedFiles: [changedFile],
+    changedFiles: [changedFile],
+    productFiles: [changedFile],
+    ignoredFiles: [],
+    ignoredPathPatterns: [],
+    baselineDiffSummary: `No existing mock diff on ${branch.baseBranch}.`,
+    afterAgentDiffSummary: `Mock implementation changed ${changedFile} on ${branch.name}.`,
+    diffSummary: `${repository.ref.owner}/${repository.ref.name} mock implementation changed product files.`
+  };
+}
+
+function buildMockAgentCompletionReport(branch: BranchRef): AgentCompletionReport {
+  return {
+    decision: 'pass',
+    reason: `Mock OpenCode run completed on ${branch.name}.`,
+    source: 'combined',
+    statusSignal: 'completed',
+    summaryText: 'Mock implementation completed with local-only evidence.',
+    changedFilesMentioned: ['src/mock-implementation.ts'],
+    testsMentioned: true,
+    knownLimitsMentioned: true,
+    blockers: [],
+    findings: []
+  };
+}
+
+function buildMockCoreSafetyReport(): CoreSafetyReport {
+  return {
+    decision: 'pass',
+    reason: 'Mock run changed only allowed local product files.',
+    changedFiles: ['src/mock-implementation.ts'],
+    changedFileCount: 1,
+    addedLineCount: 12,
+    limits: {
+      maxChangedFiles: 200,
+      maxAddedLines: 5000
+    },
+    forbiddenFiles: [],
+    secretFindings: [],
+    limitFindings: [],
+    humanReviewFindings: []
+  };
+}
+
+function buildMockTestRelevanceReport(qualityReport: QualityReport): TestRelevanceReport {
+  return {
+    decision: 'pass',
+    reason: 'Mock local quality gate is relevant for the mock product diff.',
+    changedFiles: ['src/mock-implementation.ts'],
+    testsReported: ['mock quality gates'],
+    qualityCommands: qualityReport.required.map((result) => ({
+      name: result.name,
+      command: result.command ?? result.name,
+      requirement: 'required',
+      status: result.status,
+      relevant: true,
+      trivial: false
+    })),
+    findings: [],
+    trivialCommandPatterns: []
   };
 }
 

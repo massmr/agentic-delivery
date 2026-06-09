@@ -4,6 +4,8 @@ import type { GitHubConnector } from '../connectors/github/index.js';
 import { buildDevelopPullRequestBody } from '../connectors/github/index.js';
 import type { BranchRef, DeliveryRunStateRecord, DeliveryTicket, PullRequestCheckSummary, PullRequestRef, QualityReport, RepositoryConfig } from '../domain/index.js';
 import type { LocalGitAdapter } from '../git/index.js';
+import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
+import { createRuntimeCodeHostPort } from '../providers/index.js';
 import type { RunStateStore } from '../state/index.js';
 import { recordBranchCreated, recordBranchPushed, recordPullRequestOpened, transitionDeliveryRunState } from '../state/index.js';
 
@@ -20,9 +22,27 @@ export interface DevelopPullRequestHandoffInput {
   readonly now?: () => Date;
 }
 
+export interface RuntimeDevelopPullRequestHandoffInput extends Omit<DevelopPullRequestHandoffInput, 'github'> {
+  readonly runtimeProviders: RuntimeProviderFactoryOptions;
+}
+
+export async function runRuntimeDevelopPullRequestHandoff(input: RuntimeDevelopPullRequestHandoffInput): Promise<DeliveryRunStateRecord> {
+  assertReadyForDevelopPullRequestHandoff(input.state);
+  const github = await createRuntimeCodeHostPort({
+    ...input.runtimeProviders,
+    requiredGitHubMcpActions: ['openPullRequest']
+  });
+
+  return runDevelopPullRequestHandoff({
+    ...input,
+    github
+  });
+}
+
 export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHandoffInput): Promise<DeliveryRunStateRecord> {
   const now = input.now ?? (() => new Date());
   const operationLedger = resolveOperationLedger(input);
+  const latestQualityReport = requireReadyForDevelopPullRequest(input.state);
   const branch = await input.git.createBranch({
     repository: input.repository.ref,
     localPath: input.repository.localPath,
@@ -32,9 +52,6 @@ export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHand
   const branchCreatedState = recordBranchCreated(input.state, branch, now().toISOString());
 
   await input.stateStore.write(branchCreatedState);
-  assertReadyForDevelopPullRequest(input.state);
-
-  const latestQualityReport = requireLatestPassedRequiredQualityReport(input.state);
   const codeHostBranch = await createCodeHostBranch({ state: branchCreatedState, input, operationLedger, now, branch });
   const pushedBranch = await pushLocalBranch({ state: branchCreatedState, input, operationLedger, now, branch: codeHostBranch });
   const pushedState = recordBranchPushed(branchCreatedState, pushedBranch, now().toISOString());
@@ -144,7 +161,10 @@ async function openDevelopPullRequest(input: WorkflowInput & { readonly branch: 
       runId: input.state.runId,
       repository: input.input.repository.ref,
       branch: input.branch,
-      qualityReport: input.qualityReport
+      qualityReport: input.qualityReport,
+      meaningfulDiff: input.state.meaningfulDiff,
+      coreSafety: input.state.coreSafety,
+      testRelevance: input.state.testRelevance
     }),
     sourceBranch: input.branch.name,
     targetBranch: input.input.repository.branchPolicy.stagingTarget
@@ -266,12 +286,32 @@ function buildDevelopPullRequestComment(state: DeliveryRunStateRecord, qualityRe
   ].join('\n');
 }
 
-function assertReadyForDevelopPullRequest(state: DeliveryRunStateRecord): void {
+export function assertReadyForDevelopPullRequestHandoff(state: DeliveryRunStateRecord): void {
+  requireReadyForDevelopPullRequest(state);
+}
+
+function requireReadyForDevelopPullRequest(state: DeliveryRunStateRecord): QualityReport {
   if (state.state !== 'LOCAL_CHECKS_PASSED') {
     throw new Error(`Develop PR handoff requires LOCAL_CHECKS_PASSED state; current state is ${state.state}.`);
   }
 
-  requireLatestPassedRequiredQualityReport(state);
+  if (state.meaningfulDiff?.decision !== 'passed') {
+    throw new Error('Develop PR handoff requires meaningful diff evidence to pass before branch, push, or PR creation.');
+  }
+
+  if (state.agentCompletion?.decision !== 'pass') {
+    throw new Error('Develop PR handoff requires agent completion evidence to pass before branch, push, or PR creation.');
+  }
+
+  if (state.coreSafety?.decision !== 'pass') {
+    throw new Error('Develop PR handoff requires core safety evidence to pass before branch, push, or PR creation.');
+  }
+
+  if (state.testRelevance?.decision !== 'pass') {
+    throw new Error('Develop PR handoff requires test relevance evidence to pass before branch, push, or PR creation.');
+  }
+
+  return requireLatestPassedRequiredQualityReport(state);
 }
 
 function requireLatestPassedRequiredQualityReport(state: DeliveryRunStateRecord): DeliveryRunStateRecord['qualityReports'][number] {

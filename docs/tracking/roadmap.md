@@ -136,7 +136,7 @@ Status legend:
 - `[x]` Atlassian MCP real mapping for Jira intake/comment tools
 - `[x]` Railway MCP real mapping for read-only staging evidence
 - `[x]` GitHub MCP real mapping for PR handoff tools
-- `[ ]` GitHub draft PR handoff after validated local evidence and accepted MCP policy
+- `[x]` GitHub draft PR handoff after validated local evidence and accepted MCP policy
 - `[ ]` Real staging verification through policy-approved Railway read-only evidence
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 

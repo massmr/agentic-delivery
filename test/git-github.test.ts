@@ -13,24 +13,34 @@ import {
   InMemoryOperationLedger,
   JsonOperationLedger,
   getOperationLedgerFilePath,
+  RuntimeMcpPolicyError,
+  MockMcpClient,
+  createMockMcpTool,
+  defaultGitHubMcpToolNames,
+  parseWorkspaceConfig,
   recordBranchCreated,
   recordBranchPushed,
   recordPullRequestOpened,
   runDevelopPullRequestHandoff,
+  runRuntimeDevelopPullRequestHandoff,
   runGitCommand,
   transitionDeliveryRunState,
   type BranchRef,
+  type AgentCompletionReport,
+  type CoreSafetyReport,
   type DeliveryRunStateRecord,
   type DeliveryTicket,
   type GitCommandInput,
   type GitCommandResult,
+  type MeaningfulDiffEvidence,
   type PullRequestCheckSummary,
   type PullRequestCommentInput,
   type PullRequestRef,
   type QualityReport,
   type RepositoryConfig,
   type RepositoryRef,
-  type RunStateStore
+  type RunStateStore,
+  type TestRelevanceReport
 } from '../src/index.js';
 
 const ticket = {
@@ -101,6 +111,69 @@ const qualityReport = {
     }
   ]
 } satisfies QualityReport;
+
+const meaningfulDiff = {
+  decision: 'passed',
+  reason: 'Implementation changed product TypeScript files.',
+  baselineChangedFiles: [],
+  afterAgentChangedFiles: ['src/delivery/develop-pr-handoff.ts'],
+  newChangedFiles: ['src/delivery/develop-pr-handoff.ts'],
+  changedFiles: ['src/delivery/develop-pr-handoff.ts'],
+  productFiles: ['src/delivery/develop-pr-handoff.ts'],
+  ignoredFiles: [],
+  ignoredPathPatterns: [],
+  baselineDiffSummary: 'No baseline product diff.',
+  afterAgentDiffSummary: 'Develop PR handoff implementation changed.',
+  diffSummary: 'Develop PR handoff implementation changed.'
+} satisfies MeaningfulDiffEvidence;
+
+const agentCompletion = {
+  decision: 'pass',
+  reason: 'Agent reported implementation and verification complete.',
+  source: 'combined',
+  statusSignal: 'completed',
+  summaryText: 'Implemented GitHub PR handoff flow and ran tests.',
+  changedFilesMentioned: ['src/delivery/develop-pr-handoff.ts'],
+  testsMentioned: true,
+  knownLimitsMentioned: true,
+  blockers: [],
+  findings: []
+} satisfies AgentCompletionReport;
+
+const coreSafety = {
+  decision: 'pass',
+  reason: 'No core safety findings.',
+  changedFiles: ['src/delivery/develop-pr-handoff.ts'],
+  changedFileCount: 1,
+  addedLineCount: 12,
+  limits: {
+    maxChangedFiles: 50,
+    maxAddedLines: 2000
+  },
+  forbiddenFiles: [],
+  secretFindings: [],
+  limitFindings: [],
+  humanReviewFindings: []
+} satisfies CoreSafetyReport;
+
+const testRelevance = {
+  decision: 'pass',
+  reason: 'Relevant git and GitHub tests were reported.',
+  changedFiles: ['src/delivery/develop-pr-handoff.ts'],
+  testsReported: ['pnpm test -- test/git-github.test.ts'],
+  qualityCommands: [
+    {
+      name: 'typecheck',
+      command: 'pnpm typecheck',
+      requirement: 'required',
+      status: 'passed',
+      relevant: true,
+      trivial: false
+    }
+  ],
+  findings: [],
+  trivialCommandPatterns: []
+} satisfies TestRelevanceReport;
 
 test('buildWorkingBranchName follows deterministic agent ticket slug policy with custom prefix', () => {
   assert.equal(buildWorkingBranchName({ ticketKey: 'ad-123', summary: 'Add GitHub PR handoff flow!' }), 'agent/AD-123-add-github-pr-handoff-flow');
@@ -210,7 +283,7 @@ test('MockGitHubConnector opens deterministic idempotent PR refs without real pr
   assert.match(first.url, /^https:\/\/mock-github\.local\/agentic\/delivery-cli\/pull\//u);
 });
 
-test('buildDevelopPullRequestBody includes Jira, run, branch, quality, risks, and local-only note', () => {
+test('buildDevelopPullRequestBody includes Jira, run, branch, quality, evidence, risks, and local-only note', () => {
   const body = buildDevelopPullRequestBody({
     ticket,
     analysis: {
@@ -223,7 +296,10 @@ test('buildDevelopPullRequestBody includes Jira, run, branch, quality, risks, an
     runId: 'run-1',
     repository: repositoryRef,
     branch: createBranchRef('agent/AD-123-github-pr-handoff'),
-    qualityReport
+    qualityReport,
+    meaningfulDiff,
+    coreSafety,
+    testRelevance
   });
 
   assert.match(body, /\[AD-123\]\(https:\/\/jira\.example\.test\/browse\/AD-123\)/u);
@@ -232,8 +308,13 @@ test('buildDevelopPullRequestBody includes Jira, run, branch, quality, risks, an
   assert.match(body, /Status: PASSED/u);
   assert.match(body, /typecheck: PASSED - typecheck passed\./u);
   assert.match(body, /coverage: SKIPPED - coverage skipped/u);
+  assert.match(body, /Meaningful Diff: PASSED - Implementation changed product TypeScript files/u);
+  assert.match(body, /Core Safety: PASS - No core safety findings/u);
+  assert.match(body, /Test Relevance: PASS - Relevant git and GitHub tests were reported/u);
   assert.match(body, /Mock behavior could drift/u);
-  assert.match(body, /local git and mock GitHub interfaces only/u);
+  assert.match(body, /Branch push uses the local git\/native fallback/u);
+  assert.match(body, /requires explicit MCP policy for develop PR creation/u);
+  assert.match(body, /No production PR, merge, deployment, production branch push/u);
 });
 
 test('state helpers idempotently replace matching branch and PR entries while transitioning', () => {
@@ -392,9 +473,11 @@ test('runDevelopPullRequestHandoff uses persisted ledger state on rerun with a n
   assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
 });
 
-test('runDevelopPullRequestHandoff persists BRANCH_CREATED but blocks push and PR when quality failed', async () => {
+test('runDevelopPullRequestHandoff blocks before side effects when quality failed', async () => {
   const store = new MemoryRunStateStore();
   const connector = new CountingGitHubConnector();
+  const commands: GitCommandInput[] = [];
+  const ledger = new InMemoryOperationLedger();
   const failedQualityReport: QualityReport = {
     ...qualityReport,
     status: 'failed',
@@ -408,20 +491,188 @@ test('runDevelopPullRequestHandoff persists BRANCH_CREATED but blocks push and P
       ticket,
       repository,
       branchName: 'agent/AD-123-github-pr-handoff',
-      git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+      git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
       github: connector,
+      operationLedger: ledger,
       stateStore: store,
       now: fixedClock()
     }),
     /latest required quality report to pass/u
   );
 
-  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED']);
+  assert.deepEqual(store.writes.map((write) => write.state), []);
+  assert.deepEqual(commands, []);
+  assert.deepEqual(await ledger.listOperations(), []);
   assert.equal(connector.createBranchCount, 0);
   assert.equal(connector.pushCount, 0);
   assert.equal(connector.pullRequestCount, 0);
   assert.equal(connector.commentCount, 0);
   assert.equal(connector.checkCount, 0);
+});
+
+test('runDevelopPullRequestHandoff requires BA local evidence before side effects', async () => {
+  const cases: readonly {
+    readonly name: string;
+    readonly state: DeliveryRunStateRecord;
+    readonly message: RegExp;
+  }[] = [
+    {
+      name: 'missing meaningful diff',
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport], { meaningfulDiff: null }),
+      message: /meaningful diff evidence to pass/u
+    },
+    {
+      name: 'failed meaningful diff',
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport], { meaningfulDiff: { ...meaningfulDiff, decision: 'failed', reason: 'Only documentation changed.' } }),
+      message: /meaningful diff evidence to pass/u
+    },
+    {
+      name: 'missing agent completion',
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport], { agentCompletion: null }),
+      message: /agent completion evidence to pass/u
+    },
+    {
+      name: 'failed core safety',
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport], { coreSafety: { ...coreSafety, decision: 'fail', reason: 'Secret-like diff found.' } }),
+      message: /core safety evidence to pass/u
+    },
+    {
+      name: 'warn test relevance',
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport], { testRelevance: { ...testRelevance, decision: 'warn', reason: 'Only trivial tests were reported.' } }),
+      message: /test relevance evidence to pass/u
+    }
+  ];
+
+  for (const testCase of cases) {
+    const store = new MemoryRunStateStore();
+    const connector = new CountingGitHubConnector();
+    const commands: GitCommandInput[] = [];
+    const ledger = new InMemoryOperationLedger();
+
+    await assert.rejects(
+      runDevelopPullRequestHandoff({
+        state: testCase.state,
+        ticket,
+        repository,
+        branchName: 'agent/AD-123-github-pr-handoff',
+        git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+        github: connector,
+        operationLedger: ledger,
+        stateStore: store,
+        now: fixedClock()
+      }),
+      testCase.message,
+      testCase.name
+    );
+
+    assert.deepEqual(store.writes, [], testCase.name);
+    assert.deepEqual(commands, [], testCase.name);
+    assert.deepEqual(await ledger.listOperations(), [], testCase.name);
+    assert.equal(connector.createBranchCount, 0, testCase.name);
+    assert.equal(connector.pullRequestCount, 0, testCase.name);
+  }
+});
+
+test('runRuntimeDevelopPullRequestHandoff blocks denied create_pull_request before handoff side effects', async () => {
+  const config = parseWorkspaceConfig(githubMcpWorkspaceConfig(`mcp_policy:
+  mode: read_only
+`));
+  const client = new MockMcpClient([
+    createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: {}, isError: false }))
+  ]);
+  const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
+  const store = new MemoryRunStateStore();
+  const ledger = new InMemoryOperationLedger();
+  const commands: GitCommandInput[] = [];
+
+  await assert.rejects(
+    runRuntimeDevelopPullRequestHandoff({
+      state,
+      ticket,
+      repository,
+      branchName: 'agent/ad-123-runtime-policy',
+      git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+      operationLedger: ledger,
+      stateStore: store,
+      runtimeProviders: {
+        config,
+        mcpClients: { github: client }
+      },
+      now: fixedClock()
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.openPullRequest);
+      assert.equal(error.decision, 'deny');
+      assert.match(error.message, /Develop PR handoff is allowed after local evidence/u);
+      return true;
+    }
+  );
+
+  assert.deepEqual(client.listToolRequests, [{ serverId: 'github' }]);
+  assert.deepEqual(client.toolCallRequests, []);
+  assert.deepEqual(commands, []);
+  assert.deepEqual(store.writes, []);
+  assert.deepEqual(await ledger.listOperations(), []);
+});
+
+test('runRuntimeDevelopPullRequestHandoff validates evidence before GitHub MCP policy readiness', async () => {
+  const config = parseWorkspaceConfig(githubMcpWorkspaceConfig(`mcp_policy:
+  mode: read_only
+`));
+  const client = new MockMcpClient([
+    createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: {}, isError: false }))
+  ]);
+  const store = new MemoryRunStateStore();
+  const ledger = new InMemoryOperationLedger();
+  const commands: GitCommandInput[] = [];
+
+  await assert.rejects(
+    runRuntimeDevelopPullRequestHandoff({
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport], { testRelevance: null }),
+      ticket,
+      repository,
+      branchName: 'agent/ad-123-runtime-policy',
+      git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+      operationLedger: ledger,
+      stateStore: store,
+      runtimeProviders: {
+        config,
+        mcpClients: { github: client }
+      },
+      now: fixedClock()
+    }),
+    /test relevance evidence to pass/u
+  );
+
+  assert.deepEqual(client.listToolRequests, []);
+  assert.deepEqual(client.toolCallRequests, []);
+  assert.deepEqual(commands, []);
+  assert.deepEqual(store.writes, []);
+  assert.deepEqual(await ledger.listOperations(), []);
+});
+
+test('runRuntimeDevelopPullRequestHandoff keeps mock GitHub mode working without MCP readiness', async () => {
+  const config = parseWorkspaceConfig(mockGithubWorkspaceConfig());
+  const commands: GitCommandInput[] = [];
+  const result = await runRuntimeDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/ad-123-runtime-mock',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner(commands)),
+    stateStore: new MemoryRunStateStore(),
+    runtimeProviders: {
+      config,
+      createMcpClient: () => {
+        throw new Error('mock GitHub mode must not construct MCP clients');
+      }
+    },
+    now: fixedClock()
+  });
+
+  assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+  assert.deepEqual(commands.map((command) => command.args[0]), ['show-ref', 'checkout', 'rev-parse', 'push', 'rev-parse']);
 });
 
 async function createTempRoot(t: TestContext, prefix: string): Promise<string> {
@@ -467,7 +718,14 @@ function createPullRequest(sourceBranch: string, number: number): PullRequestRef
   };
 }
 
-function createState(state: DeliveryRunStateRecord['state'], qualityReports: readonly QualityReport[] = []): DeliveryRunStateRecord {
+interface CreateStateOptions {
+  readonly meaningfulDiff?: MeaningfulDiffEvidence | null | undefined;
+  readonly agentCompletion?: AgentCompletionReport | null | undefined;
+  readonly coreSafety?: CoreSafetyReport | null | undefined;
+  readonly testRelevance?: TestRelevanceReport | null | undefined;
+}
+
+function createState(state: DeliveryRunStateRecord['state'], qualityReports: readonly QualityReport[] = [], options: CreateStateOptions = {}): DeliveryRunStateRecord {
   const initial = createDeliveryRunStateRecord({
     runId: 'run-1',
     ticket: ticket.ref,
@@ -487,8 +745,66 @@ function createState(state: DeliveryRunStateRecord['state'], qualityReports: rea
 
   return {
     ...transitionDeliveryRunState(initial, state, '2026-06-03T10:00:00.000Z'),
-    qualityReports
+    qualityReports,
+    meaningfulDiff: options.meaningfulDiff === undefined ? meaningfulDiff : options.meaningfulDiff ?? undefined,
+    agentCompletion: options.agentCompletion === undefined ? agentCompletion : options.agentCompletion ?? undefined,
+    coreSafety: options.coreSafety === undefined ? coreSafety : options.coreSafety ?? undefined,
+    testRelevance: options.testRelevance === undefined ? testRelevance : options.testRelevance ?? undefined
   };
+}
+
+function githubMcpWorkspaceConfig(policyBlock: string): string {
+  return `
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+github:
+  mode: mcp
+  organization: agentic
+  mcp_server: github
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 1
+quality:
+  default_profile: node
+${policyBlock}mcp_servers:
+  github:
+    display_name: GitHub MCP
+    command: npx
+    args:
+      - -y
+      - mcp-remote
+      - https://mcp.example.test/github
+repos:
+  - name: delivery-cli
+    url: git@github.com:agentic/delivery-cli.git
+    local_path: /workspace/delivery-cli
+    default_branch: develop
+    production_branch: main
+    staging_smoke_urls: []
+    quality_profile: node
+    hints:
+      - delivery
+`;
+}
+
+function mockGithubWorkspaceConfig(): string {
+  return githubMcpWorkspaceConfig(`mcp_policy:
+  mode: read_only
+`).replace('mode: mcp\n  organization: agentic\n  mcp_server: github', 'mode: mock\n  organization: agentic');
 }
 
 function createSuccessfulGitCommandRunner(commands: GitCommandInput[] = []): (input: GitCommandInput) => Promise<GitCommandResult> {

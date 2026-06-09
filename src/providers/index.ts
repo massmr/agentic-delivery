@@ -14,7 +14,8 @@ export {
   RuntimeMcpPolicyError,
   RuntimeMcpServerConfigError,
   collectRuntimeMcpRequirements,
+  createRuntimeCodeHostPort,
   createRuntimeTicketPort,
   createRuntimeWorkspaceAdapters
 } from './runtime-mcp-factory.js';
-export type { RuntimeMcpAuditSink, RuntimeMcpClientFactory, RuntimeProviderFactoryOptions } from './runtime-mcp-factory.js';
+export type { RuntimeGitHubMcpAction, RuntimeJiraMcpAction, RuntimeMcpAuditSink, RuntimeMcpClientFactory, RuntimeProviderFactoryOptions } from './runtime-mcp-factory.js';

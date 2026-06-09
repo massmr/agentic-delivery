@@ -23,7 +23,8 @@ import {
 } from '../state/index.js';
 import type { RunStateStore } from '../state/index.js';
 import type { WorkspaceAdapters } from '../providers/index.js';
-import { runDevelopPullRequestHandoff } from './develop-pr-handoff.js';
+import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
+import { runRuntimeDevelopPullRequestHandoff } from './develop-pr-handoff.js';
 import { runProductionPullRequestPreparation } from './production-pr-preparation.js';
 import { runStagingVerification } from './staging-verification.js';
 
@@ -43,6 +44,8 @@ export type SmokeQualityRunner = (input: {
   readonly logRootPath: string;
 }) => Promise<QualityReport>;
 
+export type RealProviderSmokeRuntimeMcpOptions = Pick<RuntimeProviderFactoryOptions, 'mcpClients' | 'createMcpClient' | 'mcpAllowlist' | 'mcpAuditSink'>;
+
 export interface RunRealProviderSmokeRunInput {
   readonly ticketKey: string;
   readonly config: WorkspaceConfig;
@@ -56,6 +59,7 @@ export interface RunRealProviderSmokeRunInput {
   readonly stateStore?: RunStateStore | undefined;
   readonly reportWriter?: MarkdownReportWriter | undefined;
   readonly environment?: Readonly<Record<string, string | undefined>> | undefined;
+  readonly runtimeMcp?: RealProviderSmokeRuntimeMcpOptions | undefined;
   readonly abortSignal?: AbortSignal | undefined;
 }
 
@@ -173,13 +177,17 @@ export async function runRealProviderSmokeRun(input: RunRealProviderSmokeRunInpu
   const localChecksPassedState = transitionDeliveryRunState(stateWithQuality, 'LOCAL_CHECKS_PASSED', now().toISOString());
   await stateStore.write(localChecksPassedState);
 
-  const developState = await runDevelopPullRequestHandoff({
+  const developState = await runRuntimeDevelopPullRequestHandoff({
     state: localChecksPassedState,
     ticket,
     repository,
     branchName,
     git,
-    github: input.adapters.github,
+    runtimeProviders: {
+      config: input.config,
+      environment: input.environment ?? process.env,
+      ...(input.runtimeMcp ?? {})
+    },
     operationLedgerRootPath: rootPath,
     stateStore,
     now
