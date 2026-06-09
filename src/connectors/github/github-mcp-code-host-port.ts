@@ -131,7 +131,7 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
         continue;
       }
 
-      const name = readOptionalString(branchValue.name);
+      const name = normalizeGitHubBranchName(readOptionalString(branchValue.name));
       if (name === branchName) {
         return { name, headSha: readOptionalString(readNestedStringValue(branchValue, ['commit', 'sha']) ?? branchValue.sha) };
       }
@@ -250,15 +250,21 @@ function readBranchRef(content: JsonValue | undefined, fallback: BranchRef): Bra
 
   return {
     repository: fallback.repository,
-    name: readOptionalString(branch.name ?? branch.ref) ?? fallback.name,
+    name: normalizeGitHubBranchName(readOptionalString(branch.name ?? branch.ref)) ?? fallback.name,
     baseBranch: readOptionalString(branch.baseBranch ?? branch.base_branch ?? branch.from_branch) ?? fallback.baseBranch,
     headSha: readOptionalString(readNestedStringValue(branch, ['commit', 'sha']) ?? branch.headSha ?? branch.head_sha ?? branch.sha) ?? fallback.headSha
   };
 }
 
 function readPullRequestRef(content: JsonValue | undefined, input: OpenPullRequestInput): PullRequestRef {
-  const pullRequest = unwrapObject(content, 'content', 'pullRequest');
-  const number = readOptionalPositiveInteger(pullRequest.number ?? pullRequest.pullRequestNumber ?? pullRequest.pull_request_number);
+  const pullRequest = unwrapPullRequestObject(content);
+  const number = readOptionalPositiveInteger(
+    pullRequest.number
+      ?? pullRequest.pullRequestNumber
+      ?? pullRequest.pull_request_number
+      ?? pullRequest.pullNumber
+      ?? pullRequest.pull_number
+  ) ?? readPullRequestNumberFromUrl(readOptionalString(pullRequest.html_url ?? pullRequest.url));
 
   if (number === undefined) {
     throw new Error('GitHub MCP pull request response must include a numeric pull request number.');
@@ -270,11 +276,22 @@ function readPullRequestRef(content: JsonValue | undefined, input: OpenPullReque
     repositoryName: input.repository.name,
     number,
     title: readOptionalString(pullRequest.title) ?? input.title,
-    sourceBranch: readOptionalString(readNestedStringValue(pullRequest, ['head', 'ref']) ?? pullRequest.sourceBranch ?? pullRequest.source_branch ?? pullRequest.head) ?? input.sourceBranch,
+    sourceBranch: normalizeGitHubBranchName(readOptionalString(readNestedStringValue(pullRequest, ['head', 'ref']) ?? pullRequest.sourceBranch ?? pullRequest.source_branch ?? pullRequest.head)) ?? input.sourceBranch,
     targetBranch: readOptionalPullRequestTarget(readNestedStringValue(pullRequest, ['base', 'ref']) ?? pullRequest.targetBranch ?? pullRequest.target_branch ?? pullRequest.base) ?? input.targetBranch,
     url: readOptionalString(pullRequest.html_url ?? pullRequest.url) ?? `https://github.com/${input.repository.owner}/${input.repository.name}/pull/${number}`,
     status: readOptionalPullRequestStatus(pullRequest.status) ?? 'open'
   };
+}
+
+function unwrapPullRequestObject(content: JsonValue | undefined): JsonObject {
+  const root = readJsonObjectFromMcpContent(content, 'content');
+  const nested = root.pullRequest ?? root.pull_request ?? root.pr ?? root.data;
+
+  if (nested !== undefined) {
+    return readJsonObjectFromMcpContent(nested, 'content.pullRequest');
+  }
+
+  return root;
 }
 
 function readCheckSummary(content: JsonValue | undefined): PullRequestCheckSummary {
@@ -323,9 +340,9 @@ function summarizeCheckRuns(checkRuns: readonly JsonValue[]): { readonly passedC
 }
 
 function unwrapObject(content: JsonValue | undefined, path: string, nestedKey: string): JsonObject {
-  const root = readObject(content, path);
+  const root = readJsonObjectFromMcpContent(content, path);
   const nested = root[nestedKey];
-  return nested !== undefined && isJsonObject(nested) ? nested : root;
+  return nested !== undefined && isJsonObject(nested) ? readJsonObjectFromMcpContent(nested, `${path}.${nestedKey}`) : root;
 }
 
 function readObject(value: JsonValue | undefined, path: string): JsonObject {
@@ -334,6 +351,76 @@ function readObject(value: JsonValue | undefined, path: string): JsonObject {
   }
 
   return value;
+}
+
+function readJsonObjectFromMcpContent(value: JsonValue | undefined, path: string): JsonObject {
+  if (value !== undefined && isJsonObject(value)) {
+    const content = value.content;
+
+    if (content !== undefined) {
+      const contentObject = tryReadJsonObjectFromMcpContent(content);
+
+      if (contentObject !== undefined) {
+        return contentObject;
+      }
+    }
+
+    return value;
+  }
+
+  const object = tryReadJsonObjectFromMcpContent(value);
+
+  if (object !== undefined) {
+    return object;
+  }
+
+  throw new Error(`${path} must be an object.`);
+}
+
+function tryReadJsonObjectFromMcpContent(value: JsonValue | undefined): JsonObject | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (isJsonObject(value)) {
+    if (value.type === 'text' && typeof value.text === 'string') {
+      return tryParseJsonObject(value.text);
+    }
+
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const object = tryReadJsonObjectFromMcpContent(entry);
+
+      if (object !== undefined) {
+        return object;
+      }
+    }
+
+    return undefined;
+  }
+
+  if (typeof value === 'string') {
+    return tryParseJsonObject(value);
+  }
+
+  return undefined;
+}
+
+function tryParseJsonObject(value: string): JsonObject | undefined {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return isUnknownJsonObject(parsed) ? parsed : undefined;
+  } catch (error) {
+    void error;
+    return undefined;
+  }
+}
+
+function isUnknownJsonObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function readArrayFromObject(content: JsonValue | undefined, ...keys: readonly string[]): JsonArray {
@@ -387,7 +474,32 @@ function readOptionalPositiveInteger(value: JsonValue | undefined): number | und
     return value;
   }
 
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10);
+
+    if (String(parsed) === value.trim() && parsed > 0) {
+      return parsed;
+    }
+  }
+
   return undefined;
+}
+
+function readPullRequestNumberFromUrl(value: string | undefined): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const match = /\/pull\/(\d+)(?:\b|$)/u.exec(value);
+  return match?.[1] === undefined ? undefined : readOptionalPositiveInteger(match[1]);
+}
+
+function normalizeGitHubBranchName(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  return value.startsWith('refs/heads/') ? value.slice('refs/heads/'.length) : value;
 }
 
 function readOptionalPullRequestTarget(value: JsonValue | undefined): PullRequestTarget | undefined {

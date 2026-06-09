@@ -48,7 +48,7 @@ test('GitHub MCP CodeHostPort maps inspected default tools for branch creation a
         branch: branch.name,
         from_branch: branch.baseBranch
       });
-      return { content: { name: branch.name, commit: { sha: 'sha-create' } }, isError: false };
+      return { content: { ref: `refs/heads/${branch.name}`, commit: { sha: 'sha-create' } }, isError: false };
     }),
     createMockMcpTool(serverId, defaultGitHubMcpToolNames.openPullRequest, (input) => {
       assert.deepEqual(input.arguments, {
@@ -64,7 +64,7 @@ test('GitHub MCP CodeHostPort maps inspected default tools for branch creation a
         content: {
           number: 77,
           title: 'LK-123 Add GitHub MCP adapter',
-          head: { ref: branch.name },
+          head: { ref: `refs/heads/${branch.name}` },
           base: { ref: 'develop' },
           html_url: 'https://github.com/agentic/frontend/pull/77',
           state: 'open'
@@ -119,6 +119,45 @@ test('GitHub MCP CodeHostPort skips remote branch creation when list_branches fi
 
   assert.deepEqual(createdBranch, { repository, name: branch.name, baseBranch: branch.baseBranch, headSha: 'sha-existing' });
   assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultGitHubMcpToolNames.listBranches]);
+});
+
+test('GitHub MCP CodeHostPort parses MCP content-array PR creation responses', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.openPullRequest, () => ({
+      content: {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              pull_request: {
+                id: 3832207447,
+                html_url: 'https://github.com/agentic/frontend/pull/88',
+                title: 'LK-123 Add GitHub MCP adapter',
+                head: { ref: `refs/heads/${branch.name}` },
+                base: { ref: 'develop' },
+                state: 'open'
+              }
+            })
+          }
+        ]
+      },
+      isError: false
+    }))
+  ]);
+  const port = new GitHubMcpCodeHostPort({ client, serverId });
+
+  const pullRequest = await port.openPullRequest({
+    repository,
+    title: 'LK-123 Add GitHub MCP adapter',
+    body: 'Body',
+    sourceBranch: branch.name,
+    targetBranch: 'develop'
+  });
+
+  assert.equal(pullRequest.number, 88);
+  assert.equal(pullRequest.url, 'https://github.com/agentic/frontend/pull/88');
+  assert.equal(pullRequest.sourceBranch, branch.name);
+  assert.equal(pullRequest.targetBranch, 'develop');
 });
 
 test('GitHub MCP CodeHostPort resolves checks through list_pull_requests and pull_request_read', async () => {
