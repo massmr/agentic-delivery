@@ -137,7 +137,7 @@ Status legend:
 - `[x]` Railway MCP real mapping for read-only staging evidence
 - `[x]` GitHub MCP real mapping for PR handoff tools
 - `[x]` GitHub draft PR handoff after validated local evidence and accepted MCP policy
-- `[ ]` Real staging verification through policy-approved Railway read-only evidence
+- `[x]` Real staging verification through policy-approved Railway read-only evidence
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 
 ## Future Control Surfaces

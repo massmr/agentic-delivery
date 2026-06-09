@@ -1,12 +1,13 @@
 import { resolve } from 'node:path';
 
 import { loadWorkspaceConfig } from '../../config/index.js';
-import { runDevelopmentExecution } from '../../delivery/index.js';
-import type { DevelopmentQualityRunner, DevelopmentRunBoundary, DevelopmentRunResult } from '../../delivery/index.js';
-import type { CoreSafetyLimits, DevRunner } from '../../domain/index.js';
+import { runRealProviderSmokeRun } from '../../delivery/index.js';
+import type { RealProviderSmokeRunResult, SmokeQualityRunner } from '../../delivery/index.js';
+import type { SmokeUrlVerifier } from '../../deployment/index.js';
+import type { DevRunner } from '../../domain/index.js';
 import { mapMcpError } from '../../mcp/index.js';
 import type { GitCommandRunner } from '../../git/index.js';
-import { createDevRunner, createRuntimeTicketPort } from '../../providers/index.js';
+import { createRuntimeWorkspaceAdapters } from '../../providers/index.js';
 import { loadWorkspaceEnvironment, runLocalDoctor } from '../../setup/index.js';
 import type { DoctorCheck, DoctorProbeOptions, DoctorReport } from '../../setup/index.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
@@ -14,9 +15,9 @@ import type { CliProgramIO, CliRuntimeMcpOptions } from '../program.js';
 
 export interface SmokeCommandDeliveryOptions {
   readonly gitCommandRunner?: GitCommandRunner | undefined;
-  readonly qualityRunner?: DevelopmentQualityRunner | undefined;
-  readonly coreSafetyLimits?: Partial<CoreSafetyLimits> | undefined;
+  readonly qualityRunner?: SmokeQualityRunner | undefined;
   readonly devRunner?: DevRunner | undefined;
+  readonly smokeVerifier?: SmokeUrlVerifier | undefined;
   readonly now?: (() => Date) | undefined;
 }
 
@@ -42,8 +43,8 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
   const cwd = options.cwd ?? process.cwd();
   const environment = loadWorkspaceEnvironment(cwd);
   options.io.stdout(`Atlassian MCP Jira work-item smoke run requested for ${ticketKey}.\n`);
-  options.io.stdout('Scope: one Jira work item, one selected repository, local branch, OpenCode, quality, and evidence only; no PR, deployment, or provider handoff.\n');
-  options.io.stdout('Local-only boundary: Ewokbot will not push, open GitHub PRs, call Railway or Vercel, verify deployments, write an operation ledger, or merge/deploy production.\n');
+  options.io.stdout('Scope: one Jira work item, one selected repository, local branch, OpenCode, quality, develop PR handoff, read-only Railway staging verification, and evidence only.\n');
+  options.io.stdout('Production boundary: Ewokbot will not prepare a production PR, merge production, deploy production, or call Railway mutating tools.\n');
   options.io.stdout('Phase 1/3: running local doctor before side effects.\n');
 
   const doctorReport = runAtSmokeDoctor(cwd, options.doctorOptions);
@@ -54,7 +55,7 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
     return 1;
   }
 
-  options.io.stdout(`Phase 2/3: loading ${ewokbotWorkspaceConfigPath}, workspace env, and validating Atlassian MCP Jira work-item TicketPort.getTicket readiness.\n`);
+  options.io.stdout(`Phase 2/3: loading ${ewokbotWorkspaceConfigPath}, workspace env, and validating runtime MCP readiness for Jira, GitHub handoff, and Railway staging reads.\n`);
   const config = await loadSmokeConfig(cwd, options.configPath, options.io);
 
   if (config === undefined) {
@@ -65,38 +66,39 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
 
   if (modeError !== undefined) {
     options.io.stderr(`${modeError}\n`);
-    options.io.stderr(`Smoke preflight failed before run state, git, OpenCode, quality, or provider side effects. Set jira.mode to mcp in ${ewokbotWorkspaceConfigPath}.\n`);
+    options.io.stderr(`Smoke preflight failed before run state, git, OpenCode, quality, GitHub, Railway, operation ledger, staging report, production PR, merge, or deploy side effects. Set jira.mode, github.mode, and railway.mode to mcp in ${ewokbotWorkspaceConfigPath}.\n`);
     return 1;
   }
 
   try {
-    const ticketPort = await createRuntimeTicketPort({
+    const adapters = await createRuntimeWorkspaceAdapters({
       config,
       environment,
-      ...(options.runtimeMcp ?? {}),
-      requiredJiraMcpActions: ['getTicket']
+      requiredJiraMcpActions: ['getTicket'],
+      requiredGitHubMcpActions: ['createBranch', 'openPullRequest', 'getChecks', 'commentOnPullRequest'],
+      requiredRailwayMcpActions: ['waitForDeployment', 'getServiceUrl'],
+      ...(options.runtimeMcp ?? {})
     });
 
-    const devRunner = options.delivery?.devRunner ?? createDevRunner({ config, environment });
+    const runtimeAdapters = options.delivery?.devRunner === undefined ? adapters : { ...adapters, devRunner: options.delivery.devRunner };
 
-    options.io.stdout('Phase 3/3: Atlassian MCP Jira work-item getTicket readiness confirmed; reading the work item and running local execution evidence.\n');
-    const result = await runDevelopmentExecution({
+    options.io.stdout('Phase 3/3: runtime readiness confirmed; running local execution, develop PR handoff, and read-only Railway staging verification.\n');
+    const result = await runRealProviderSmokeRun({
       ticketKey,
       config,
-      ticketPort,
-      devRunner,
+      adapters: runtimeAdapters,
       rootPath: cwd,
       runId: options.runId,
       now: options.delivery?.now,
       gitCommandRunner: options.delivery?.gitCommandRunner,
       qualityRunner: options.delivery?.qualityRunner,
-      coreSafetyLimits: options.delivery?.coreSafetyLimits,
+      smokeVerifier: options.delivery?.smokeVerifier,
       environment,
-      onBoundaryReady: (boundary) => renderBoundary(options.io, boundary)
+      runtimeMcp: options.runtimeMcp
     });
 
     renderSmokeResult(options.io, ticketKey, result);
-    return result.state.state === 'LOCAL_CHECKS_PASSED' ? 0 : 1;
+    return result.state.state === 'STAGING_VERIFIED' ? 0 : 1;
   } catch (error) {
     options.io.stderr(formatSmokeFailure(ticketKey, error));
     return 1;
@@ -124,11 +126,11 @@ export function parseSmokeCommandOptions(args: readonly string[]): { readonly ti
 }
 
 function validateSmokeConfig(config: Awaited<ReturnType<typeof loadWorkspaceConfig>>): string | undefined {
-  if (config.jira.mode === 'mcp') {
+  if (config.jira.mode === 'mcp' && config.github.mode === 'mcp' && config.railway.mode === 'mcp') {
     return undefined;
   }
 
-  return `Configured jira.mode is ${config.jira.mode}. Smoke preflight requires jira.mode to be mcp for Atlassian MCP Jira work-item TicketPort.getTicket readiness.`;
+  return `Configured provider modes are jira.mode=${config.jira.mode}, github.mode=${config.github.mode}, railway.mode=${config.railway.mode}. Smoke preflight requires jira.mode, github.mode, and railway.mode to be mcp for BB.`;
 }
 
 async function loadSmokeConfig(cwd: string, configPath: string | undefined, io: CliProgramIO): Promise<Awaited<ReturnType<typeof loadWorkspaceConfig>> | undefined> {
@@ -145,42 +147,27 @@ function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function renderBoundary(io: CliProgramIO, boundary: DevelopmentRunBoundary): void {
-  const gateNames = boundary.qualityGates.map((gate) => gate.name).join(', ') || 'none configured';
-
-  io.stdout('Execution boundary confirmed before run state, git, OpenCode, and quality side effects:\n');
-  io.stdout(`- Ticket: ${boundary.ticketKey} - ${boundary.ticketSummary}\n`);
-  io.stdout(`- Repository: ${boundary.repository.owner}/${boundary.repository.name} at ${boundary.repositoryLocalPath}\n`);
-  io.stdout(`- Branch: ${boundary.branchName} from ${boundary.baseBranch}\n`);
-  io.stdout(`- Quality: ${gateNames}\n`);
-  io.stdout(`- Evidence: ${boundary.runDirectoryPath}\n`);
-  io.stdout('- Local-only stop: LOCAL_CHECKS_PASSED or FAILED; no provider handoff follows.\n');
-}
-
-function renderSmokeResult(io: CliProgramIO, ticketKey: string, result: DevelopmentRunResult): void {
-  io.stdout('Local execution evidence completed: local branch, OpenCode, agent completion check, core safety, test relevance, and local quality gates.\n');
+function renderSmokeResult(io: CliProgramIO, ticketKey: string, result: RealProviderSmokeRunResult): void {
+  io.stdout('Smoke delivery evidence completed through local quality, develop PR handoff, and read-only Railway staging verification.\n');
   io.stdout(`Smoke run ${ticketKey} completed as ${result.runId}.\n`);
   io.stdout(`Final State: ${result.state.state}\n`);
   io.stdout(`Run Directory: ${result.runDirectoryPath}\n`);
   io.stdout(`Plan Report: ${result.planReportPath}\n`);
   io.stdout(`Implementation Log: ${result.implementationLogPath ?? 'n/a'}\n`);
-  io.stdout(`Meaningful Diff Report: ${result.meaningfulDiffReportPath ?? 'n/a'}\n`);
   if (result.state.meaningfulDiff !== undefined) {
     io.stdout(`Meaningful Diff: ${result.state.meaningfulDiff.decision.toUpperCase()} - ${result.state.meaningfulDiff.reason}\n`);
   }
-  io.stdout(`Agent Completion Report: ${result.agentCompletionReportPath ?? 'n/a'}\n`);
   if (result.state.agentCompletion !== undefined) {
     io.stdout(`Agent Completion: ${result.state.agentCompletion.decision.toUpperCase()} - ${result.state.agentCompletion.reason}\n`);
   }
-  io.stdout(`Core Safety Report: ${result.coreSafetyReportPath ?? 'n/a'}\n`);
   if (result.state.coreSafety !== undefined) {
     io.stdout(`Core Safety: ${result.state.coreSafety.decision.toUpperCase()} - ${result.state.coreSafety.reason}\n`);
   }
   io.stdout(`Quality Report: ${result.qualityReportPath ?? 'n/a'}\n`);
-  io.stdout(`Test Relevance Report: ${result.testRelevanceReportPath ?? 'n/a'}\n`);
   if (result.state.testRelevance !== undefined) {
     io.stdout(`Test Relevance: ${result.state.testRelevance.decision.toUpperCase()} - ${result.state.testRelevance.reason}\n`);
   }
+  io.stdout(`Staging Report: ${result.stagingReportPath ?? 'n/a'}\n`);
   if (result.state.failure !== undefined) {
     io.stdout(`Failure Reason: ${result.state.failure.reason}\n`);
   }
@@ -188,7 +175,7 @@ function renderSmokeResult(io: CliProgramIO, ticketKey: string, result: Developm
     io.stdout(`Human Action Needed: ${result.state.humanActionNeeded.reason}\n`);
   }
   io.stdout(`Final Report: ${result.finalReportPath ?? 'n/a'}\n`);
-  io.stdout('Local-only boundary preserved: no git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, Jira work-item comment/transition, staging report, production merge, or production deploy was attempted.\n');
+  io.stdout('BB boundary preserved: no production PR preparation, production merge, production deploy, Railway deploy/rollback/scale/variable/domain mutation, or Vercel deployment was attempted.\n');
 }
 
 function formatSmokeFailure(ticketKey: string, error: unknown): string {
@@ -197,7 +184,7 @@ function formatSmokeFailure(ticketKey: string, error: unknown): string {
 
   return [
     `Smoke run failed: ${formatSmokeFailureReason(ticketKey, mappedError.kind, originalMessage)}.`,
-    'No git push, GitHub PR, Railway/Vercel deployment verification, operation ledger, Jira work-item comment/transition, staging report, production merge, or production deploy was attempted.',
+    'Review persisted evidence to determine the last completed boundary. Production PR preparation, production merge, production deploy, and Railway mutating actions are never attempted by this BB smoke path.',
     'If a run id was created, review local evidence under .ewokbot/runs/.'
   ].join('\n') + '\n';
 }
@@ -205,9 +192,9 @@ function formatSmokeFailure(ticketKey: string, error: unknown): string {
 function formatSmokeFailureReason(ticketKey: string, kind: ReturnType<typeof mapMcpError>['kind'], message: string): string {
   switch (kind) {
     case 'tool_not_found':
-      return `missing required Atlassian MCP Jira work-item tool for TicketPort.getTicket (${message})`;
+      return `missing required runtime MCP tool for the Jira/GitHub/Railway smoke path (${message})`;
     case 'allowlist':
-      return `Atlassian MCP Jira work-item tool is not allowlisted for TicketPort.getTicket (${message})`;
+      return `runtime MCP tool is not allowlisted for the Jira/GitHub/Railway smoke path (${message})`;
     case 'auth':
     case 'session':
       return `unable to read Jira work item ${ticketKey}; MCP auth/session is not ready (${message})`;

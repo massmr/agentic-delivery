@@ -2,6 +2,26 @@
 
 ## 2026-06-09
 
+Implemented Milestone BB Real Staging Verification v1:
+
+- Changed the confirmed real-provider smoke path to preserve the BA local evidence gates before provider handoff: meaningful diff, agent completion, core safety, local quality, and test relevance evidence are written before develop PR side effects.
+- Added scoped runtime MCP readiness for the smoke path so Jira intake validates only `TicketPort.getTicket`, GitHub handoff validates the actual develop PR handoff tool group, and Railway validates read-only staging deployment evidence required for `DeploymentPort.waitForDeployment` plus configured service URL fallbacks.
+- Tightened BB smoke preflight so `jira.mode`, `github.mode`, and `railway.mode` must all be `mcp`; mock GitHub or Railway mode now fails before run state, git, OpenCode, quality, provider handoff, operation ledger, staging report, production PR, merge, or deploy side effects.
+- Aligned the BB smoke evidence gates with `run-dev` so agent completion, core safety, or test relevance decisions that require human input transition to `NEEDS_HUMAN` instead of `FAILED`, before provider handoff or staging side effects.
+- Continued the smoke path after develop PR handoff into Railway staging verification, using policy-approved read-only deployment evidence plus the injectable smoke URL verifier, and writing `staging-report.md` with deployment and smoke-check results.
+- Stopped the real-provider smoke path at `STAGING_VERIFIED`; production PR preparation, production merge, and production deployment remain human-only and were not attempted.
+- Added fake-only CLI regression coverage for provider-mode preflight failure and fake GitHub/Railway MCP staging verification, including assertions that Railway deploy, rollback, scale, variable, domain, and secret-sensitive tools are never called.
+- Preserved BB scope only: no BC operator sandbox, Vercel deployment, production PR automation, live provider/MCP/Docker/OAuth/network calls in tests, Railway mutating tools, production merge, or production deployment was added.
+
+Verification commands run for BB:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `node --test dist/test/smoke-command.test.js` (`7/7`)
+- `pnpm test`
+- `pnpm build`
+- `git diff --check`
+
 Implemented Milestone BA GitHub PR Handoff v1:
 
 - Moved develop PR handoff readiness ahead of branch, push, PR, state-write, and operation-ledger side effects.

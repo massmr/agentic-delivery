@@ -6,6 +6,7 @@ import { test, type TestContext } from 'node:test';
 
 import {
   MockMcpClient,
+  MockSmokeUrlVerifier,
   createCliProgram,
   createMockMcpTool,
   defaultGitHubMcpToolNames,
@@ -69,7 +70,7 @@ test('smoke command stops on doctor fail before MCP readiness or run state', asy
   await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs')));
 });
 
-test('smoke command reads one Atlassian MCP Jira work item and stays on local checks only', async (t) => {
+test('smoke command requires Jira, GitHub, and Railway MCP modes before run state or provider side effects', async (t) => {
   const rootPath = await createSmokeWorkspace(t, smokeWorkspaceYaml());
   const captured = createCapturedIO();
   const clients = createSmokeMcpClients();
@@ -97,6 +98,7 @@ test('smoke command reads one Atlassian MCP Jira work item and stays on local ch
       now: fixedClock(),
       gitCommandRunner: createFakeGitRunner({ calls: gitCalls }),
       devRunner,
+      smokeVerifier: new MockSmokeUrlVerifier(),
       qualityRunner: async ({ gates, logRootPath }) => {
         qualityCalls += 1;
         assert.deepEqual(gates.map((gate) => gate.name), ['test']);
@@ -106,77 +108,27 @@ test('smoke command reads one Atlassian MCP Jira work item and stays on local ch
     }
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke', '--run-id', 'smoke-run-1']);
 
-  assert.equal(exitCode, 0);
+  assert.equal(exitCode, 1);
   assert.match(captured.stdout, /Atlassian MCP Jira work-item smoke run requested for AE-101/u);
-  assert.match(captured.stdout, /validating Atlassian MCP Jira work-item TicketPort\.getTicket readiness/u);
-  assert.match(captured.stdout, /Atlassian MCP Jira work-item getTicket readiness confirmed/u);
-  assert.match(captured.stdout, /Execution boundary confirmed/u);
-  assert.match(captured.stdout, /Final State: LOCAL_CHECKS_PASSED/u);
-  assert.match(captured.stdout, /Run Directory: \.ewokbot\/runs\/AE-101\/smoke-run-1/u);
-  assert.match(captured.stdout, /Plan Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/plan\.md/u);
-  assert.match(captured.stdout, /Implementation Log: \.ewokbot\/runs\/AE-101\/smoke-run-1\/implementation-log\.md/u);
-  assert.match(captured.stdout, /Meaningful Diff Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/meaningful-diff\.json/u);
-  assert.match(captured.stdout, /Agent Completion Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/agent-completion\.json/u);
-  assert.match(captured.stdout, /Core Safety Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/core-safety\.json/u);
-  assert.match(captured.stdout, /Quality Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/quality-report\.md/u);
-  assert.match(captured.stdout, /Test Relevance Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/test-relevance\.json/u);
-  assert.match(captured.stdout, /Final Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/final-report\.md/u);
-  assert.match(captured.stdout, /no git push, GitHub PR, Railway\/Vercel deployment verification, operation ledger, Jira work-item comment\/transition, staging report/u);
-  assert.doesNotMatch(captured.stdout, /Provider Modes: Jira=mcp, GitHub=mcp, Railway=mcp/u);
-  assert.doesNotMatch(captured.stdout, /Phase 5\/6: delivery contracts completed through staging verification/u);
-  assert.doesNotMatch(captured.stdout, /Phase 6\/6: production PR preparation completed; merge\/deploy remains human-only\./u);
-  assert.equal(captured.stderr, '');
-
-  assert.deepEqual(clients.atlassian.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
-    {
-      toolName: defaultJiraMcpToolNames.getTicket,
-      arguments: { issueKey: 'AE-101' }
-    }
-  ]);
-  assert.equal(clients.atlassian.toolCallRequests.some((call) => call.toolName === defaultJiraMcpToolNames.listBacklog), false);
-  assert.equal(clients.atlassian.toolCallRequests.some((call) => call.toolName === defaultJiraMcpToolNames.comment), false);
+  assert.match(captured.stdout, /validating runtime MCP readiness for Jira, GitHub handoff, and Railway staging reads/u);
+  assert.match(captured.stderr, /Smoke preflight requires jira\.mode, github\.mode, and railway\.mode to be mcp for BB/u);
+  assert.match(captured.stderr, /github\.mode=mock/u);
+  assert.match(captured.stderr, /railway\.mode=mock/u);
+  assert.match(captured.stderr, /failed before run state, git, OpenCode, quality, GitHub, Railway, operation ledger, staging report, production PR, merge, or deploy side effects/u);
+  assert.deepEqual(clients.atlassian.listToolRequests, []);
+  assert.deepEqual(clients.atlassian.toolCallRequests, []);
   assert.deepEqual(clients.github.listToolRequests, []);
   assert.deepEqual(clients.github.toolCallRequests, []);
   assert.deepEqual(clients.railway.listToolRequests, []);
   assert.deepEqual(clients.railway.toolCallRequests, []);
-  assert.deepEqual(auditRecords.map((record) => `${record.port}.${record.action}:${record.status}`), [
-    'TicketPort.getTicket:started',
-    'TicketPort.getTicket:succeeded'
-  ]);
-  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff']);
-  assert.equal(devRunner.calls.length, 1);
-  assert.equal(devRunner.calls[0]?.ticketKey, 'AE-101');
-  assert.equal(qualityCalls, 1);
-
-  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AE-101', 'smoke-run-1')), 'utf8')) as DeliveryRunStateRecord;
-  assert.equal(state.state, 'LOCAL_CHECKS_PASSED');
-  assert.equal(state.targetRepositories.length, 1);
-  assert.equal(state.branches.length, 1);
-  assert.equal(state.pullRequests.length, 0);
-  assert.equal(state.stagingDeployments.length, 0);
-  assert.equal(state.qualityReports.length, 1);
-  assert.equal(state.devRuns.length, 1);
-  assert.equal(state.meaningfulDiff?.decision, 'passed');
-  assert.equal(state.agentCompletion?.decision, 'pass');
-  assert.equal(state.coreSafety?.decision, 'pass');
-  assert.equal(state.testRelevance?.decision, 'pass');
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'plan.md'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'implementation-log.md'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'meaningful-diff.json'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'agent-completion.json'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'core-safety.json'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'test-relevance.json'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'quality-report.md'))).isFile(), true);
-  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'final-report.md'))).isFile(), true);
-  const finalReport = await readFile(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'final-report.md'), 'utf8');
-  assert.match(finalReport, /Jira ticket read through TicketPort\.getTicket/u);
-  assert.match(finalReport, /local branch creation, OpenCode\/dev-runner execution, meaningful diff inspection, agent completion evaluation, core safety evaluation, local quality gates, test relevance evaluation/u);
-  assert.match(finalReport, /did not transition or comment on Jira, push git branches, open GitHub pull requests, call Railway or Vercel/u);
-  assert.match(finalReport, /write an operation ledger, write a staging report, merge production, or deploy production/u);
-  await assertNoProviderHandoffFiles(rootPath);
+  assert.deepEqual(auditRecords, []);
+  assert.deepEqual(gitCalls, []);
+  assert.equal(devRunner.calls.length, 0);
+  assert.equal(qualityCalls, 0);
+  await assertNoSmokeSideEffectFiles(rootPath);
 });
 
-test('smoke command ignores non-AT provider env readiness and does not call their MCP clients', async (t) => {
+test('smoke command uses fake GitHub and Railway MCP tools for staging verification without mutating Railway', async (t) => {
   const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml(), {
     envLines: ['GITHUB_PERSONAL_ACCESS_TOKEN=redacted', 'ATLASSIAN_BASE_URL=redacted', 'ATLASSIAN_EMAIL=redacted', 'ATLASSIAN_API_TOKEN=redacted', 'VERCEL_TOKEN=redacted']
   });
@@ -206,6 +158,7 @@ test('smoke command ignores non-AT provider env readiness and does not call thei
       now: fixedClock(),
       gitCommandRunner: createFakeGitRunner({ calls: gitCalls }),
       devRunner,
+      smokeVerifier: new MockSmokeUrlVerifier(),
       qualityRunner: async () => {
         qualityCalls += 1;
         return createPassedQualityReport(join(rootPath, 'frontend'), 'pnpm test');
@@ -213,34 +166,101 @@ test('smoke command ignores non-AT provider env readiness and does not call thei
     }
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke', '--run-id', 'smoke-run-1']);
 
-  assert.equal(exitCode, 0);
-  assert.match(captured.stdout, /Final State: LOCAL_CHECKS_PASSED/u);
+  assert.equal(exitCode, 0, captured.stderr + captured.stdout);
+  assert.match(captured.stdout, /Final State: STAGING_VERIFIED/u);
+  assert.match(captured.stdout, /Staging Report: \.ewokbot\/runs\/AE-101\/smoke-run-1\/staging-report\.md/u);
   assert.doesNotMatch(captured.stdout, /FAIL: GitHub/u);
   assert.doesNotMatch(captured.stdout, /FAIL: Railway/u);
   assert.doesNotMatch(captured.stdout, /FAIL: Vercel/u);
   assert.equal(captured.stderr, '');
   assert.deepEqual(clients.atlassian.toolCallRequests.map((call) => call.toolName), [defaultJiraMcpToolNames.getTicket]);
-  assert.deepEqual(clients.github.listToolRequests, []);
-  assert.deepEqual(clients.github.toolCallRequests, []);
-  assert.deepEqual(clients.railway.listToolRequests, []);
-  assert.deepEqual(clients.railway.toolCallRequests, []);
-  assert.deepEqual(auditRecords.map((record) => `${record.port}.${record.action}:${record.status}`), [
-    'TicketPort.getTicket:started',
-    'TicketPort.getTicket:succeeded'
+  assert.deepEqual(clients.github.toolCallRequests.map((call) => call.toolName), [
+    defaultGitHubMcpToolNames.listBranches,
+    defaultGitHubMcpToolNames.createBranch,
+    defaultGitHubMcpToolNames.openPullRequest,
+    defaultGitHubMcpToolNames.commentOnPullRequest,
+    defaultGitHubMcpToolNames.listPullRequests,
+    defaultGitHubMcpToolNames.getChecks
   ]);
-  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff']);
+  assert.deepEqual(clients.railway.toolCallRequests.map((call) => call.toolName), [
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment
+  ]);
+  assertNoRailwayMutatingToolCalls(clients.railway.toolCallRequests.map((call) => call.toolName));
+  assert.equal(auditRecords.some((record) => record.port === 'DeploymentPort' && record.action === 'waitForDeployment' && record.status === 'succeeded'), true);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff', 'status', 'diff', 'show-ref', 'checkout', 'rev-parse', 'push', 'rev-parse']);
   assert.equal(devRunner.calls.length, 1);
   assert.equal(qualityCalls, 1);
 
   const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AE-101', 'smoke-run-1')), 'utf8')) as DeliveryRunStateRecord;
-  assert.equal(state.state, 'LOCAL_CHECKS_PASSED');
+  assert.equal(state.state, 'STAGING_VERIFIED');
+  assert.equal(state.pullRequests.length, 1);
+  assert.equal(state.pullRequests[0]?.targetBranch, 'develop');
+  assert.equal(state.stagingDeployments.length, 1);
+  assert.equal(state.stagingDeployments[0]?.serviceUrl, 'https://frontend.example.test');
+  assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md'))).isFile(), true);
+  assert.equal((await stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1')))).isFile(), true);
+});
+
+test('smoke command needs human before provider handoff when agent completion needs credentials', async (t) => {
+  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml());
+  const captured = createCapturedIO();
+  const clients = createSmokeMcpClients();
+  const gitCalls: GitCommandInput[] = [];
+  const devRunner = createFakeDevRunner(completionLog({
+    status: 'blocked',
+    changedFiles: 'src/app.ts',
+    testsRun: 'not run with reason: provider credentials are required',
+    knownLimits: 'blocked by credentials',
+    blockers: 'credentials required from operator',
+    backgroundAgents: 'none'
+  }));
+  let qualityCalls = 0;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    doctorOptions: { commandExists: () => true, opencodeHomeDirectory: join(rootPath, 'opencode-home') },
+    runtimeMcp: { mcpClients: clients },
+    smokeDelivery: {
+      now: fixedClock(),
+      gitCommandRunner: createFakeGitRunner({ calls: gitCalls }),
+      devRunner,
+      smokeVerifier: new MockSmokeUrlVerifier(),
+      qualityRunner: async () => {
+        qualityCalls += 1;
+        return createPassedQualityReport(join(rootPath, 'frontend'), 'pnpm test');
+      }
+    }
+  }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke', '--run-id', 'smoke-run-1']);
+
+  assert.equal(exitCode, 1);
+  assert.match(captured.stdout, /Final State: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Agent Completion: NEEDS_HUMAN/u);
+  assert.match(captured.stdout, /Human Action Needed:/u);
+  assert.equal(captured.stderr, '');
+  assert.deepEqual(clients.atlassian.toolCallRequests.map((call) => call.toolName), [defaultJiraMcpToolNames.getTicket]);
+  assert.deepEqual(clients.github.toolCallRequests, []);
+  assert.deepEqual(clients.railway.toolCallRequests, []);
+  assert.equal(devRunner.calls.length, 1);
+  assert.equal(qualityCalls, 0);
+  assert.deepEqual(gitCalls.map((call) => call.args[0]), ['show-ref', 'checkout', 'rev-parse', 'status', 'diff', 'status', 'diff']);
+
+  const state = JSON.parse(await readFile(join(rootPath, getRunStateFilePath('AE-101', 'smoke-run-1')), 'utf8')) as DeliveryRunStateRecord;
+  assert.equal(state.state, 'NEEDS_HUMAN');
+  assert.equal(state.agentCompletion?.decision, 'needs_human');
+  assert.equal(state.humanActionNeeded?.reason, state.agentCompletion.reason);
+  assert.equal(state.coreSafety, undefined);
+  assert.equal(state.qualityReports.length, 0);
   assert.equal(state.pullRequests.length, 0);
   assert.equal(state.stagingDeployments.length, 0);
-  await assertNoProviderHandoffFiles(rootPath);
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'core-safety.json')));
+  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md')));
+  await assert.rejects(stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1'))));
 });
 
 test('smoke command refuses an existing state file before delivery side effects', async (t) => {
-  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceYaml());
+  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml());
   const runDirectoryPath = join(rootPath, getRunDirectoryPath('AE-101', 'smoke-run-1'));
   const statePath = join(rootPath, getRunStateFilePath('AE-101', 'smoke-run-1'));
   const existingState = '{"sentinel":"keep-existing-state"}\n';
@@ -292,7 +312,7 @@ test('smoke command refuses an existing state file before delivery side effects'
 });
 
 test('smoke command refuses an existing run directory before delivery side effects', async (t) => {
-  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceYaml());
+  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml());
   const runDirectoryPath = join(rootPath, getRunDirectoryPath('AE-101', 'smoke-run-1'));
   const statePath = join(rootPath, getRunStateFilePath('AE-101', 'smoke-run-1'));
   const captured = createCapturedIO();
@@ -343,7 +363,7 @@ test('smoke command refuses an existing run directory before delivery side effec
 });
 
 test('smoke command fails missing Atlassian MCP Jira work-item readiness before run state, repository branch/git, OpenCode, quality, package-manager, or provider side effects', async (t) => {
-  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceYaml());
+  const rootPath = await createSmokeWorkspace(t, smokeWorkspaceWithProviderMcpYaml());
   const captured = createCapturedIO();
   const clients = createSmokeMcpClients();
   clients.atlassian = new MockMcpClient([
@@ -372,9 +392,9 @@ test('smoke command fails missing Atlassian MCP Jira work-item readiness before 
 
   assert.equal(exitCode, 1);
   assert.match(captured.stderr, /Smoke run failed/u);
-  assert.match(captured.stderr, /missing required Atlassian MCP Jira work-item tool/u);
+  assert.match(captured.stderr, /missing required runtime MCP tool/u);
   assert.match(captured.stderr, new RegExp(defaultJiraMcpToolNames.getTicket, 'u'));
-  assert.match(captured.stderr, /No git push, GitHub PR, Railway\/Vercel deployment verification, operation ledger/u);
+  assert.match(captured.stderr, /Production PR preparation, production merge, production deploy, and Railway mutating actions are never attempted/u);
   assert.deepEqual(clients.atlassian.toolCallRequests, []);
   assert.deepEqual(clients.github.toolCallRequests, []);
   assert.deepEqual(clients.railway.toolCallRequests, []);
@@ -435,12 +455,14 @@ function createSmokeMcpClients(): Record<string, MockMcpClient> {
       createMockMcpTool('atlassian', defaultJiraMcpToolNames.comment, () => ({ content: { ok: true }, isError: false }))
     ]),
     github: new MockMcpClient([
+      createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({ content: { branches: [] }, isError: false })),
       createMockMcpTool('github', defaultGitHubMcpToolNames.createBranch, () => ({ content: { branch: { headSha: 'github-branch-head' } }, isError: false })),
       createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, (input) => {
-        const targetBranch = String(input.arguments.targetBranch);
+        const targetBranch = String(input.arguments.base ?? input.arguments.targetBranch);
         const number = targetBranch === 'main' ? 9102 : 9101;
         return { content: { pullRequest: { number, url: `https://github.example.test/pull/${number}`, targetBranch } }, isError: false };
       }),
+      createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: { pullRequests: [{ number: 9101, head: { ref: 'agent/AE-101-smoke-frontend-real-provider-path' } }] }, isError: false })),
       createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: { checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } }, isError: false })),
       createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false }))
     ]),
@@ -464,6 +486,14 @@ function createRailwayTools(): ReturnType<typeof createMockMcpTool>[] {
 
 function uniqueRailwayToolNames(): readonly string[] {
   return Array.from(new Set(Object.values(defaultRailwayMcpToolNames).filter((toolName) => toolName.trim().length > 0)));
+}
+
+function assertNoRailwayMutatingToolCalls(toolNames: readonly string[]): void {
+  const deniedToolNames = ['deploy', 'deploy_template', 'generate_domain', 'remove_service', 'remove_project', 'scale_service', 'set_variables', 'add_reference_variable', 'list_variables'];
+
+  for (const toolName of deniedToolNames) {
+    assert.equal(toolNames.includes(toolName), false, `${toolName} must not be called by staging verification`);
+  }
 }
 
 function jiraIssue(): JsonObject {
@@ -664,11 +694,6 @@ async function assertNoSmokeSideEffectFiles(rootPath: string): Promise<void> {
   await assert.rejects(stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1'))));
 }
 
-async function assertNoProviderHandoffFiles(rootPath: string): Promise<void> {
-  await assert.rejects(stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md')));
-  await assert.rejects(stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1'))));
-}
-
 function smokeWorkspaceYaml(): string {
   return `
 workspace:
@@ -775,6 +800,27 @@ mcp_servers:
     command: railway
     args:
       - mcp
+mcp_policy:
+  mode: custom
+  tools:
+    read_jira_issue:
+      decision: allow
+    list_branches:
+      decision: allow
+    create_branch:
+      decision: allow
+    list_pull_requests:
+      decision: allow
+    create_pull_request:
+      decision: allow
+    pull_request_read:
+      decision: allow
+    add_issue_comment:
+      decision: allow
+    environment_status:
+      decision: allow
+    list_deployments:
+      decision: allow
 repos:
   - name: frontend
     url: https://github.com/agentic/frontend

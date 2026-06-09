@@ -14,6 +14,7 @@ export type RuntimeMcpClientFactory = (server: McpServerConfig) => McpClient | P
 export type RuntimeMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
 export type RuntimeJiraMcpAction = 'listBacklog' | 'getTicket' | 'comment';
 export type RuntimeGitHubMcpAction = 'createBranch' | 'openPullRequest' | 'getChecks' | 'commentOnPullRequest';
+export type RuntimeRailwayMcpAction = 'waitForDeployment' | 'readDeployment' | 'getServiceUrl';
 
 export interface RuntimeProviderFactoryOptions {
   readonly config: WorkspaceConfig;
@@ -25,6 +26,7 @@ export interface RuntimeProviderFactoryOptions {
   readonly mcpAuditSink?: RuntimeMcpAuditSink | undefined;
   readonly requiredJiraMcpActions?: readonly RuntimeJiraMcpAction[] | undefined;
   readonly requiredGitHubMcpActions?: readonly RuntimeGitHubMcpAction[] | undefined;
+  readonly requiredRailwayMcpActions?: readonly RuntimeRailwayMcpAction[] | undefined;
 }
 
 export class RuntimeMcpClientResolutionError extends Error {
@@ -74,7 +76,7 @@ interface RuntimeMcpBinding {
 }
 
 export async function createRuntimeWorkspaceAdapters(options: RuntimeProviderFactoryOptions): Promise<WorkspaceAdapters> {
-  const bindings = collectRuntimeMcpBindings(options.config);
+  const bindings = scopeRuntimeMcpBindings(collectRuntimeMcpBindings(options.config), options);
   const mcpClients = await resolveRuntimeMcpClients(options, bindings);
   const requirements = bindings.flatMap((binding) => [...binding.requirements]);
 
@@ -145,6 +147,19 @@ export async function createRuntimeCodeHostPort(options: RuntimeProviderFactoryO
 
 function scopeJiraMcpBinding(binding: RuntimeMcpBinding, actions: readonly RuntimeJiraMcpAction[] | undefined): RuntimeMcpBinding {
   return scopeMcpBinding(binding, actions);
+}
+
+function scopeRuntimeMcpBindings(bindings: readonly RuntimeMcpBinding[], options: RuntimeProviderFactoryOptions): readonly RuntimeMcpBinding[] {
+  return bindings.map((binding) => {
+    switch (binding.provider) {
+      case 'Jira':
+        return scopeJiraMcpBinding(binding, options.requiredJiraMcpActions);
+      case 'GitHub':
+        return scopeMcpBinding(binding, options.requiredGitHubMcpActions);
+      case 'Railway':
+        return scopeMcpBinding(binding, options.requiredRailwayMcpActions);
+    }
+  });
 }
 
 function scopeMcpBinding(binding: RuntimeMcpBinding, actions: readonly string[] | undefined): RuntimeMcpBinding {
