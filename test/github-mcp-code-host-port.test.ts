@@ -104,6 +104,46 @@ test('GitHub MCP CodeHostPort maps inspected default tools for branch creation a
   ]);
 });
 
+test('GitHub MCP CodeHostPort forwards explicit draft:false on PR creation', async () => {
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.openPullRequest, (input) => {
+      assert.deepEqual(input.arguments, {
+        owner: repository.owner,
+        repo: repository.name,
+        title: 'LK-123 Add GitHub MCP adapter',
+        body: 'Body',
+        head: branch.name,
+        base: 'develop',
+        draft: false
+      });
+      return {
+        content: {
+          number: 78,
+          title: 'LK-123 Add GitHub MCP adapter',
+          head: { ref: `refs/heads/${branch.name}` },
+          base: { ref: 'develop' },
+          html_url: 'https://github.com/agentic/frontend/pull/78',
+          state: 'open'
+        },
+        isError: false
+      };
+    })
+  ]);
+  const port = new GitHubMcpCodeHostPort({ client, serverId });
+
+  const pullRequest = await port.openPullRequest({
+    repository,
+    title: 'LK-123 Add GitHub MCP adapter',
+    body: 'Body',
+    sourceBranch: branch.name,
+    targetBranch: 'develop',
+    draft: false
+  });
+
+  assert.equal(pullRequest.number, 78);
+  assert.equal(pullRequest.status, 'open');
+});
+
 test('GitHub MCP CodeHostPort skips remote branch creation when list_branches finds the branch', async () => {
   const client = new MockMcpClient([
     createMockMcpTool(serverId, defaultGitHubMcpToolNames.listBranches, () => ({

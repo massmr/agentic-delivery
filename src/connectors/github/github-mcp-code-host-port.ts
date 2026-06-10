@@ -96,7 +96,7 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
       body: input.body,
       head: input.sourceBranch,
       base: input.targetBranch,
-      draft: true
+      draft: input.draft ?? true
     });
 
     return readPullRequestRef(execution.result.content, input);

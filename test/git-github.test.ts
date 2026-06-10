@@ -1487,6 +1487,7 @@ function deliveryConfig(options: {
   readonly autoMerge?: boolean | undefined;
   readonly requireChecks?: DeliveryConfig['pullRequests']['develop']['requireChecks'] | undefined;
   readonly requireHumanApproval?: boolean | undefined;
+  readonly draftMode?: DeliveryConfig['pullRequests']['develop']['draftMode'] | undefined;
 } = {}): DeliveryConfig {
   return {
     checks: {
@@ -1498,6 +1499,7 @@ function deliveryConfig(options: {
         mergeMethod: 'squash',
         requireChecks: options.requireChecks ?? 'pass',
         requireHumanApproval: options.requireHumanApproval ?? false,
+        draftMode: options.draftMode ?? 'always',
         afterMerge: { verifyDeployment: true }
       },
       main: {
@@ -1505,6 +1507,7 @@ function deliveryConfig(options: {
         mergeMethod: 'squash',
         requireChecks: 'pass',
         requireHumanApproval: true,
+        draftMode: 'always',
         afterMerge: { verifyDeployment: false }
       }
     }

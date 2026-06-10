@@ -263,6 +263,7 @@ test('workspace config defaults no remote checks policy to wait', () => {
 
   assert.equal(config.delivery.checks.noRemoteChecks, 'wait');
   assert.equal(config.delivery.pullRequests.develop.autoMerge, false);
+  assert.equal(config.delivery.pullRequests.develop.draftMode, 'always');
   assert.equal(config.delivery.pullRequests.main.autoMerge, false);
   assert.equal(config.delivery.pullRequests.main.requireHumanApproval, true);
 });
@@ -279,6 +280,7 @@ test('workspace config parses explicit delivery PR follow-up policy', () => {
       auto_merge: true
       merge_method: rebase
       require_checks: pass_or_absent
+      draft_mode: auto
       after_merge:
         verify_deployment: true
     main:
@@ -290,6 +292,7 @@ test('workspace config parses explicit delivery PR follow-up policy', () => {
   assert.equal(config.delivery.pullRequests.develop.autoMerge, true);
   assert.equal(config.delivery.pullRequests.develop.mergeMethod, 'rebase');
   assert.equal(config.delivery.pullRequests.develop.requireChecks, 'pass_or_absent');
+  assert.equal(config.delivery.pullRequests.develop.draftMode, 'auto');
   assert.equal(config.delivery.pullRequests.main.autoMerge, false);
   assert.equal(config.delivery.pullRequests.main.requireHumanApproval, true);
 });
@@ -304,14 +307,17 @@ test('workspace config rejects unsafe or invalid delivery policy values', () => 
   pull_requests:
     develop:
       merge_method: fast_forward
+      draft_mode: maybe
     main:
       auto_merge: true
 `));
 
   assert.ok(error.issues.some((issue) => issue.path === 'delivery.checks.no_remote_checks'));
   assert.ok(error.issues.some((issue) => issue.path === 'delivery.pull_requests.develop.merge_method'));
+  assert.ok(error.issues.some((issue) => issue.path === 'delivery.pull_requests.develop.draft_mode'));
   assert.ok(error.issues.some((issue) => issue.path === 'delivery.pull_requests.main.auto_merge'));
   assert.match(error.message, /delivery\.checks\.no_remote_checks must be one of: pass, wait, needs_human, fail/u);
+  assert.match(error.message, /delivery\.pull_requests\.develop\.draft_mode must be one of: always, never, auto/u);
   assert.match(error.message, /Main\/production pull requests cannot be auto-merged by Ewokbot/u);
 });
 

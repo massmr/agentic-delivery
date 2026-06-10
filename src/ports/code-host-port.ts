@@ -16,6 +16,7 @@ export interface OpenPullRequestInput {
   readonly body: string;
   readonly sourceBranch: string;
   readonly targetBranch: PullRequestTarget;
+  readonly draft?: boolean | undefined;
 }
 
 export interface ChecksInput {

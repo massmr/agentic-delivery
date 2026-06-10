@@ -140,7 +140,8 @@ export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHand
     now,
     branch: pushedBranch,
     handoffCommit,
-    qualityReport: latestQualityReport
+    qualityReport: latestQualityReport,
+    draft: determineDevelopPullRequestDraftState(input.deliveryConfig ?? getDefaultDeliveryConfig())
   });
   const pullRequestState = recordPullRequestOpened(pushedState, pullRequest, now().toISOString());
 
@@ -277,7 +278,7 @@ async function commitScopedAgentDiff(input: WorkflowInput & { readonly input: De
   });
 }
 
-async function openDevelopPullRequest(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly branch: BranchRef; readonly handoffCommit: DevelopHandoffCommit; readonly qualityReport: QualityReport }): Promise<PullRequestRef> {
+async function openDevelopPullRequest(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly branch: BranchRef; readonly handoffCommit: DevelopHandoffCommit; readonly qualityReport: QualityReport; readonly draft: boolean }): Promise<PullRequestRef> {
   const operationInput = {
     repository: input.input.repository.ref,
     title: `${input.input.ticket.ref.key} ${input.input.ticket.summary}`,
@@ -294,7 +295,8 @@ async function openDevelopPullRequest(input: WorkflowInput & { readonly input: D
       testRelevance: input.state.testRelevance
     }),
     sourceBranch: input.branch.name,
-    targetBranch: input.input.repository.branchPolicy.stagingTarget
+    targetBranch: input.input.repository.branchPolicy.stagingTarget,
+    draft: input.draft
   };
   const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'github', 'CodeHostPort', 'openPullRequest', operationInput));
 
@@ -311,6 +313,33 @@ async function openDevelopPullRequest(input: WorkflowInput & { readonly input: D
     run: async () => input.input.github.openPullRequest(operationInput),
     external: (pullRequest) => ({ externalId: String(pullRequest.number), externalUrl: pullRequest.url, result: pullRequest })
   });
+}
+
+function determineDevelopPullRequestDraftState(deliveryConfig: DeliveryConfig): boolean {
+  const develop = deliveryConfig.pullRequests.develop;
+  const noRemoteChecks = deliveryConfig.checks.noRemoteChecks;
+
+  if (develop.draftMode === 'always') {
+    return true;
+  }
+
+  if (develop.draftMode === 'never') {
+    return false;
+  }
+
+  if (develop.requireHumanApproval) {
+    return true;
+  }
+
+  if (noRemoteChecks === 'needs_human' || noRemoteChecks === 'fail') {
+    return true;
+  }
+
+  if (develop.autoMerge && develop.requireChecks === 'pass_or_absent' && noRemoteChecks === 'pass') {
+    return false;
+  }
+
+  return true;
 }
 
 async function commentOnDevelopPullRequest(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly pullRequest: PullRequestRef; readonly qualityReport: QualityReport }): Promise<void> {

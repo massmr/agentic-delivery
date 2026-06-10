@@ -37,6 +37,7 @@ export interface GitHubMcpToolNameConfig {
 export type DeliveryNoRemoteChecksPolicy = 'pass' | 'wait' | 'needs_human' | 'fail';
 export type DeliveryPullRequestMergeMethod = 'merge' | 'squash' | 'rebase';
 export type DeliveryRequireChecksPolicy = 'pass' | 'pass_or_absent';
+export type DeliveryPullRequestDraftMode = 'always' | 'never' | 'auto';
 
 export interface DeliveryChecksConfig {
   readonly noRemoteChecks: DeliveryNoRemoteChecksPolicy;
@@ -47,6 +48,7 @@ export interface DeliveryPullRequestConfig {
   readonly mergeMethod: DeliveryPullRequestMergeMethod;
   readonly requireChecks: DeliveryRequireChecksPolicy;
   readonly requireHumanApproval: boolean;
+  readonly draftMode: DeliveryPullRequestDraftMode;
   readonly afterMerge: {
     readonly verifyDeployment: boolean;
   };
@@ -196,6 +198,7 @@ const defaultDeliveryConfig: DeliveryConfig = {
       mergeMethod: 'squash',
       requireChecks: 'pass',
       requireHumanApproval: false,
+      draftMode: 'always',
       afterMerge: {
         verifyDeployment: true
       }
@@ -205,6 +208,7 @@ const defaultDeliveryConfig: DeliveryConfig = {
       mergeMethod: 'squash',
       requireChecks: 'pass',
       requireHumanApproval: true,
+      draftMode: 'always',
       afterMerge: {
         verifyDeployment: false
       }
@@ -633,16 +637,19 @@ function parseDeliveryPullRequestConfig(
   const requireHumanApproval = section.require_human_approval === undefined
     ? defaults.requireHumanApproval
     : readBoolean(section.require_human_approval, `delivery.pull_requests.${target}.require_human_approval`, `Set delivery.pull_requests.${target}.require_human_approval to true or false.`, issues);
+  const draftMode = section.draft_mode === undefined
+    ? defaults.draftMode
+    : readEnumValue(section.draft_mode, `delivery.pull_requests.${target}.draft_mode`, ['always', 'never', 'auto'], `Set delivery.pull_requests.${target}.draft_mode to always, never, or auto.`, issues);
   const afterMergeSection = readOptionalSection(section, 'after_merge', issues);
   const verifyDeployment = afterMergeSection?.verify_deployment === undefined
     ? defaults.afterMerge.verifyDeployment
     : readBoolean(afterMergeSection.verify_deployment, `delivery.pull_requests.${target}.after_merge.verify_deployment`, `Set delivery.pull_requests.${target}.after_merge.verify_deployment to true or false.`, issues);
 
-  if (autoMerge === undefined || mergeMethod === undefined || requireChecks === undefined || requireHumanApproval === undefined || verifyDeployment === undefined) {
+  if (autoMerge === undefined || mergeMethod === undefined || requireChecks === undefined || requireHumanApproval === undefined || draftMode === undefined || verifyDeployment === undefined) {
     return undefined;
   }
 
-  return { autoMerge, mergeMethod, requireChecks, requireHumanApproval, afterMerge: { verifyDeployment } };
+  return { autoMerge, mergeMethod, requireChecks, requireHumanApproval, draftMode, afterMerge: { verifyDeployment } };
 }
 
 function parseMcpPolicyConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): McpPolicyConfig | undefined {
