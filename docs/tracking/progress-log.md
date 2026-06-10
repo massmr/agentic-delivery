@@ -2,6 +2,38 @@
 
 ## 2026-06-09
 
+Implemented Milestone BC Develop PR Follow-Up Policy:
+
+- Added branch-scoped delivery policy parsing for develop PR follow-up, with safe default `delivery.checks.no_remote_checks: wait` so absent remote CI does not pass unless explicitly configured.
+- Extended the typed `CodeHostPort` and GitHub MCP mapping with PR state reads and develop-only merge operations, while keeping main/production PRs human-only and preserving `merge_pull_request` as policy-gated only through the typed develop follow-up path.
+- Added develop PR follow-up decisions for zero checks (`pass`, `wait`, `needs_human`, `fail`), pending checks, failed/cancelled checks, human-merged PRs, closed-unmerged PRs, and explicit develop `auto_merge`.
+- Completed the BC review remediation: removed the runtime MCP `require_human` merge bypass, kept raw `merge_pull_request` human-only at the generic MCP policy layer, and narrowed typed develop auto-merge readiness to explicit develop `auto_merge`, `require_human_approval: false`, and explicit MCP policy allow.
+- Applied `require_checks` and `require_human_approval` during follow-up decisions. Absent checks with `no_remote_checks: pass` now become staging-ready only when `require_checks: pass_or_absent` is configured, and develop is merged first when auto-merge is enabled; otherwise Ewokbot waits or escalates instead of staging an open PR.
+- Added a follow-up-only runner for persisted `PR_TO_DEVELOP_OPENED` states that rereads PR state/checks and optionally merges develop without recreating local branches, commits, pushes, PRs, or PR comments.
+- Persisted follow-up evidence in run state and operation ledger records, and surfaced the evidence in status output and final reports.
+- Stopped real-provider smoke runs before Railway staging unless develop follow-up reaches `DEVELOP_CHECKS_PASSED`; closed, waiting, failed, or human-needed follow-up outcomes do not call Railway staging verification.
+- Fixed smoke failure attribution so GitHub develop follow-up and Railway staging failures are not reported as Jira read failures.
+- Added fake-only coverage for config defaults/validation, GitHub MCP PR read/merge mapping, runtime MCP readiness, handoff policy decisions, smoke follow-up behavior, and mock worker/end-to-end compatibility.
+- Preserved BC scope only: no BD Cubic Review Provider, BE operator sandbox, production merge automation, production deployment, Railway mutations, live provider/MCP/Docker/OpenCode/OAuth/network calls in tests, or main/production auto-merge work was added.
+
+Verification commands run for BC:
+
+- `lsp_diagnostics` on `src` and `test` was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm run build`
+- `node --test dist/test/git-github.test.js dist/test/runtime-mcp-wiring.test.js dist/test/config/workspace-config.test.js dist/test/smoke-command.test.js`
+- `node --test dist/test/milestone-i.test.js dist/test/worker-runtime.test.js dist/test/worker-mcp-mode.test.js dist/test/cli-help.test.js`
+- `pnpm test` (`404/404`)
+- `git diff --check`
+
+Planned Milestone BC Develop PR Follow-Up Policy after real SCRUM-6 smoke:
+
+- Recorded that the SCRUM-6 real smoke reached GitHub PR handoff successfully after BB1: OpenCode produced scoped product changes, local quality passed, the scoped commit was created, the branch was pushed, GitHub MCP opened PR #3, GitHub MCP added a PR comment, and PR number parsing worked.
+- Recorded the remaining blocker: GitHub checks returned `totalCount: 0`, leaving Ewokbot at `PR_TO_DEVELOP_OPENED` without a policy for absent remote CI checks, human-merged PRs, closed PRs, or develop auto-merge.
+- Added BC as the next approved milestone for branch-scoped develop PR follow-up, including `auto_merge`, `merge_method`, `no_remote_checks`, PR polling, closed/merged handling, and staging handoff only after develop is accepted or merged by policy.
+- Deferred Cubic Review Provider to BD and Operator Agent Action Sandbox to BE.
+- Updated README, approved backlog, next actions, and roadmap only; no runtime code was changed.
+
 Implemented Milestone BB1 Commit Scoped Agent Diff Before Develop PR Handoff:
 
 - Added a scoped local commit step after meaningful diff, agent completion, core safety, local quality gates, and test relevance pass, and before local branch push or develop PR creation.
@@ -10,7 +42,7 @@ Implemented Milestone BB1 Commit Scoped Agent Diff Before Develop PR Handoff:
 - Persisted and surfaced the scoped agent diff commit SHA in run state, branch head metadata, smoke output, develop PR body/comment, status output, and final reports.
 - Fixed the real-provider smoke failure formatter so GitHub develop PR handoff errors such as `create_pull_request` failures are reported as GitHub handoff failures instead of misleading Jira read failures.
 - Added fake-only regression coverage for scoped staging, unsafe file refusal, commit-before-push ordering, ledger replay, smoke success evidence, smoke GitHub handoff failure wording, status output, and final reports.
-- Preserved BB1 scope only: no BB2 review adapter, BC operator sandbox, production PR automation, production merge, production deployment, dashboard, Telegram, WhatsApp, live provider/MCP/Docker/OAuth/network calls in tests, or real remote git endpoints were added.
+- Preserved BB1 scope only: no BD review adapter, BE operator sandbox, production PR automation, production merge, production deployment, dashboard, Telegram, WhatsApp, live provider/MCP/Docker/OAuth/network calls in tests, or real remote git endpoints were added.
 
 Verification commands run for BB1:
 
@@ -30,7 +62,7 @@ Implemented Milestone BB Real Staging Verification v1:
 - Continued the smoke path after develop PR handoff into Railway staging verification, using policy-approved read-only deployment evidence plus the injectable smoke URL verifier, and writing `staging-report.md` with deployment and smoke-check results.
 - Stopped the real-provider smoke path at `STAGING_VERIFIED`; production PR preparation, production merge, and production deployment remain human-only and were not attempted.
 - Added fake-only CLI regression coverage for provider-mode preflight failure and fake GitHub/Railway MCP staging verification, including assertions that Railway deploy, rollback, scale, variable, domain, and secret-sensitive tools are never called.
-- Preserved BB scope only: no BC operator sandbox, Vercel deployment, production PR automation, live provider/MCP/Docker/OAuth/network calls in tests, Railway mutating tools, production merge, or production deployment was added.
+- Preserved BB scope only: no BC develop PR follow-up, BD review adapter, BE operator sandbox, Vercel deployment, production PR automation, live provider/MCP/Docker/OAuth/network calls in tests, Railway mutating tools, production merge, or production deployment was added.
 
 Verification commands run for BB:
 
@@ -50,7 +82,7 @@ Implemented Milestone BA GitHub PR Handoff v1:
 - Preserved operation-ledger idempotency for GitHub branch readiness/creation, local git push fallback, and develop draft PR creation across reruns.
 - Updated develop draft PR bodies to include ticket, repo, branch, run id, quality summary, meaningful diff summary, core safety summary, test relevance summary, and local-only handoff notes that exclude production PRs, merges, deployments, production branch pushes, and production approval bypasses.
 - Updated legacy fake mock delivery evidence so existing fake-only end-to-end and worker tests still provide local evidence before their mock develop handoff.
-- Preserved BA scope only: no production PR handoff expansion, production merge, production deployment, BB staging verification, BC operator sandbox, live GitHub calls, live MCP/Docker/OAuth/network calls, remote git endpoints, provider CLIs, or test remotes were added.
+- Preserved BA scope only: no production PR handoff expansion, production merge, production deployment, BB staging verification, BC develop PR follow-up, BD review adapter, BE operator sandbox, live GitHub calls, live MCP/Docker/OAuth/network calls, remote git endpoints, provider CLIs, or test remotes were added.
 
 Verification commands run for BA:
 
@@ -130,7 +162,7 @@ Accepted Milestone AW MCP Policy Modes:
 
 - Marked AW as complete and accepted after review.
 - Current MCP policy state is safe by default: `read_only` allows read-classified tools, non-read tools remain denied unless a later policy explicitly allows or requires human approval, and production merge/deployment remains human-only.
-- No AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC operator-agent sandbox, worker daemon, Telegram/dashboard, Sentry/PostHog/Notion ingestion, or autonomous production automation has been started as part of acceptance.
+- No AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC develop PR follow-up, BD review adapter, BE operator-agent sandbox, worker daemon, Telegram/dashboard, Sentry/PostHog/Notion ingestion, or autonomous production automation has been started as part of acceptance.
 
 Completed GitHub MCP Docker preset unblocker:
 
@@ -167,7 +199,7 @@ Implemented Milestone AW MCP Policy Modes review candidate:
 - Added runtime MCP readiness policy checks before the existing typed-port allowlist guard and before provider side effects. Autonomous runtime execution proceeds only for `allow`; `deny`, `require_human`, and `allow_redacted` stop readiness.
 - Preserved production merge/deploy as human-only, denied unknown tools by default, kept destructive delete/remove/destroy tools from autonomous allow, and kept raw MCP tool calling away from coding/operator agents.
 - Added fake-only tests covering Atlassian, Railway, GitHub, custom, inspect output, config parsing, and runtime readiness decisions.
-- Preserved AW scope only: no AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC operator-agent sandbox, live provider/MCP/OAuth/network calls in tests, production merge/deploy automation, worker daemon, dashboard, Telegram, Sentry/PostHog/Notion ingestion, or autonomous production automation were added.
+- Preserved AW scope only: no AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC develop PR follow-up, BD review adapter, BE operator-agent sandbox, live provider/MCP/OAuth/network calls in tests, production merge/deploy automation, worker daemon, dashboard, Telegram, Sentry/PostHog/Notion ingestion, or autonomous production automation were added.
 
 Verification commands run for AW so far:
 
@@ -189,7 +221,7 @@ Implemented Milestone AV MCP Tool Registry review candidate:
 - Added explicit `--cache-registry` snapshot writing under `.ewokbot/cache/mcp-tools/<server-id>.json`; snapshots are sanitized and remain separate from credentials, run evidence, operation ledgers, and provider execution records.
 - Added fake-only tests for Atlassian, Railway, GitHub, and custom registry data plus CLI snapshot behavior. The targeted tests initially caught a `get_deployment_status` classifier bug where the embedded `deployment` term was treated as a destructive `deploy` action; the classifier now treats explicit read prefixes as read before destructive verb matching.
 - Documented the registry as support for full MCP mapping with policy-gated execution, without adding the later AW policy modes.
-- Preserved AV scope only: no AW policy modes, AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC operator-agent sandbox, provider tool execution or mutation, production merge/deploy, live provider/MCP/OAuth/network calls in tests, worker daemon, dashboard, Telegram, Sentry/PostHog/Notion ingestion, or autonomous production automation were added.
+- Preserved AV scope only: no AW policy modes, AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC develop PR follow-up, BD review adapter, BE operator-agent sandbox, provider tool execution or mutation, production merge/deploy, live provider/MCP/OAuth/network calls in tests, worker daemon, dashboard, Telegram, Sentry/PostHog/Notion ingestion, or autonomous production automation were added.
 
 Verification commands run for AV:
 

@@ -1,6 +1,7 @@
 export {
   WorkspaceConfigError,
   formatWorkspaceConfigIssues,
+  getDefaultDeliveryConfig,
   loadWorkspaceConfig,
   parseWorkspaceConfig,
   validateWorkspaceConfig
@@ -9,6 +10,12 @@ export { createDiscoveredRepositoryConfig, discoverSiblingGitDirectories } from 
 export type {
   DevRunnerProvider,
   DevRunnerWorkspaceConfig,
+  DeliveryChecksConfig,
+  DeliveryConfig,
+  DeliveryNoRemoteChecksPolicy,
+  DeliveryPullRequestConfig,
+  DeliveryPullRequestMergeMethod,
+  DeliveryRequireChecksPolicy,
   GitHubMcpToolNameConfig,
   GitHubProviderMode,
   GitHubWorkspaceConfig,

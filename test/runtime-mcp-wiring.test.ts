@@ -191,6 +191,181 @@ test('runtime CodeHostPort wiring allows develop PR handoff with explicit create
   assert.deepEqual(clients.github.toolCallRequests, []);
 });
 
+test('runtime CodeHostPort wiring requires merge tool only for configured develop auto-merge', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `mcp_policy:
+  mode: custom
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+`));
+  const clients = createRuntimeMcpClients();
+
+  await createRuntimeCodeHostPort({
+    config,
+    createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+    requiredGitHubMcpActions: ['openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks']
+  });
+
+  await assert.rejects(
+    () => createRuntimeCodeHostPort({
+      config,
+      createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+      requiredGitHubMcpActions: ['openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks', 'mergePullRequest']
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.mergePullRequest);
+      assert.equal(error.decision, 'deny');
+      return true;
+    }
+  );
+  assert.deepEqual(clients.github.toolCallRequests, []);
+});
+
+test('runtime CodeHostPort wiring allows policy-gated develop merge readiness', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `delivery:
+  pull_requests:
+    develop:
+      auto_merge: true
+      require_human_approval: false
+mcp_policy:
+  mode: custom
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.mergePullRequest}:
+      decision: allow
+`));
+  const clients = createRuntimeMcpClients();
+
+  await createRuntimeCodeHostPort({
+    config,
+    createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+    requiredGitHubMcpActions: ['openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks', 'mergePullRequest']
+  });
+
+  assert.deepEqual(clients.github.toolCallRequests, []);
+});
+
+test('runtime CodeHostPort wiring keeps raw merge require_human unless typed develop auto-merge is enabled', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `mcp_policy:
+  mode: custom
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.mergePullRequest}:
+      decision: allow
+`));
+  const clients = createRuntimeMcpClients();
+
+  await assert.rejects(
+    () => createRuntimeCodeHostPort({
+      config,
+      createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+      requiredGitHubMcpActions: ['openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks', 'mergePullRequest']
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.mergePullRequest);
+      assert.equal(error.decision, 'require_human');
+      return true;
+    }
+  );
+  assert.deepEqual(clients.github.toolCallRequests, []);
+});
+
+test('runtime CodeHostPort wiring blocks develop auto-merge readiness when merge_pull_request policy is deny', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `delivery:
+  pull_requests:
+    develop:
+      auto_merge: true
+      require_human_approval: false
+mcp_policy:
+  mode: custom
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+`));
+  const clients = createRuntimeMcpClients();
+
+  await assert.rejects(
+    () => createRuntimeCodeHostPort({
+      config,
+      createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+      requiredGitHubMcpActions: ['openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks', 'mergePullRequest']
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.mergePullRequest);
+      assert.equal(error.decision, 'deny');
+      return true;
+    }
+  );
+  assert.deepEqual(clients.github.toolCallRequests, []);
+});
+
+test('runtime CodeHostPort wiring blocks develop auto-merge readiness when human approval is required', async () => {
+  const config = parseWorkspaceConfig(workspaceWithMcpProviders(['github'], `delivery:
+  pull_requests:
+    develop:
+      auto_merge: true
+      require_human_approval: true
+mcp_policy:
+  mode: custom
+  tools:
+    ${defaultGitHubMcpToolNames.openPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+    ${defaultGitHubMcpToolNames.mergePullRequest}:
+      decision: allow
+`));
+  const clients = createRuntimeMcpClients();
+
+  await assert.rejects(
+    () => createRuntimeCodeHostPort({
+      config,
+      createMcpClient: (server: McpServerConfig): McpClient => clients[server.id] ?? new MockMcpClient(),
+      requiredGitHubMcpActions: ['openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks', 'mergePullRequest']
+    }),
+    (error: unknown) => {
+      assert.ok(error instanceof RuntimeMcpPolicyError);
+      assert.equal(error.toolName, defaultGitHubMcpToolNames.mergePullRequest);
+      assert.equal(error.decision, 'require_human');
+      return true;
+    }
+  );
+  assert.deepEqual(clients.github.toolCallRequests, []);
+});
+
 test('runtime MCP wiring fails before delivery side effects when an MCP client cannot be resolved', async () => {
   const config = parseWorkspaceConfig(workspaceWithGitHubMcpOnly());
 
@@ -298,7 +473,8 @@ function createRuntimeMcpClients(): Record<string, MockMcpClient> {
         defaultGitHubMcpToolNames.openPullRequest,
         defaultGitHubMcpToolNames.listPullRequests,
         defaultGitHubMcpToolNames.getChecks,
-        defaultGitHubMcpToolNames.commentOnPullRequest
+        defaultGitHubMcpToolNames.commentOnPullRequest,
+        defaultGitHubMcpToolNames.mergePullRequest
       ])
     ]),
     railway: new MockMcpClient(createTools('railway', uniqueRailwayToolNames()))
@@ -377,6 +553,18 @@ function trustedRuntimePolicyBlock(): string {
     ${defaultGitHubMcpToolNames.openPullRequest}:
       decision: allow
       reason: Opening a staging pull request is allowed by the runtime fixture.
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+      reason: Reading develop pull request state and checks is allowed by the runtime fixture.
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+      reason: Resolving develop pull requests for checks is allowed by the runtime fixture.
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+      reason: Commenting on develop pull requests is allowed by the runtime fixture.
+    ${defaultGitHubMcpToolNames.mergePullRequest}:
+      decision: allow
+      reason: Develop auto-merge is allowed only when the scoped runtime action requires it.
     ${defaultRailwayMcpToolNames.waitForDeployment}:
       decision: allow
       reason: Waiting for a staging deployment is allowed by the runtime fixture.
@@ -390,6 +578,15 @@ function developPullRequestPolicyBlock(): string {
     ${defaultGitHubMcpToolNames.openPullRequest}:
       decision: allow
       reason: Develop PR handoff is allowed after local evidence.
+    ${defaultGitHubMcpToolNames.getChecks}:
+      decision: allow
+      reason: Develop PR follow-up reads are allowed after handoff.
+    ${defaultGitHubMcpToolNames.listPullRequests}:
+      decision: allow
+      reason: Develop PR check lookup is allowed after handoff.
+    ${defaultGitHubMcpToolNames.commentOnPullRequest}:
+      decision: allow
+      reason: Develop PR comments are allowed after local evidence.
 `;
 }
 

@@ -175,6 +175,16 @@ export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInpu
   await stateStore.write(localChecksPassedState);
 
   const github = new MockGitHubConnector();
+  const mockDeliveryConfig = {
+    ...input.config.delivery,
+    pullRequests: {
+      ...input.config.delivery.pullRequests,
+      develop: {
+        ...input.config.delivery.pullRequests.develop,
+        autoMerge: true
+      }
+    }
+  };
   const checksPassedState = await runDevelopPullRequestHandoff({
     state: localChecksPassedState,
     ticket,
@@ -182,6 +192,7 @@ export async function runEndToEndMockDelivery(input: RunEndToEndMockDeliveryInpu
     branchName,
     git: new LocalGitAdapter(createMockGitCommandRunner(repository.ref, branchName)),
     github,
+    deliveryConfig: mockDeliveryConfig,
     operationLedgerRootPath: rootPath,
     stateStore,
     now

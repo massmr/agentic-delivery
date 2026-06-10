@@ -28,7 +28,7 @@ AZ should stop guessing GitHub MCP tool names and map Ewokbot's `CodeHostPort` t
 | PR or issue comment | `add_issue_comment` | write | Use for ordinary PR comments by passing the PR number as `issue_number`; policy-gated. |
 | Copilot review request | `request_copilot_review` | read-classified by inspection | Optional later workflow; not required for AZ or BA unless explicitly approved. |
 | Branch creation | `create_branch` | write | Use only if Ewokbot needs remote branch creation; local git push fallback may remain separate. |
-| Production merge | `merge_pull_request` | destructive | Always human-only; never autonomously allowed. |
+| Production merge | `merge_pull_request` | destructive | Human-only for main/production. BC permits only the typed `CodeHostPort.mergePullRequest` develop auto-merge path when branch-scoped delivery config and MCP policy explicitly allow it. |
 
 Remote file mutation tools exist but should not be used for Ewokbot's normal local-agent delivery flow:
 
@@ -348,8 +348,8 @@ Write or destructive tools denied by `read_only` include:
 
 ## Policy Notes
 
-- `create_pull_request` and `merge_pull_request` are destructive-classified by Ewokbot policy and require explicit human approval.
-- `merge_pull_request` must remain human-only.
+- `create_pull_request` and generic/raw `merge_pull_request` are destructive-classified by Ewokbot policy and require explicit human approval.
+- `merge_pull_request` remains human-only outside BC's typed develop auto-merge path, which additionally requires develop `auto_merge: true`, `require_human_approval: false`, explicit MCP policy allow, and a PR targeting `develop` rather than main/production.
 - `delete_file`, `push_files`, remote file writes, branch deletion, repository mutation, workflow mutation, and secrets must remain denied by default.
 - AZ should preserve `github.mcp_tools` overrides for custom GitHub MCP servers.
 - Tests must remain fake-only and must not call GitHub, Docker, the network, local git remotes, PR creation, or production operations.

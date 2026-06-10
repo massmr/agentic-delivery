@@ -1,6 +1,6 @@
 import type { DeploymentResult } from './deployment.js';
 import type { DevRunResult } from './dev-runner.js';
-import type { PullRequestRef } from './pull-request.js';
+import type { DevelopPullRequestFollowUpEvidence, PullRequestRef } from './pull-request.js';
 import type { QualityReport } from './quality.js';
 import type { RepositoryRef } from './repository.js';
 import type { TicketAnalysis, TicketRef } from './ticket.js';
@@ -218,6 +218,7 @@ export interface DeliveryRunStateRecord {
   readonly timestamps: RunTimestamps;
   readonly meaningfulDiff?: MeaningfulDiffEvidence;
   readonly developHandoffCommit?: DevelopHandoffCommit;
+  readonly developPullRequestFollowUp?: DevelopPullRequestFollowUpEvidence;
   readonly agentCompletion?: AgentCompletionReport;
   readonly coreSafety?: CoreSafetyReport;
   readonly testRelevance?: TestRelevanceReport;

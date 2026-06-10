@@ -13,7 +13,7 @@ import type { ProviderFactoryEnvironment, WorkspaceAdapters } from './adapter-fa
 export type RuntimeMcpClientFactory = (server: McpServerConfig) => McpClient | Promise<McpClient>;
 export type RuntimeMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
 export type RuntimeJiraMcpAction = 'listBacklog' | 'getTicket' | 'comment';
-export type RuntimeGitHubMcpAction = 'createBranch' | 'openPullRequest' | 'getChecks' | 'commentOnPullRequest';
+export type RuntimeGitHubMcpAction = 'createBranch' | 'openPullRequest' | 'readPullRequest' | 'getChecks' | 'mergePullRequest' | 'commentOnPullRequest';
 export type RuntimeRailwayMcpAction = 'waitForDeployment' | 'readDeployment' | 'getServiceUrl';
 
 export interface RuntimeProviderFactoryOptions {
@@ -80,7 +80,7 @@ export async function createRuntimeWorkspaceAdapters(options: RuntimeProviderFac
   const mcpClients = await resolveRuntimeMcpClients(options, bindings);
   const requirements = bindings.flatMap((binding) => [...binding.requirements]);
 
-  await validateRuntimeMcpReadiness(mcpClients, bindings, options.mcpAllowlist ?? requirements, options.config.mcpPolicy);
+  await validateRuntimeMcpReadiness(mcpClients, bindings, options.mcpAllowlist ?? requirements, options.config);
 
   const auditSink = options.mcpAuditSink;
 
@@ -110,7 +110,7 @@ export async function createRuntimeTicketPort(options: RuntimeProviderFactoryOpt
 
   const scopedBinding = scopeJiraMcpBinding(binding, options.requiredJiraMcpActions);
   const mcpClients = await resolveRuntimeMcpClients(options, [scopedBinding]);
-  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements, options.config.mcpPolicy);
+  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements, options.config);
 
   return createJiraConnector({
     config: options.config,
@@ -135,7 +135,7 @@ export async function createRuntimeCodeHostPort(options: RuntimeProviderFactoryO
 
   const scopedBinding = scopeMcpBinding(binding, options.requiredGitHubMcpActions);
   const mcpClients = await resolveRuntimeMcpClients(options, [scopedBinding]);
-  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements, options.config.mcpPolicy);
+  await validateRuntimeMcpReadiness(mcpClients, [scopedBinding], options.mcpAllowlist ?? scopedBinding.requirements, options.config);
 
   return createGitHubConnector({
     config: options.config,
@@ -155,7 +155,7 @@ function scopeRuntimeMcpBindings(bindings: readonly RuntimeMcpBinding[], options
       case 'Jira':
         return scopeJiraMcpBinding(binding, options.requiredJiraMcpActions);
       case 'GitHub':
-        return scopeMcpBinding(binding, options.requiredGitHubMcpActions);
+        return scopeMcpBinding(binding, options.requiredGitHubMcpActions ?? defaultGitHubRuntimeActions(options.config));
       case 'Railway':
         return scopeMcpBinding(binding, options.requiredRailwayMcpActions);
     }
@@ -173,6 +173,16 @@ function scopeMcpBinding(binding: RuntimeMcpBinding, actions: readonly string[] 
     ...binding,
     requirements: binding.requirements.filter((requirement) => actionSet.has(requirement.action))
   };
+}
+
+function defaultGitHubRuntimeActions(config: WorkspaceConfig): readonly RuntimeGitHubMcpAction[] {
+  const actions: RuntimeGitHubMcpAction[] = ['createBranch', 'openPullRequest', 'readPullRequest', 'getChecks', 'commentOnPullRequest'];
+
+  if (config.delivery.pullRequests.develop.autoMerge) {
+    actions.push('mergePullRequest');
+  }
+
+  return actions;
 }
 
 export function collectRuntimeMcpRequirements(config: WorkspaceConfig): readonly McpToolAllowlistRule[] {
@@ -270,7 +280,7 @@ async function validateRuntimeMcpReadiness(
   clients: Readonly<Record<string, McpClient | undefined>>,
   bindings: readonly RuntimeMcpBinding[],
   allowlist: readonly McpToolAllowlistRule[],
-  policy: McpPolicyConfig
+  config: WorkspaceConfig
 ): Promise<void> {
   const catalogsByServer = new Map<string, Awaited<ReturnType<typeof discoverMcpTools>>>();
 
@@ -288,7 +298,7 @@ async function validateRuntimeMcpReadiness(
 
     for (const requirement of binding.requirements) {
       requireDiscoveredMcpTool(catalog, requirement.toolName);
-      assertRuntimeMcpPolicyAllowsRequirement(binding, catalog, requirement, policy);
+      assertRuntimeMcpPolicyAllowsRequirement(binding, catalog, requirement, config);
       assertMcpToolAllowed(
         allowlist,
         { serverId: requirement.serverId, toolName: requirement.toolName, arguments: {} },
@@ -302,7 +312,7 @@ function assertRuntimeMcpPolicyAllowsRequirement(
   binding: RuntimeMcpBinding,
   catalog: Awaited<ReturnType<typeof discoverMcpTools>>,
   requirement: McpToolAllowlistRule,
-  policy: McpPolicyConfig
+  config: WorkspaceConfig
 ): void {
   const registry = createMcpToolRegistry({
     provider: inferMcpToolRegistryProvider(binding.serverId),
@@ -315,9 +325,13 @@ function assertRuntimeMcpPolicyAllowsRequirement(
     return;
   }
 
-  const evaluation = evaluateMcpToolPolicy({ entry, policy });
+  const evaluation = evaluateMcpToolPolicy({ entry, policy: config.mcpPolicy });
 
   if (evaluation.decision === 'allow') {
+    return;
+  }
+
+  if (allowsTypedDevelopAutoMergeRequirement(binding, requirement, config)) {
     return;
   }
 
@@ -328,6 +342,38 @@ function assertRuntimeMcpPolicyAllowsRequirement(
     decision: evaluation.decision,
     reason: evaluation.reason
   });
+}
+
+function allowsTypedDevelopAutoMergeRequirement(
+  binding: RuntimeMcpBinding,
+  requirement: McpToolAllowlistRule,
+  config: WorkspaceConfig
+): boolean {
+  if (binding.provider !== 'GitHub'
+    || requirement.port !== 'CodeHostPort'
+    || requirement.action !== 'mergePullRequest'
+    || requirement.toolName !== config.github.mcpToolNames.mergePullRequest) {
+    return false;
+  }
+
+  const developPolicy = config.delivery.pullRequests.develop;
+  if (!developPolicy.autoMerge || developPolicy.requireHumanApproval || config.delivery.pullRequests.main.autoMerge) {
+    return false;
+  }
+
+  return explicitToolPolicyAllows(config.mcpPolicy, binding.serverId, requirement.toolName);
+}
+
+function explicitToolPolicyAllows(policy: McpPolicyConfig, serverId: string, toolName: string): boolean {
+  const tools = policy.tools ?? {};
+  const overrideKeys = [
+    `${serverId}.${toolName}`,
+    `github.${toolName}`,
+    `GitHub.${toolName}`,
+    toolName
+  ];
+
+  return overrideKeys.some((key) => tools[key]?.decision === 'allow');
 }
 
 function findRuntimeMcpServer(config: WorkspaceConfig, provider: string, serverId: string): McpServerConfig {
@@ -349,7 +395,15 @@ function requireRuntimeServerId(provider: string, serverId: string | undefined):
 }
 
 function formatPolicyNextAction(input: { readonly provider: string; readonly toolName: string }): string {
-  if (input.provider !== 'GitHub' || input.toolName !== 'create_pull_request') {
+  if (input.provider !== 'GitHub') {
+    return '';
+  }
+
+  if (input.toolName === 'merge_pull_request') {
+    return ' To allow BC develop auto-merge, configure delivery.pull_requests.develop.auto_merge: true, keep require_human_approval: false, and add an explicit mcp_policy.tools.merge_pull_request.decision: allow. Main and production merges remain human-only.';
+  }
+
+  if (input.toolName !== 'create_pull_request') {
     return '';
   }
 

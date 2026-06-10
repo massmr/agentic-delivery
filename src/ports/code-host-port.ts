@@ -1,4 +1,4 @@
-import type { BranchRef, PullRequestCheckSummary, PullRequestRef, PullRequestTarget, RepositoryRef } from '../domain/index.js';
+import type { BranchRef, PullRequestCheckSummary, PullRequestMergeMethod, PullRequestMergeResult, PullRequestRef, PullRequestTarget, RepositoryRef } from '../domain/index.js';
 
 export interface CreateCodeHostBranchInput {
   readonly repository: RepositoryRef;
@@ -21,6 +21,7 @@ export interface OpenPullRequestInput {
 export interface ChecksInput {
   readonly repository: RepositoryRef;
   readonly branchName: string;
+  readonly pullRequest?: PullRequestRef | undefined;
 }
 
 export interface PullRequestCommentInput {
@@ -28,10 +29,21 @@ export interface PullRequestCommentInput {
   readonly body: string;
 }
 
+export interface ReadPullRequestInput {
+  readonly pullRequest: PullRequestRef;
+}
+
+export interface MergePullRequestInput {
+  readonly pullRequest: PullRequestRef;
+  readonly method: PullRequestMergeMethod;
+}
+
 export interface CodeHostPort {
   createBranch(input: CreateCodeHostBranchInput): Promise<BranchRef>;
   pushBranch(input: PushCodeHostBranchInput): Promise<BranchRef>;
   openPullRequest(input: OpenPullRequestInput): Promise<PullRequestRef>;
+  readPullRequest(input: ReadPullRequestInput): Promise<PullRequestRef>;
   getChecks(input: ChecksInput): Promise<PullRequestCheckSummary>;
+  mergePullRequest(input: MergePullRequestInput): Promise<PullRequestMergeResult>;
   commentOnPullRequest(input: PullRequestCommentInput): Promise<void>;
 }

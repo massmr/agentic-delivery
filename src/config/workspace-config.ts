@@ -31,6 +31,33 @@ export interface GitHubMcpToolNameConfig {
   readonly openPullRequest: string;
   readonly getChecks: string;
   readonly commentOnPullRequest: string;
+  readonly mergePullRequest: string;
+}
+
+export type DeliveryNoRemoteChecksPolicy = 'pass' | 'wait' | 'needs_human' | 'fail';
+export type DeliveryPullRequestMergeMethod = 'merge' | 'squash' | 'rebase';
+export type DeliveryRequireChecksPolicy = 'pass' | 'pass_or_absent';
+
+export interface DeliveryChecksConfig {
+  readonly noRemoteChecks: DeliveryNoRemoteChecksPolicy;
+}
+
+export interface DeliveryPullRequestConfig {
+  readonly autoMerge: boolean;
+  readonly mergeMethod: DeliveryPullRequestMergeMethod;
+  readonly requireChecks: DeliveryRequireChecksPolicy;
+  readonly requireHumanApproval: boolean;
+  readonly afterMerge: {
+    readonly verifyDeployment: boolean;
+  };
+}
+
+export interface DeliveryConfig {
+  readonly checks: DeliveryChecksConfig;
+  readonly pullRequests: {
+    readonly develop: DeliveryPullRequestConfig;
+    readonly main: DeliveryPullRequestConfig;
+  };
 }
 
 export interface WorkspaceConfigIssue {
@@ -56,6 +83,7 @@ export interface WorkspaceConfig {
   readonly railway: RailwayWorkspaceConfig;
   readonly devRunner: DevRunnerWorkspaceConfig;
   readonly quality: QualityWorkspaceConfig;
+  readonly delivery: DeliveryConfig;
   readonly mcpServers: readonly McpServerConfig[];
   readonly mcpPolicy: McpPolicyConfig;
   readonly repos: readonly WorkspaceRepositoryConfig[];
@@ -155,10 +183,40 @@ const defaultGitHubMcpToolNames: GitHubMcpToolNameConfig = {
   listPullRequests: 'list_pull_requests',
   openPullRequest: 'create_pull_request',
   getChecks: 'pull_request_read',
-  commentOnPullRequest: 'add_issue_comment'
+  commentOnPullRequest: 'add_issue_comment',
+  mergePullRequest: 'merge_pull_request'
+};
+const defaultDeliveryConfig: DeliveryConfig = {
+  checks: {
+    noRemoteChecks: 'wait'
+  },
+  pullRequests: {
+    develop: {
+      autoMerge: false,
+      mergeMethod: 'squash',
+      requireChecks: 'pass',
+      requireHumanApproval: false,
+      afterMerge: {
+        verifyDeployment: true
+      }
+    },
+    main: {
+      autoMerge: false,
+      mergeMethod: 'squash',
+      requireChecks: 'pass',
+      requireHumanApproval: true,
+      afterMerge: {
+        verifyDeployment: false
+      }
+    }
+  }
 };
 const defaultDevRunnerTimeoutMs = 30 * 60 * 1000;
 export const defaultDevRunnerEnvVarNames = ['PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP'] as const;
+
+export function getDefaultDeliveryConfig(): DeliveryConfig {
+  return defaultDeliveryConfig;
+}
 
 export async function loadWorkspaceConfig(filePath: string, options: WorkspaceConfigParseOptions = {}): Promise<WorkspaceConfig> {
   const source = await readFile(filePath, 'utf8');
@@ -232,6 +290,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
   const quality = readSection(input, 'quality', issues);
   const mcpServers = readOptionalSection(input, 'mcp_servers', issues);
   const mcpPolicy = readOptionalMappingSection(input, 'mcp_policy', 'Set mcp_policy.mode and optional provider/server/tool overrides, or remove mcp_policy to use read_only defaults.', issues);
+  const delivery = readOptionalSection(input, 'delivery', issues);
   const reposValue = input.repos;
 
   const parsedWorkspace = workspace === undefined ? undefined : parseWorkspaceSettings(workspace, issues);
@@ -240,6 +299,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
   const parsedRailway = railway === undefined ? undefined : parseRailwayConfig(railway, issues);
   const parsedDevRunner = devRunner === undefined ? undefined : parseDevRunnerConfig(devRunner, issues);
   const parsedQuality = quality === undefined ? undefined : parseQualityConfig(quality, issues);
+  const parsedDelivery = delivery === undefined ? defaultDeliveryConfig : parseDeliveryConfig(delivery, issues);
   const parsedMcpServers = mcpServers === undefined ? [] : parseMcpServers(mcpServers, issues);
   const parsedMcpPolicy = mcpPolicy === undefined ? createDefaultMcpPolicyConfig() : parseMcpPolicyConfig(mcpPolicy, issues);
   const parsedRepos = parseRepositories(reposValue, issues, options);
@@ -264,6 +324,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
     parsedRailway === undefined ||
     parsedDevRunner === undefined ||
     parsedQuality === undefined ||
+    parsedDelivery === undefined ||
     parsedMcpServers === undefined ||
     parsedMcpPolicy === undefined ||
     parsedRepos === undefined
@@ -281,6 +342,7 @@ export function validateWorkspaceConfig(input: unknown, options: WorkspaceConfig
       railway: parsedRailway,
       devRunner: parsedDevRunner,
       quality: parsedQuality,
+      delivery: parsedDelivery,
       mcpServers: parsedMcpServers,
       mcpPolicy: parsedMcpPolicy,
       repos: parsedRepos.repos,
@@ -411,7 +473,8 @@ function parseGitHubMcpToolNames(value: unknown, issues: WorkspaceConfigIssue[])
     listPullRequests: readOptionalNonEmptyString(value.list_pull_requests, 'github.mcp_tools.list_pull_requests', 'Set github.mcp_tools.list_pull_requests to the GitHub MCP pull-request listing tool name.', issues) ?? defaultGitHubMcpToolNames.listPullRequests,
     openPullRequest: readOptionalNonEmptyString(value.open_pull_request, 'github.mcp_tools.open_pull_request', 'Set github.mcp_tools.open_pull_request to the GitHub MCP pull-request creation tool name.', issues) ?? defaultGitHubMcpToolNames.openPullRequest,
     getChecks: readOptionalNonEmptyString(value.get_checks, 'github.mcp_tools.get_checks', 'Set github.mcp_tools.get_checks to the GitHub MCP pull-request read tool name.', issues) ?? defaultGitHubMcpToolNames.getChecks,
-    commentOnPullRequest: readOptionalNonEmptyString(value.comment_pull_request, 'github.mcp_tools.comment_pull_request', 'Set github.mcp_tools.comment_pull_request to the GitHub MCP issue comment tool name.', issues) ?? defaultGitHubMcpToolNames.commentOnPullRequest
+    commentOnPullRequest: readOptionalNonEmptyString(value.comment_pull_request, 'github.mcp_tools.comment_pull_request', 'Set github.mcp_tools.comment_pull_request to the GitHub MCP issue comment tool name.', issues) ?? defaultGitHubMcpToolNames.commentOnPullRequest,
+    mergePullRequest: readOptionalNonEmptyString(value.merge_pull_request, 'github.mcp_tools.merge_pull_request', 'Set github.mcp_tools.merge_pull_request to the GitHub MCP develop pull-request merge tool name.', issues) ?? defaultGitHubMcpToolNames.mergePullRequest
   };
 }
 
@@ -519,6 +582,67 @@ function parseQualityConfig(section: WorkspaceConfigInput, issues: WorkspaceConf
   }
 
   return { defaultProfile };
+}
+
+function parseDeliveryConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): DeliveryConfig | undefined {
+  const checksSection = readOptionalSection(section, 'checks', issues);
+  const pullRequestsSection = readOptionalSection(section, 'pull_requests', issues);
+  const noRemoteChecks = checksSection === undefined || checksSection.no_remote_checks === undefined
+    ? defaultDeliveryConfig.checks.noRemoteChecks
+    : readEnumValue(checksSection.no_remote_checks, 'delivery.checks.no_remote_checks', ['pass', 'wait', 'needs_human', 'fail'], 'Set delivery.checks.no_remote_checks to pass, wait, needs_human, or fail.', issues);
+  const developSection = pullRequestsSection === undefined ? undefined : readOptionalSection(pullRequestsSection, 'develop', issues);
+  const mainSection = pullRequestsSection === undefined ? undefined : readOptionalSection(pullRequestsSection, 'main', issues);
+  const develop = parseDeliveryPullRequestConfig('develop', developSection, defaultDeliveryConfig.pullRequests.develop, issues);
+  const main = parseDeliveryPullRequestConfig('main', mainSection, defaultDeliveryConfig.pullRequests.main, issues);
+
+  if (main?.autoMerge === true) {
+    issues.push({
+      path: 'delivery.pull_requests.main.auto_merge',
+      message: 'Main/production pull requests cannot be auto-merged by Ewokbot.',
+      action: 'Set delivery.pull_requests.main.auto_merge to false and keep production merge human-only.'
+    });
+  }
+
+  if (noRemoteChecks === undefined || develop === undefined || main === undefined) {
+    return undefined;
+  }
+
+  return {
+    checks: { noRemoteChecks },
+    pullRequests: { develop, main: { ...main, autoMerge: false, requireHumanApproval: true } }
+  };
+}
+
+function parseDeliveryPullRequestConfig(
+  target: 'develop' | 'main',
+  section: WorkspaceConfigInput | undefined,
+  defaults: DeliveryPullRequestConfig,
+  issues: WorkspaceConfigIssue[]
+): DeliveryPullRequestConfig | undefined {
+  if (section === undefined) {
+    return defaults;
+  }
+
+  const autoMerge = section.auto_merge === undefined ? defaults.autoMerge : readBoolean(section.auto_merge, `delivery.pull_requests.${target}.auto_merge`, `Set delivery.pull_requests.${target}.auto_merge to true or false.`, issues);
+  const mergeMethod = section.merge_method === undefined
+    ? defaults.mergeMethod
+    : readEnumValue(section.merge_method, `delivery.pull_requests.${target}.merge_method`, ['merge', 'squash', 'rebase'], `Set delivery.pull_requests.${target}.merge_method to merge, squash, or rebase.`, issues);
+  const requireChecks = section.require_checks === undefined
+    ? defaults.requireChecks
+    : readEnumValue(section.require_checks, `delivery.pull_requests.${target}.require_checks`, ['pass', 'pass_or_absent'], `Set delivery.pull_requests.${target}.require_checks to pass or pass_or_absent.`, issues);
+  const requireHumanApproval = section.require_human_approval === undefined
+    ? defaults.requireHumanApproval
+    : readBoolean(section.require_human_approval, `delivery.pull_requests.${target}.require_human_approval`, `Set delivery.pull_requests.${target}.require_human_approval to true or false.`, issues);
+  const afterMergeSection = readOptionalSection(section, 'after_merge', issues);
+  const verifyDeployment = afterMergeSection?.verify_deployment === undefined
+    ? defaults.afterMerge.verifyDeployment
+    : readBoolean(afterMergeSection.verify_deployment, `delivery.pull_requests.${target}.after_merge.verify_deployment`, `Set delivery.pull_requests.${target}.after_merge.verify_deployment to true or false.`, issues);
+
+  if (autoMerge === undefined || mergeMethod === undefined || requireChecks === undefined || requireHumanApproval === undefined || verifyDeployment === undefined) {
+    return undefined;
+  }
+
+  return { autoMerge, mergeMethod, requireChecks, requireHumanApproval, afterMerge: { verifyDeployment } };
 }
 
 function parseMcpPolicyConfig(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): McpPolicyConfig | undefined {
@@ -1108,6 +1232,32 @@ function readDevRunnerProvider(section: WorkspaceConfigInput, issues: WorkspaceC
   }
 
   return value;
+}
+
+function readBoolean(value: unknown, path: string, action: string, issues: WorkspaceConfigIssue[]): boolean | undefined {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+
+  issues.push({
+    path,
+    message: `${path} must be true or false.`,
+    action
+  });
+  return undefined;
+}
+
+function readEnumValue<T extends string>(value: unknown, path: string, allowed: readonly T[], action: string, issues: WorkspaceConfigIssue[]): T | undefined {
+  if (typeof value === 'string' && allowed.includes(value as T)) {
+    return value as T;
+  }
+
+  issues.push({
+    path,
+    message: `${path} must be one of: ${allowed.join(', ')}.`,
+    action
+  });
+  return undefined;
 }
 
 function readPathValue(section: WorkspaceConfigInput, path: string): unknown {

@@ -275,6 +275,10 @@ export function renderFinalReportMarkdown(
     '',
     renderPullRequest(developPullRequest),
     '',
+    '## Develop Pull Request Follow-Up',
+    '',
+    renderDevelopPullRequestFollowUp(state.developPullRequestFollowUp),
+    '',
     '## Staging Verification',
     '',
     renderStagingSummary(latestDeployment, options.stagingReportPath),
@@ -443,6 +447,24 @@ function renderPullRequest(pullRequest: PullRequestRef | undefined): string {
     `- Source: ${pullRequest.sourceBranch}`,
     `- Target: ${pullRequest.targetBranch}`,
     `- Status: ${pullRequest.status}`
+  ].join('\n');
+}
+
+function renderDevelopPullRequestFollowUp(evidence: DeliveryRunStateRecord['developPullRequestFollowUp']): string {
+  if (evidence === undefined) {
+    return '- No develop pull request follow-up evidence recorded.';
+  }
+
+  return [
+    `- Decision: ${evidence.decision.toUpperCase()}`,
+    `- Reason: ${evidence.reason}`,
+    `- Observed At: ${evidence.observedAt}`,
+    `- PR Status: ${evidence.pullRequest.status}`,
+    `- Checks: ${evidence.checks.status.toUpperCase()} (${evidence.checks.passedCount}/${evidence.checks.totalCount} passed, ${evidence.checks.failedCount} failed, ${evidence.checks.pendingCount} pending)`,
+    `- No Remote Checks Policy: ${evidence.noRemoteChecksPolicy}`,
+    `- Develop Auto Merge: ${evidence.autoMerge ? 'enabled' : 'disabled'}`,
+    `- Merge Method: ${evidence.mergeMethod}`,
+    `- Merge Result: ${evidence.mergeResult === undefined ? 'none' : `${evidence.mergeResult.pullRequest.status} ${evidence.mergeResult.commitSha ?? 'unknown commit'}`}`
   ].join('\n');
 }
 

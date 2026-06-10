@@ -1,12 +1,14 @@
-import type { BranchRef, PullRequestCheckStatus, PullRequestCheckSummary, PullRequestRef, PullRequestTarget, RepositoryRef } from '../../domain/index.js';
+import type { BranchRef, PullRequestCheckStatus, PullRequestCheckSummary, PullRequestMergeResult, PullRequestRef, PullRequestTarget, RepositoryRef } from '../../domain/index.js';
 import type { JsonArray, JsonObject, JsonValue, McpClient, McpToolAllowlistRule, McpToolCallAuditRecord, McpToolCallExecutionResult } from '../../mcp/index.js';
 import { callAllowedMcpTool, discoverMcpTools, isJsonObject, requireDiscoveredMcpTool } from '../../mcp/index.js';
 import type {
   ChecksInput,
   CodeHostPort,
   CreateCodeHostBranchInput,
+  MergePullRequestInput,
   OpenPullRequestInput,
   PullRequestCommentInput,
+  ReadPullRequestInput,
   PushCodeHostBranchInput
 } from '../../ports/index.js';
 import type { GitHubConnector } from './github-connector.js';
@@ -20,6 +22,7 @@ export interface GitHubMcpToolNames {
   readonly openPullRequest: string;
   readonly getChecks: string;
   readonly commentOnPullRequest: string;
+  readonly mergePullRequest: string;
 }
 
 export type GitHubMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
@@ -30,7 +33,8 @@ export const defaultGitHubMcpToolNames: GitHubMcpToolNames = {
   listPullRequests: 'list_pull_requests',
   openPullRequest: 'create_pull_request',
   getChecks: 'pull_request_read',
-  commentOnPullRequest: 'add_issue_comment'
+  commentOnPullRequest: 'add_issue_comment',
+  mergePullRequest: 'merge_pull_request'
 } as const;
 
 export interface GitHubMcpCodeHostPortOptions {
@@ -98,8 +102,19 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
     return readPullRequestRef(execution.result.content, input);
   }
 
+  async readPullRequest(input: ReadPullRequestInput): Promise<PullRequestRef> {
+    const execution = await this.callGitHubTool(this.toolNames.getChecks, 'readPullRequest', {
+      method: 'get',
+      owner: input.pullRequest.repositoryOwner,
+      repo: input.pullRequest.repositoryName,
+      pullNumber: input.pullRequest.number
+    });
+
+    return readPullRequestRefFromExisting(execution.result.content, input.pullRequest);
+  }
+
   async getChecks(input: ChecksInput): Promise<PullRequestCheckSummary> {
-    const pullRequestNumber = await this.findPullRequestNumber(input.repository, input.branchName);
+    const pullRequestNumber = input.pullRequest?.number ?? await this.findPullRequestNumber(input.repository, input.branchName);
     const execution = await this.callGitHubTool(this.toolNames.getChecks, 'getChecks', {
       method: 'get_check_runs',
       owner: input.repository.owner,
@@ -108,6 +123,21 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
     });
 
     return readCheckSummary(execution.result.content);
+  }
+
+  async mergePullRequest(input: MergePullRequestInput): Promise<PullRequestMergeResult> {
+    if (input.pullRequest.targetBranch !== 'develop') {
+      throw new Error(`GitHub MCP auto-merge is only allowed for develop pull requests; target branch is ${input.pullRequest.targetBranch}.`);
+    }
+
+    const execution = await this.callGitHubTool(this.toolNames.mergePullRequest, 'mergePullRequest', {
+      owner: input.pullRequest.repositoryOwner,
+      repo: input.pullRequest.repositoryName,
+      pullNumber: input.pullRequest.number,
+      merge_method: input.method
+    });
+
+    return readMergeResult(execution.result.content, input);
   }
 
   async commentOnPullRequest(input: PullRequestCommentInput): Promise<void> {
@@ -145,7 +175,7 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
       owner: repository.owner,
       repo: repository.name,
       head: `${repository.owner}:${branchName}`,
-      state: 'open'
+      state: 'all'
     });
     const pullRequests = readArrayFromObject(execution.result.content, 'pullRequests', 'pull_requests', 'items');
 
@@ -163,10 +193,14 @@ export class GitHubMcpCodeHostPort implements GitHubConnector, CodeHostPort {
       }
     }
 
-    throw new Error(`GitHub MCP list_pull_requests response must include an open pull request for branch '${branchName}' with a numeric number.`);
+    throw new Error(`GitHub MCP list_pull_requests response must include a pull request for branch '${branchName}' with a numeric number.`);
   }
 
-  private async callGitHubTool(configuredToolName: string, action: 'createBranch' | 'openPullRequest' | 'getChecks' | 'commentOnPullRequest', argumentsObject: JsonObject): Promise<McpToolCallExecutionResult> {
+  private async callGitHubTool(
+    configuredToolName: string,
+    action: 'createBranch' | 'openPullRequest' | 'readPullRequest' | 'getChecks' | 'mergePullRequest' | 'commentOnPullRequest',
+    argumentsObject: JsonObject
+  ): Promise<McpToolCallExecutionResult> {
     const toolName = await this.requireTool(configuredToolName);
 
     try {
@@ -210,7 +244,9 @@ export function createGitHubMcpToolRequirements(serverId: string, toolNames: Par
     { serverId, toolName: resolvedToolNames.createBranch, port: portName, action: 'createBranch', safety: 'write' },
     { serverId, toolName: resolvedToolNames.listPullRequests, port: portName, action: 'getChecks', safety: 'read' },
     { serverId, toolName: resolvedToolNames.openPullRequest, port: portName, action: 'openPullRequest', safety: 'write' },
+    { serverId, toolName: resolvedToolNames.getChecks, port: portName, action: 'readPullRequest', safety: 'read' },
     { serverId, toolName: resolvedToolNames.getChecks, port: portName, action: 'getChecks', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.mergePullRequest, port: portName, action: 'mergePullRequest', safety: 'write' },
     { serverId, toolName: resolvedToolNames.commentOnPullRequest, port: portName, action: 'commentOnPullRequest', safety: 'write' }
   ];
 }
@@ -279,7 +315,53 @@ function readPullRequestRef(content: JsonValue | undefined, input: OpenPullReque
     sourceBranch: normalizeGitHubBranchName(readOptionalString(readNestedStringValue(pullRequest, ['head', 'ref']) ?? pullRequest.sourceBranch ?? pullRequest.source_branch ?? pullRequest.head)) ?? input.sourceBranch,
     targetBranch: readOptionalPullRequestTarget(readNestedStringValue(pullRequest, ['base', 'ref']) ?? pullRequest.targetBranch ?? pullRequest.target_branch ?? pullRequest.base) ?? input.targetBranch,
     url: readOptionalString(pullRequest.html_url ?? pullRequest.url) ?? `https://github.com/${input.repository.owner}/${input.repository.name}/pull/${number}`,
-    status: readOptionalPullRequestStatus(pullRequest.status) ?? 'open'
+    status: readPullRequestStatus(pullRequest, 'open')
+  };
+}
+
+function readPullRequestRefFromExisting(content: JsonValue | undefined, fallback: PullRequestRef): PullRequestRef {
+  const pullRequest = unwrapPullRequestObject(content);
+  const number = readOptionalPositiveInteger(
+    pullRequest.number
+      ?? pullRequest.pullRequestNumber
+      ?? pullRequest.pull_request_number
+      ?? pullRequest.pullNumber
+      ?? pullRequest.pull_number
+  ) ?? readPullRequestNumberFromUrl(readOptionalString(pullRequest.html_url ?? pullRequest.url)) ?? fallback.number;
+
+  return {
+    provider: 'github',
+    repositoryOwner: fallback.repositoryOwner,
+    repositoryName: fallback.repositoryName,
+    number,
+    title: readOptionalString(pullRequest.title) ?? fallback.title,
+    sourceBranch: normalizeGitHubBranchName(readOptionalString(readNestedStringValue(pullRequest, ['head', 'ref']) ?? pullRequest.sourceBranch ?? pullRequest.source_branch ?? pullRequest.head)) ?? fallback.sourceBranch,
+    targetBranch: readOptionalPullRequestTarget(readNestedStringValue(pullRequest, ['base', 'ref']) ?? pullRequest.targetBranch ?? pullRequest.target_branch ?? pullRequest.base) ?? fallback.targetBranch,
+    url: readOptionalString(pullRequest.html_url ?? pullRequest.url) ?? fallback.url,
+    status: readPullRequestStatus(pullRequest, fallback.status)
+  };
+}
+
+function readPullRequestStatus(pullRequest: JsonObject, fallback: PullRequestRef['status']): PullRequestRef['status'] {
+  if (pullRequest.draft === true) {
+    return 'draft';
+  }
+
+  return readOptionalPullRequestStatus(pullRequest.status ?? pullRequest.state) ?? fallback;
+}
+
+function readMergeResult(content: JsonValue | undefined, input: MergePullRequestInput): PullRequestMergeResult {
+  const root: JsonObject = tryReadJsonObjectFromMcpContent(content) ?? {};
+  const pullRequest = readPullRequestRefFromExisting(root.pullRequest ?? root.pull_request ?? root.pr ?? root.data ?? root, {
+    ...input.pullRequest,
+    status: 'merged'
+  });
+
+  return {
+    pullRequest: { ...pullRequest, status: 'merged' },
+    mergeMethod: input.method,
+    commitSha: readOptionalString(root.sha ?? root.merge_commit_sha ?? root.commitSha ?? readNestedStringValue(root, ['commit', 'sha'])),
+    mergedAt: readOptionalString(root.mergedAt ?? root.merged_at) ?? new Date(0).toISOString()
   };
 }
 

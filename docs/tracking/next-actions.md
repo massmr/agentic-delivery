@@ -26,10 +26,12 @@
 22. Milestone AX - Atlassian MCP Real Mapping is implemented in this pass and awaiting acceptance. Jira `TicketPort` now maps to the documented Atlassian MCP tools from `docs/reference/atlassian-mcp-tools.md`: `search_jira_issues`, `read_jira_issue`, and `add_jira_comment` with the documented argument schemas.
 23. Milestone AY - Railway MCP Real Mapping is implemented in this pass and awaiting acceptance. Railway `DeploymentPort` now maps to inspected read-only Railway MCP deployment evidence tools from `docs/reference/railway-mcp-tools.md`: `environment_status` and `list_deployments`. Optional inspected read tools such as `get_service_config`, `list_projects`, `list_services`, `get_logs`, and `service_metrics` remain parsed/classified for future typed use but are not globally required for current `DeploymentPort` readiness. Custom `railway.mcp_tools` overrides remain supported; service URLs must come from deployment evidence or explicit safe URL configuration. `list_variables` is secret-sensitive/redacted/denied, source/link mutation tools are denied by default, and `whoami` plus Railway HTTP observability tools remain unmapped and denied by default.
 24. Milestone AZ - GitHub MCP Real Mapping is implemented in this pass and awaiting acceptance. GitHub `CodeHostPort` now maps to inspected tools from `docs/reference/github-mcp-tools.md`: `list_branches`, `create_branch`, `list_pull_requests`, `create_pull_request`, `pull_request_read`, and `add_issue_comment`. `create_pull_request` is destructive-classified and policy-gated, `merge_pull_request` remains human-only, destructive branch/file/repo/workflow/secret operations are denied by default, branch push remains a local/native git fallback, mock mode remains the default, and tests remain fake-only with no live GitHub/MCP/Docker/OAuth/network calls.
-25. Milestone BA - GitHub PR Handoff v1 is complete and accepted. Develop-target draft PR handoff now requires passed local quality, meaningful diff, agent completion, core safety, and test relevance evidence before branch push or PR side effects; the production BA orchestration path constructs the GitHub `CodeHostPort` through scoped runtime readiness after local BA evidence passes and before any handoff side effects; missing or denied `create_pull_request` policy blocks before local branch handoff, code-host branch creation, git push, PR creation, PR comment, or operation-ledger mutation. Scoped readiness requires only the BA handoff action `openPullRequest`/`create_pull_request`, mock GitHub mode remains working without MCP readiness, and operation-ledger idempotency is preserved for branch readiness/creation, local git push, and develop PR creation. Production PRs, merges, deployments, BB staging verification, BC operator sandboxing, live GitHub/MCP/Docker/OAuth/network calls, and test remotes remain out of scope.
+25. Milestone BA - GitHub PR Handoff v1 is complete and accepted. Develop-target draft PR handoff now requires passed local quality, meaningful diff, agent completion, core safety, and test relevance evidence before branch push or PR side effects; the production BA orchestration path constructs the GitHub `CodeHostPort` through scoped runtime readiness after local BA evidence passes and before any handoff side effects; missing or denied `create_pull_request` policy blocks before local branch handoff, code-host branch creation, git push, PR creation, PR comment, or operation-ledger mutation. Scoped readiness requires only the BA handoff action `openPullRequest`/`create_pull_request`, mock GitHub mode remains working without MCP readiness, and operation-ledger idempotency is preserved for branch readiness/creation, local git push, and develop PR creation. Production PRs, merges, deployments, BB staging verification, BE operator sandboxing, live GitHub/MCP/Docker/OAuth/network calls, and test remotes remain out of scope.
 26. Milestone BB - Real Staging Verification v1 is implemented but not accepted. A real smoke run against Atlassian MCP, OpenCode, GitHub MCP, and Railway MCP proved the path reaches GitHub PR handoff, but it pushes a branch with no commit after OpenCode changes. GitHub then rejects PR creation with `No commits between develop and agent/<ticket>...`.
-27. Immediate corrective milestone: BB1 - Commit Scoped Agent Diff Before Develop PR Handoff is implemented in this pass and awaiting acceptance. The develop handoff now stages only meaningful-diff product files, creates a deterministic local commit after all local evidence gates pass, persists/surfaces the commit SHA, pushes the committed branch, and then creates or reuses the develop draft PR. GitHub handoff failures in real-provider smoke output are now labeled as GitHub develop PR handoff failures instead of Jira read failures. BB1 must be accepted before BB can be accepted and before BC begins.
-28. Next approved milestone after BB1 acceptance: BC - Cubic Review Provider. Cubic must be selectable from `ewokbot init`, represented in workspace config as the review provider, executed through `cubic-cli` after the scoped agent diff and local evidence gates pass but before commit/PR handoff, and verified after the PR is opened. The previous Operator Agent Action Sandbox milestone is deferred to BD.
+27. Corrective milestone BB1 - Commit Scoped Agent Diff Before Develop PR Handoff is complete and accepted. The develop handoff now stages only meaningful-diff product files, creates a deterministic local commit after all local evidence gates pass, persists/surfaces the commit SHA, pushes the committed branch, and then creates or reuses the develop draft PR. GitHub handoff failures in real-provider smoke output are now labeled as GitHub develop PR handoff failures instead of Jira read failures.
+28. Real smoke follow-up against `SCRUM-6` proved the path now reaches GitHub PR handoff successfully: OpenCode produced a scoped product diff, local quality passed, a local commit was created, the branch was pushed, GitHub MCP created PR #3, GitHub MCP added a PR comment, and PR number parsing worked. The run stopped at `PR_TO_DEVELOP_OPENED` because GitHub checks returned `totalCount: 0`, leaving Ewokbot unable to decide whether to wait, require human review, treat absent CI as acceptable, or auto-merge develop.
+29. Milestone BC - Develop PR Follow-Up Policy is implemented in this pass and awaiting acceptance. Develop PR handoff now reads PR state and checks through the typed `CodeHostPort`, applies branch-scoped `delivery` policy for `no_remote_checks`, supports develop-only explicit `auto_merge`, records follow-up evidence in state/status/final reports and the operation ledger, stops closed-unmerged PRs before Railway, continues after human-merged PRs, and runs Railway staging only after develop is accepted, merged, or ready by policy. The review fix removed the generic `require_human` merge bypass: raw `merge_pull_request` remains human-only, and typed develop auto-merge now requires explicit develop `auto_merge`, `require_human_approval: false`, and explicit MCP policy allow. Main/production PRs remain human-only.
+30. Next milestone after BC acceptance: BD - Cubic Review Provider. Cubic must be selectable from `ewokbot init`, represented in workspace config as the review provider, executed through `cubic-cli` after the scoped agent diff and local evidence gates pass but before commit/PR handoff, and verified after the PR is opened. The Operator Agent Action Sandbox milestone is deferred to BE.
 
 ## Immediate Real-Smoke Finding
 
@@ -65,9 +67,30 @@ BB1 implementation status:
 - The misleading smoke error message is fixed for GitHub develop PR handoff failures.
 - Verification remains fake-only; no live provider, MCP, OpenCode, Docker, OAuth, or network tests were added.
 
+## Develop PR Follow-Up Policy
+
+Milestone BC now makes Ewokbot supervise the develop PR after creation:
+
+- Add branch-scoped delivery config under a `delivery` policy section.
+- Allow `develop` auto-merge only when explicitly configured.
+- Keep `main` and production PRs human-only.
+- Add `no_remote_checks` behavior for repos with no GitHub Actions or external CI checks.
+- Supported `no_remote_checks` outcomes should include at least `pass`, `wait`, `needs_human`, and `fail`.
+- Poll GitHub MCP for PR state, merge state, and checks/status.
+- If the PR is closed without merge, stop the run and stop monitoring.
+- If a human merges the PR, continue to Railway staging verification.
+- If checks pass and develop auto-merge is enabled, merge through a typed develop-only GitHub action that also requires explicit MCP policy allow; raw `merge_pull_request` remains human-only outside that typed path.
+- If checks pass and develop auto-merge is disabled, keep waiting for a human merge.
+- If there are no remote checks and policy says `pass`, local Ewokbot quality gates are sufficient only when `require_checks: pass_or_absent` is configured; if develop auto-merge is enabled, Ewokbot merges develop before staging-ready, and if auto-merge is disabled it waits for a human merge instead of staging an open PR.
+- `PR_TO_DEVELOP_OPENED` remains resumable through a follow-up-only path that rereads PR state/checks and optionally merges develop without recreating branches, commits, pushes, PRs, or PR comments.
+- Persist follow-up evidence in run state, operation ledger, status output, and final reports.
+- Fix the misleading error wrapper that reported staging/follow-up failures as Jira read failures.
+
+BC must not implement Cubic, production merge automation, production deploy, Telegram, WhatsApp, dashboard, or conversational operator-agent behavior.
+
 ## Cubic Review Provider
 
-Milestone BC should add Cubic as the first full review provider:
+Milestone BD should add Cubic as the first full review provider:
 
 - `ewokbot init` asks for a review provider with at least `None` and `Cubic`.
 - When Cubic is selected, `ewokbot init` detects `cubic-cli`, writes review-provider config, and gives setup guidance if missing.
@@ -85,7 +108,7 @@ Milestone BC should add Cubic as the first full review provider:
 - Never expose raw provider credentials, raw MCP tools, or unrestricted shell access to the review provider.
 - Keep tests fake-only: no live `cubic-cli`, no network, no MCP, no OpenCode, no Docker.
 
-BC must not implement production merge, production deploy, dashboard, Telegram, WhatsApp, or conversational operator-agent behavior.
+BD must not implement production merge, production deploy, dashboard, Telegram, WhatsApp, or conversational operator-agent behavior.
 
 ## OpenCode Prompt
 
@@ -245,12 +268,13 @@ Continue in this order:
 8. AY - Railway MCP Real Mapping. Implemented in this pass; awaiting acceptance.
 9. AZ - GitHub MCP Real Mapping. Implemented in this pass; awaiting acceptance.
 10. BA - GitHub PR Handoff v1. Complete and accepted.
-11. BB - Real Staging Verification v1. Implemented in this pass and awaiting acceptance.
-12. BB1 - Commit Scoped Agent Diff Before Develop PR Handoff. Implemented in this pass and awaiting acceptance.
-13. BC - Cubic Review Provider. Planned after BB1 and BB acceptance only.
-14. BD - Operator Agent Action Sandbox. Planned after BC acceptance only.
+11. BB - Real Staging Verification v1. Implemented but still dependent on develop PR follow-up acceptance.
+12. BB1 - Commit Scoped Agent Diff Before Develop PR Handoff. Complete and accepted.
+13. BC - Develop PR Follow-Up Policy. Implemented in this pass and awaiting acceptance.
+14. BD - Cubic Review Provider. Planned after BC acceptance only.
+15. BE - Operator Agent Action Sandbox. Planned after BD acceptance only.
 
-Anything outside AX must wait until the later milestone is explicitly approved. Anything outside AU-BD must be proposed here first and must not be implemented until approved.
+Anything outside BC must wait until the later milestone is explicitly approved. Anything outside AU-BE must be proposed here first and must not be implemented until approved.
 
 ## Post-Z Product Direction
 
@@ -302,10 +326,11 @@ The next milestones should move in this order:
 28. AY - Railway MCP Real Mapping. Implemented; awaiting acceptance.
 29. AZ - GitHub MCP Real Mapping. Implemented; awaiting acceptance.
 30. BA - GitHub PR Handoff v1. Complete and accepted.
-31. BB - Real Staging Verification v1. Implemented in this pass and awaiting acceptance.
-32. BB1 - Commit Scoped Agent Diff Before Develop PR Handoff. Implemented in this pass and awaiting acceptance.
-33. BC - Cubic Review Provider. Planned after BB1 and BB acceptance only.
-34. BD - Operator Agent Action Sandbox. Planned after BC acceptance only.
+31. BB - Real Staging Verification v1. Implemented but still dependent on develop PR follow-up acceptance.
+32. BB1 - Commit Scoped Agent Diff Before Develop PR Handoff. Complete and accepted.
+33. BC - Develop PR Follow-Up Policy. Implemented in this pass and awaiting acceptance.
+34. BD - Cubic Review Provider. Planned after BC acceptance only.
+35. BE - Operator Agent Action Sandbox. Planned after BD acceptance only.
 
 Non-goals for the immediate next milestone:
 

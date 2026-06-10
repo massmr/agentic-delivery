@@ -31,7 +31,8 @@ const customTools = {
   listPullRequests: 'github.listPullRequests',
   openPullRequest: 'github.createPullRequest',
   getChecks: 'github.pullRequestRead',
-  commentOnPullRequest: 'github.addIssueComment'
+  commentOnPullRequest: 'github.addIssueComment',
+  mergePullRequest: 'github.mergePullRequest'
 } as const;
 
 test('GitHub MCP CodeHostPort maps inspected default tools for branch creation and draft PR opening', async () => {
@@ -167,7 +168,7 @@ test('GitHub MCP CodeHostPort resolves checks through list_pull_requests and pul
         owner: repository.owner,
         repo: repository.name,
         head: `${repository.owner}:${branch.name}`,
-        state: 'open'
+        state: 'all'
       });
       return { content: { pull_requests: [{ number: 77, head: { ref: branch.name } }] }, isError: false };
     }),
@@ -206,6 +207,40 @@ test('GitHub MCP CodeHostPort resolves checks through list_pull_requests and pul
     defaultGitHubMcpToolNames.listPullRequests,
     defaultGitHubMcpToolNames.getChecks
   ]);
+});
+
+test('GitHub MCP CodeHostPort resolves checks for the provided pull request number without branch lookup', async () => {
+  const pullRequest = {
+    provider: 'github',
+    repositoryOwner: repository.owner,
+    repositoryName: repository.name,
+    number: 88,
+    title: 'LK-123 Add GitHub MCP adapter',
+    sourceBranch: branch.name,
+    targetBranch: 'develop',
+    url: 'https://github.com/agentic/frontend/pull/88',
+    status: 'open'
+  } as const;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.listPullRequests, () => {
+      throw new Error('list_pull_requests must not run when the pull request number is already known');
+    }),
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.getChecks, (input) => {
+      assert.deepEqual(input.arguments, {
+        method: 'get_check_runs',
+        owner: repository.owner,
+        repo: repository.name,
+        pullNumber: 88
+      });
+      return { content: { total_count: 1, check_runs: [{ status: 'completed', conclusion: 'success' }] }, isError: false };
+    })
+  ]);
+  const port = new GitHubMcpCodeHostPort({ client, serverId });
+
+  const checks = await port.getChecks({ repository, branchName: branch.name, pullRequest });
+
+  assert.deepEqual(checks, { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 });
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultGitHubMcpToolNames.getChecks]);
 });
 
 test('GitHub MCP CodeHostPort keeps custom inspected tool names for checks and comments', async () => {
@@ -276,6 +311,107 @@ test('GitHub MCP CodeHostPort keeps custom inspected tool names for checks and c
     'commentOnPullRequest:started',
     'commentOnPullRequest:succeeded'
   ]);
+});
+
+test('GitHub MCP CodeHostPort reads pull request state through pull_request_read method get', async () => {
+  const pullRequest = {
+    provider: 'github',
+    repositoryOwner: repository.owner,
+    repositoryName: repository.name,
+    number: 77,
+    title: 'LK-123 Add GitHub MCP adapter',
+    sourceBranch: branch.name,
+    targetBranch: 'develop',
+    url: 'https://github.com/agentic/frontend/pull/77',
+    status: 'open'
+  } as const;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.getChecks, (input) => {
+      assert.deepEqual(input.arguments, {
+        method: 'get',
+        owner: repository.owner,
+        repo: repository.name,
+        pullNumber: 77
+      });
+      return {
+        content: { number: 77, title: pullRequest.title, head: { ref: branch.name }, base: { ref: 'develop' }, html_url: pullRequest.url, state: 'merged' },
+        isError: false
+      };
+    })
+  ]);
+  const port = new GitHubMcpCodeHostPort({ client, serverId });
+
+  const readPullRequest = await port.readPullRequest({ pullRequest });
+
+  assert.equal(readPullRequest.status, 'merged');
+  assert.equal(readPullRequest.number, 77);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultGitHubMcpToolNames.getChecks]);
+});
+
+test('GitHub MCP CodeHostPort treats GitHub draft pull requests as draft status', async () => {
+  const pullRequest = {
+    provider: 'github',
+    repositoryOwner: repository.owner,
+    repositoryName: repository.name,
+    number: 77,
+    title: 'LK-123 Add GitHub MCP adapter',
+    sourceBranch: branch.name,
+    targetBranch: 'develop',
+    url: 'https://github.com/agentic/frontend/pull/77',
+    status: 'open'
+  } as const;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.getChecks, () => ({
+      content: { number: 77, title: pullRequest.title, head: { ref: branch.name }, base: { ref: 'develop' }, html_url: pullRequest.url, state: 'open', draft: true },
+      isError: false
+    }))
+  ]);
+  const port = new GitHubMcpCodeHostPort({ client, serverId });
+
+  const readPullRequest = await port.readPullRequest({ pullRequest });
+
+  assert.equal(readPullRequest.status, 'draft');
+});
+
+test('GitHub MCP CodeHostPort merges develop pull requests through typed merge tool only', async () => {
+  const pullRequest = {
+    provider: 'github',
+    repositoryOwner: repository.owner,
+    repositoryName: repository.name,
+    number: 77,
+    title: 'LK-123 Add GitHub MCP adapter',
+    sourceBranch: branch.name,
+    targetBranch: 'develop',
+    url: 'https://github.com/agentic/frontend/pull/77',
+    status: 'open'
+  } as const;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultGitHubMcpToolNames.mergePullRequest, (input) => {
+      assert.deepEqual(input.arguments, {
+        owner: repository.owner,
+        repo: repository.name,
+        pullNumber: 77,
+        merge_method: 'squash'
+      });
+      return {
+        content: { pull_request: { number: 77, title: pullRequest.title, head: { ref: branch.name }, base: { ref: 'develop' }, html_url: pullRequest.url, state: 'merged' }, merge_commit_sha: 'merge-sha', merged_at: '2026-06-03T10:00:00.000Z' },
+        isError: false
+      };
+    })
+  ]);
+  const port = new GitHubMcpCodeHostPort({ client, serverId });
+
+  const result = await port.mergePullRequest({ pullRequest, method: 'squash' });
+
+  assert.equal(result.pullRequest.status, 'merged');
+  assert.equal(result.mergeMethod, 'squash');
+  assert.equal(result.commitSha, 'merge-sha');
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [defaultGitHubMcpToolNames.mergePullRequest]);
+
+  await assert.rejects(
+    () => port.mergePullRequest({ pullRequest: { ...pullRequest, targetBranch: 'main' }, method: 'squash' }),
+    /develop pull requests/u
+  );
 });
 
 test('GitHub MCP CodeHostPort pushBranch fails fast and keeps local git fallback explicit', async () => {

@@ -349,6 +349,20 @@ export async function runRealProviderSmokeRun(input: RunRealProviderSmokeRunInpu
   });
   const pushedBranch = developState.branches.find((candidate) => candidate.name === branchName) ?? branch;
 
+  if (developState.state !== 'DEVELOP_CHECKS_PASSED') {
+    const finalReportPath = await reportWriter.writeFinal(ticket.ref.key, runId, developState, {
+      planReportPath,
+      implementationLogPath,
+      meaningfulDiffReportPath,
+      agentCompletionReportPath,
+      coreSafetyReportPath,
+      qualityReportPath,
+      testRelevanceReportPath,
+      mockOnlyNote: 'Real-provider smoke run stopped before Railway staging because develop pull request follow-up did not reach a staging-ready policy decision.'
+    });
+    return buildResult(developState, runId, planReportPath, { implementationLogPath, qualityReportPath, finalReportPath });
+  }
+
   const stagingState = await runStagingVerification({
     state: developState,
     repository,

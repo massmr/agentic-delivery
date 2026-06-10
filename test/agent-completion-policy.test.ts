@@ -119,6 +119,34 @@ test('evaluateAgentCompletion parses final stdout field block without summary he
   assert.equal(report.statusSignal, 'completed');
 });
 
+test('evaluateAgentCompletion ignores trailing stderr blocks when summary is present', () => {
+  const report = evaluateAgentCompletion({
+    implementationLogText: [
+      '# Implementation Log AD-123',
+      '',
+      '## Required Final Completion Summary',
+      'Implemented the requested local-only change.',
+      'Status: completed',
+      '- Changed files: src/app.ts',
+      '* Tests run: pnpm test',
+      '  Known limits: none',
+      '- Blockers: none',
+      '* Background agents: none',
+      '',
+      '### Stderr',
+      '```text',
+      'todo 0',
+      '```',
+      ''
+    ].join('\n'),
+    meaningfulDiff: meaningfulDiff()
+  });
+
+  assert.equal(report.decision, 'pass');
+  assert.equal(report.statusSignal, 'completed');
+  assert.equal(report.findings.some((finding) => finding.kind === 'incomplete_language'), false);
+});
+
 test('evaluateAgentCompletion does not treat attempt metadata status as completion', () => {
   const report = evaluateAgentCompletion({
     implementationLogText: [

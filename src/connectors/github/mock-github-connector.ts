@@ -1,17 +1,38 @@
-import type { BranchRef, PullRequestCheckSummary, PullRequestRef } from '../../domain/index.js';
+import type { BranchRef, PullRequestCheckSummary, PullRequestMergeResult, PullRequestRef } from '../../domain/index.js';
 import type {
   ChecksInput,
   CreateGitHubBranchInput,
   GitHubConnector,
+  MergePullRequestInput,
   PullRequestCommentInput,
   PullRequestInput,
+  ReadPullRequestInput,
   PushGitHubBranchInput
 } from './github-connector.js';
+
+export interface MockGitHubConnectorOptions {
+  readonly checks?: PullRequestCheckSummary;
+}
 
 export class MockGitHubConnector implements GitHubConnector {
   private readonly branches = new Map<string, BranchRef>();
   private readonly pullRequests = new Map<string, PullRequestRef>();
   private readonly comments = new Map<string, readonly string[]>();
+  private checks: PullRequestCheckSummary;
+
+  constructor(options: MockGitHubConnectorOptions = {}) {
+    this.checks = options.checks ?? passedChecks;
+  }
+
+  setChecks(checks: PullRequestCheckSummary): void {
+    this.checks = checks;
+  }
+
+  setPullRequestStatus(pullRequest: PullRequestRef, status: PullRequestRef['status']): PullRequestRef {
+    const updated = { ...pullRequest, status };
+    this.pullRequests.set(pullRequestRefKey(updated), updated);
+    return updated;
+  }
 
   async createBranch(input: CreateGitHubBranchInput): Promise<BranchRef> {
     const key = branchKey(input.branch);
@@ -60,13 +81,25 @@ export class MockGitHubConnector implements GitHubConnector {
     return pullRequest;
   }
 
+  async readPullRequest(input: ReadPullRequestInput): Promise<PullRequestRef> {
+    return this.pullRequests.get(pullRequestRefKey(input.pullRequest)) ?? input.pullRequest;
+  }
+
   async getChecks(_input: ChecksInput): Promise<PullRequestCheckSummary> {
+    return this.checks;
+  }
+
+  async mergePullRequest(input: MergePullRequestInput): Promise<PullRequestMergeResult> {
+    if (input.pullRequest.targetBranch !== 'develop') {
+      throw new Error(`Mock GitHub refuses to auto-merge ${input.pullRequest.targetBranch} pull requests.`);
+    }
+
+    const mergedPullRequest = this.setPullRequestStatus(input.pullRequest, 'merged');
     return {
-      status: 'passed',
-      totalCount: 1,
-      passedCount: 1,
-      failedCount: 0,
-      pendingCount: 0
+      pullRequest: mergedPullRequest,
+      mergeMethod: input.method,
+      commitSha: `mock-merge-${input.pullRequest.number.toString(16)}`,
+      mergedAt: new Date(0).toISOString()
     };
   }
 
@@ -85,6 +118,18 @@ function branchKey(branch: BranchRef): string {
 function pullRequestKey(input: PullRequestInput): string {
   return `${input.repository.owner}/${input.repository.name}/${input.sourceBranch}->${input.targetBranch}`;
 }
+
+function pullRequestRefKey(pullRequest: PullRequestRef): string {
+  return `${pullRequest.repositoryOwner}/${pullRequest.repositoryName}/${pullRequest.sourceBranch}->${pullRequest.targetBranch}`;
+}
+
+const passedChecks: PullRequestCheckSummary = {
+  status: 'passed',
+  totalCount: 1,
+  passedCount: 1,
+  failedCount: 0,
+  pendingCount: 0
+};
 
 function stableNumber(source: string): number {
   let hash = 0;

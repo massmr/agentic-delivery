@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path';
 
 import type { DevRunResult } from '../domain/dev-runner.js';
 import type { DeploymentResult } from '../domain/deployment.js';
-import type { PullRequestRef } from '../domain/pull-request.js';
+import type { DevelopPullRequestFollowUpEvidence, PullRequestRef } from '../domain/pull-request.js';
 import type { BranchRef, DevelopHandoffCommit } from '../domain/run.js';
 import type { DeliveryRunState, DeliveryRunStateRecord } from '../domain/run.js';
 import { getEwokbotRunDirectoryPath, getEwokbotRunStateFilePath } from '../workspace-layout.js';
@@ -116,6 +116,44 @@ export function recordPullRequestOpened(state: DeliveryRunStateRecord, pullReque
     'PR_TO_DEVELOP_OPENED',
     updatedAt
   );
+}
+
+export function recordDevelopPullRequestFollowUp(
+  state: DeliveryRunStateRecord,
+  evidence: DevelopPullRequestFollowUpEvidence,
+  nextState: DeliveryRunState,
+  updatedAt: string
+): DeliveryRunStateRecord {
+  const stateWithEvidence: DeliveryRunStateRecord = {
+    ...state,
+    pullRequests: replacePullRequest(state.pullRequests, evidence.pullRequest),
+    developPullRequestFollowUp: evidence
+  };
+
+  const transitioned = transitionDeliveryRunState(stateWithEvidence, nextState, updatedAt);
+
+  if (nextState === 'FAILED') {
+    return {
+      ...transitioned,
+      failure: {
+        state: 'PR_TO_DEVELOP_OPENED',
+        reason: evidence.reason,
+        occurredAt: updatedAt
+      }
+    };
+  }
+
+  if (nextState === 'NEEDS_HUMAN') {
+    return {
+      ...transitioned,
+      humanActionNeeded: {
+        reason: evidence.reason,
+        requestedAt: updatedAt
+      }
+    };
+  }
+
+  return transitioned;
 }
 
 export function recordProductionPullRequestOpened(

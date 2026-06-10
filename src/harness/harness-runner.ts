@@ -3,6 +3,7 @@ import { access, cp, mkdir, mkdtemp, readdir, readFile, writeFile } from 'node:f
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
+import { getDefaultDeliveryConfig } from '../config/index.js';
 import type { WorkspaceConfig } from '../config/index.js';
 import { defaultGitHubMcpToolNames } from '../connectors/github/index.js';
 import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
@@ -196,6 +197,7 @@ function buildWorkspaceConfig(fixture: HarnessFixture): WorkspaceConfig {
     quality: {
       defaultProfile: 'node'
     },
+    delivery: getDefaultDeliveryConfig(),
     mcpServers: [],
     mcpPolicy: createDefaultMcpPolicyConfig(),
     repos: fixture.repositories.map((repository) => ({

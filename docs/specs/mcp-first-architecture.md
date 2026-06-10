@@ -128,8 +128,11 @@ Current contract matrix:
 TicketPort listBacklog/getTicket/comment
   -> MCP first, mock fallback only
 
-CodeHostPort createBranch/openPullRequest/getChecks/commentOnPullRequest
+CodeHostPort createBranch/openPullRequest/readPullRequest/getChecks/commentOnPullRequest
   -> MCP first; native fallback only for documented precision gaps
+
+CodeHostPort mergePullRequest
+  -> MCP first only for typed develop auto-merge when branch-scoped delivery config and explicit MCP policy allow it; main/production remain human-only
 
 CodeHostPort pushBranch
   -> native/subprocess/mock only; MCP disallowed until a precise push contract exists
@@ -169,7 +172,7 @@ danger    -> human approval or explicit policy required
 
 Inspection registry classifications are more detailed than the runtime allowlist labels: `read`, `write`, `destructive`, `secret_sensitive`, `unknown`, and `custom`. Unknown or unclassified registry entries are explicit and denied by default. Policy reports explain whether a registry entry is allowed, redacted, blocked, or requires human approval. Runtime MCP readiness evaluates policy before typed-port allowlist checks and before provider side effects; only `allow` can continue into autonomous typed-port execution. `allow_redacted` is for reporting surfaces and does not broaden runtime execution of secret-sensitive tools.
 
-Global safety constraints override every mode and override: production merge and production deploy cannot become autonomous, destructive delete/remove/destroy tools cannot be autonomously allowed, and raw MCP tool calling is not exposed to coding agents or operator agents. AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, and BC operator-agent sandbox remain separate approved milestones.
+Global safety constraints override every mode and override: production merge and production deploy cannot become autonomous, destructive delete/remove/destroy tools cannot be autonomously allowed, and raw MCP tool calling is not exposed to coding agents or operator agents. AX/AY/AZ provider mappings, BA GitHub PR handoff, BB staging verification, BC develop PR follow-up, BD Cubic review, and BE operator-agent sandbox remain separate approved milestones.
 
 Examples:
 

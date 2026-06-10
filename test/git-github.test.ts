@@ -22,6 +22,7 @@ import {
   recordBranchPushed,
   recordDevelopHandoffCommit,
   recordPullRequestOpened,
+  runDevelopPullRequestFollowUp,
   runDevelopPullRequestHandoff,
   runRuntimeDevelopPullRequestHandoff,
   runGitCommand,
@@ -29,6 +30,7 @@ import {
   type BranchRef,
   type AgentCompletionReport,
   type CoreSafetyReport,
+  type DeliveryConfig,
   type DeliveryRunStateRecord,
   type DeliveryTicket,
   type GitCommandInput,
@@ -36,6 +38,7 @@ import {
   type MeaningfulDiffEvidence,
   type PullRequestCheckSummary,
   type PullRequestCommentInput,
+  type PullRequestMergeResult,
   type PullRequestRef,
   type QualityReport,
   type RepositoryConfig,
@@ -463,7 +466,7 @@ test('runDevelopPullRequestHandoff uses CodeHostPort actions and local push afte
     now: fixedClock()
   });
 
-  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED', 'BRANCH_CREATED', 'PUSHED', 'PR_TO_DEVELOP_OPENED', 'DEVELOP_CHECKS_PASSED']);
+  assert.deepEqual(store.writes.map((write) => write.state), ['BRANCH_CREATED', 'BRANCH_CREATED', 'PUSHED', 'PR_TO_DEVELOP_OPENED', 'PR_TO_DEVELOP_OPENED']);
   assert.deepEqual(commands.map((command) => command.args[0]), ['show-ref', 'checkout', 'rev-parse', 'reset', 'add', 'diff', '-c', 'rev-parse', 'push', 'rev-parse']);
   assert.deepEqual(commands.find((command) => command.args[0] === 'add')?.args, ['add', '--', 'src/delivery/develop-pr-handoff.ts']);
   assert.deepEqual(commands.map((command) => command.args).filter((args) => args[0] === 'push'), [
@@ -474,10 +477,386 @@ test('runDevelopPullRequestHandoff uses CodeHostPort actions and local push afte
   assert.equal(connector.pullRequestCount, 1);
   assert.equal(connector.commentCount, 1);
   assert.equal(connector.checkCount, 1);
+  assert.equal(connector.readCount, 1);
+  assert.equal(connector.mergeCount, 0);
   assert.equal(result.pullRequests.length, 1);
   assert.equal(result.pullRequests[0]?.targetBranch, 'develop');
   assert.equal(result.developHandoffCommit?.commitSha, 'abc123');
+  assert.equal(result.state, 'PR_TO_DEVELOP_OPENED');
+  assert.equal(result.developPullRequestFollowUp?.decision, 'wait');
+  assert.match(result.developPullRequestFollowUp?.reason ?? '', /auto_merge is disabled/u);
+});
+
+test('runDevelopPullRequestHandoff treats zero remote checks according to explicit no_remote_checks policy', async () => {
+  const cases: readonly {
+    readonly policy: DeliveryConfig['checks']['noRemoteChecks'];
+    readonly expectedState: DeliveryRunStateRecord['state'];
+    readonly expectedDecision: string;
+  }[] = [
+    { policy: 'pass', expectedState: 'PR_TO_DEVELOP_OPENED', expectedDecision: 'wait' },
+    { policy: 'wait', expectedState: 'PR_TO_DEVELOP_OPENED', expectedDecision: 'wait' },
+    { policy: 'needs_human', expectedState: 'NEEDS_HUMAN', expectedDecision: 'needs_human' },
+    { policy: 'fail', expectedState: 'FAILED', expectedDecision: 'fail' }
+  ];
+
+  for (const testCase of cases) {
+    const connector = new CountingGitHubConnector({ checks: { status: 'pending', totalCount: 0, passedCount: 0, failedCount: 0, pendingCount: 0 } });
+    const result = await runDevelopPullRequestHandoff({
+      state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+      ticket,
+      repository,
+      branchName: `agent/AD-123-zero-checks-${testCase.policy}`,
+      git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+      github: connector,
+      stateStore: new MemoryRunStateStore(),
+      deliveryConfig: deliveryConfig({ noRemoteChecks: testCase.policy }),
+      now: fixedClock()
+    });
+
+    assert.equal(result.state, testCase.expectedState, testCase.policy);
+    assert.equal(result.developPullRequestFollowUp?.decision, testCase.expectedDecision, testCase.policy);
+    assert.equal(result.developPullRequestFollowUp?.noRemoteChecksPolicy, testCase.policy, testCase.policy);
+    assert.equal(connector.mergeCount, 0, testCase.policy);
+  }
+});
+
+test('runDevelopPullRequestHandoff merges before staging-ready when absent checks are explicitly accepted with auto-merge', async () => {
+  const connector = new CountingGitHubConnector({ checks: { status: 'pending', totalCount: 0, passedCount: 0, failedCount: 0, pendingCount: 0 } });
+  const result = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-zero-check-auto-merge',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ noRemoteChecks: 'pass', autoMerge: true, requireChecks: 'pass_or_absent' }),
+    now: fixedClock()
+  });
+
   assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+  assert.equal(result.developPullRequestFollowUp?.decision, 'ready_for_staging');
+  assert.equal(result.developPullRequestFollowUp?.mergeResult?.pullRequest.status, 'merged');
+  assert.equal(connector.mergeCount, 1);
+});
+
+test('runDevelopPullRequestHandoff blocks absent checks when require_checks requires pass or human approval', async () => {
+  const zeroChecks: PullRequestCheckSummary = { status: 'pending', totalCount: 0, passedCount: 0, failedCount: 0, pendingCount: 0 };
+  const requirePass = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-zero-check-require-pass',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: new CountingGitHubConnector({ checks: zeroChecks }),
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ noRemoteChecks: 'pass', autoMerge: true, requireChecks: 'pass' }),
+    now: fixedClock()
+  });
+  const requireHuman = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-zero-check-human',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: new CountingGitHubConnector({ checks: zeroChecks }),
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ noRemoteChecks: 'pass', autoMerge: true, requireChecks: 'pass_or_absent', requireHumanApproval: true }),
+    now: fixedClock()
+  });
+
+  assert.equal(requirePass.state, 'PR_TO_DEVELOP_OPENED');
+  assert.match(requirePass.developPullRequestFollowUp?.reason ?? '', /require_checks=pass/u);
+  assert.equal(requireHuman.state, 'NEEDS_HUMAN');
+  assert.match(requireHuman.developPullRequestFollowUp?.reason ?? '', /require_human_approval=true/u);
+});
+
+test('runDevelopPullRequestHandoff auto-merges develop only when explicitly configured', async () => {
+  const connector = new CountingGitHubConnector();
+  const result = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-auto-merge',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+
+  assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+  assert.equal(result.developPullRequestFollowUp?.decision, 'ready_for_staging');
+  assert.equal(result.developPullRequestFollowUp?.mergeResult?.mergeMethod, 'squash');
+  assert.equal(connector.mergeCount, 1);
+});
+
+test('runDevelopPullRequestHandoff blocks draft develop PRs before auto-merge', async () => {
+  const connector = new CountingGitHubConnector();
+  const originalOpenPullRequest = connector.openPullRequest.bind(connector);
+  connector.openPullRequest = async (input) => {
+    const pullRequest = await originalOpenPullRequest(input);
+    connector.setPullRequestStatus(pullRequest, 'draft');
+    return pullRequest;
+  };
+
+  const result = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-draft-auto-merge',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+
+  assert.equal(result.state, 'NEEDS_HUMAN');
+  assert.equal(result.developPullRequestFollowUp?.pullRequest.status, 'draft');
+  assert.match(result.developPullRequestFollowUp?.reason ?? '', /draft/u);
+  assert.equal(connector.mergeCount, 0);
+});
+
+test('runDevelopPullRequestHandoff reads checks for the observed pull request before merging', async () => {
+  const connector = new CountingGitHubConnector();
+  const observedPullRequestNumbers: number[] = [];
+  connector.getChecks = async (input) => {
+    connector.checkCount += 1;
+    observedPullRequestNumbers.push(input.pullRequest?.number ?? 0);
+    return { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 };
+  };
+
+  const result = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-pr-scoped-checks',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+
+  assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+  assert.deepEqual(observedPullRequestNumbers, [result.developPullRequestFollowUp?.pullRequest.number]);
+  assert.equal(connector.mergeCount, 1);
+});
+
+test('runDevelopPullRequestHandoff continues to staging-ready when humans already merged develop PR', async () => {
+  const connector = new CountingGitHubConnector();
+  const originalOpenPullRequest = connector.openPullRequest.bind(connector);
+  connector.openPullRequest = async (input) => {
+    const pullRequest = await originalOpenPullRequest(input);
+    connector.setPullRequestStatus(pullRequest, 'merged');
+    return pullRequest;
+  };
+
+  const result = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-human-merged',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    now: fixedClock()
+  });
+
+  assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+  assert.equal(result.developPullRequestFollowUp?.pullRequest.status, 'merged');
+  assert.equal(connector.mergeCount, 0);
+});
+
+test('runDevelopPullRequestHandoff stops cleanly when develop PR is closed without merge', async () => {
+  const connector = new CountingGitHubConnector();
+  const originalOpenPullRequest = connector.openPullRequest.bind(connector);
+  connector.openPullRequest = async (input) => {
+    const pullRequest = await originalOpenPullRequest(input);
+    connector.setPullRequestStatus(pullRequest, 'closed');
+    return pullRequest;
+  };
+
+  const result = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-closed-unmerged',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    now: fixedClock()
+  });
+
+  assert.equal(result.state, 'SKIPPED');
+  assert.equal(result.developPullRequestFollowUp?.decision, 'stopped');
+  assert.equal(connector.mergeCount, 0);
+});
+
+test('runDevelopPullRequestHandoff maps failed checks to human or failed according to policy', async () => {
+  const failedChecks: PullRequestCheckSummary = { status: 'failed', totalCount: 2, passedCount: 1, failedCount: 1, pendingCount: 0 };
+  const needsHuman = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-failed-human',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: new CountingGitHubConnector({ checks: failedChecks }),
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ requireHumanApproval: true }),
+    now: fixedClock()
+  });
+  const failed = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-failed-policy',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: new CountingGitHubConnector({ checks: failedChecks }),
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ requireHumanApproval: false }),
+    now: fixedClock()
+  });
+
+  assert.equal(needsHuman.state, 'NEEDS_HUMAN');
+  assert.equal(needsHuman.developPullRequestFollowUp?.decision, 'needs_human');
+  assert.equal(failed.state, 'FAILED');
+  assert.equal(failed.developPullRequestFollowUp?.decision, 'fail');
+});
+
+test('runDevelopPullRequestFollowUp observes an existing PR without recreating handoff side effects', async () => {
+  const connector = new CountingGitHubConnector({ checks: { status: 'pending', totalCount: 1, passedCount: 0, failedCount: 0, pendingCount: 1 } });
+  const handoffState = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-follow-up-only',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+  const openedPullRequest = handoffState.pullRequests[0];
+  assert.equal(handoffState.state, 'PR_TO_DEVELOP_OPENED');
+  assert.ok(openedPullRequest !== undefined);
+  const sideEffectCounts = {
+    createBranch: connector.createBranchCount,
+    openPullRequest: connector.pullRequestCount,
+    comment: connector.commentCount
+  };
+  connector.setChecks({ status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 });
+
+  const followUpState = await runDevelopPullRequestFollowUp({
+    state: handoffState,
+    repository,
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+
+  assert.equal(followUpState.state, 'DEVELOP_CHECKS_PASSED');
+  assert.equal(followUpState.developPullRequestFollowUp?.mergeResult?.pullRequest.status, 'merged');
+  assert.equal(connector.createBranchCount, sideEffectCounts.createBranch);
+  assert.equal(connector.pullRequestCount, sideEffectCounts.openPullRequest);
+  assert.equal(connector.commentCount, sideEffectCounts.comment);
+  assert.equal(connector.mergeCount, 1);
+  assert.equal(connector.readCount, 2);
+  assert.equal(connector.checkCount, 2);
+});
+
+test('runDevelopPullRequestFollowUp continues when a human already merged the develop PR', async () => {
+  const connector = new CountingGitHubConnector({ checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } });
+  const handoffState = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-follow-up-human-merged',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: false }),
+    now: fixedClock()
+  });
+
+  const openedPullRequest = handoffState.pullRequests[0];
+  assert.ok(openedPullRequest !== undefined);
+  connector.setPullRequestStatus(openedPullRequest, 'merged');
+
+  const followUpState = await runDevelopPullRequestFollowUp({
+    state: handoffState,
+    repository,
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: false }),
+    now: fixedClock()
+  });
+
+  assert.equal(followUpState.state, 'DEVELOP_CHECKS_PASSED');
+  assert.equal(followUpState.developPullRequestFollowUp?.pullRequest.status, 'merged');
+  assert.equal(connector.mergeCount, 0);
+});
+
+test('runDevelopPullRequestFollowUp stops cleanly when the develop PR is closed without merge', async () => {
+  const connector = new CountingGitHubConnector({ checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } });
+  const handoffState = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-follow-up-closed',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: false }),
+    now: fixedClock()
+  });
+
+  const openedPullRequest = handoffState.pullRequests[0];
+  assert.ok(openedPullRequest !== undefined);
+  connector.setPullRequestStatus(openedPullRequest, 'closed');
+
+  const followUpState = await runDevelopPullRequestFollowUp({
+    state: handoffState,
+    repository,
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: false }),
+    now: fixedClock()
+  });
+
+  assert.equal(followUpState.state, 'SKIPPED');
+  assert.equal(followUpState.developPullRequestFollowUp?.decision, 'stopped');
+  assert.equal(connector.mergeCount, 0);
+});
+
+test('runDevelopPullRequestFollowUp remains waiting while develop checks are still pending', async () => {
+  const connector = new CountingGitHubConnector({ checks: { status: 'pending', totalCount: 1, passedCount: 0, failedCount: 0, pendingCount: 1 } });
+  const handoffState = await runDevelopPullRequestHandoff({
+    state: createState('LOCAL_CHECKS_PASSED', [qualityReport]),
+    ticket,
+    repository,
+    branchName: 'agent/AD-123-follow-up-pending',
+    git: new LocalGitAdapter(createSuccessfulGitCommandRunner()),
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+
+  const followUpState = await runDevelopPullRequestFollowUp({
+    state: handoffState,
+    repository,
+    github: connector,
+    stateStore: new MemoryRunStateStore(),
+    deliveryConfig: deliveryConfig({ autoMerge: true }),
+    now: fixedClock()
+  });
+
+  assert.equal(followUpState.state, 'PR_TO_DEVELOP_OPENED');
+  assert.equal(followUpState.developPullRequestFollowUp?.decision, 'wait');
+  assert.equal(connector.mergeCount, 0);
 });
 
 test('runDevelopPullRequestHandoff without a ledger root ignores stale cwd ledger state', async (t) => {
@@ -547,6 +926,7 @@ test('runDevelopPullRequestHandoff ledger prevents duplicate GitHub handoff side
   assert.equal(connector.pullRequestCount, 1);
   assert.equal(connector.commentCount, 1);
   assert.equal(connector.checkCount, 1);
+  assert.equal(connector.readCount, 1);
   assert.equal(commands.filter((command) => command.args[0] === 'add').length, 1);
   assert.equal(commands.filter((command) => command.args[0] === '-c').length, 1);
   assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
@@ -556,7 +936,8 @@ test('runDevelopPullRequestHandoff ledger prevents duplicate GitHub handoff side
     'github:CodeHostPort.commentOnPullRequest',
     'github:CodeHostPort.createBranch',
     'github:CodeHostPort.getChecks',
-    'github:CodeHostPort.openPullRequest'
+    'github:CodeHostPort.openPullRequest',
+    'github:CodeHostPort.readPullRequest'
   ]);
 });
 
@@ -646,6 +1027,7 @@ test('runDevelopPullRequestHandoff uses persisted ledger state on rerun with a n
   assert.equal(connector.pullRequestCount, 1);
   assert.equal(connector.commentCount, 1);
   assert.equal(connector.checkCount, 1);
+  assert.equal(connector.readCount, 1);
   assert.equal(commands.filter((command) => command.args[0] === 'add').length, 1);
   assert.equal(commands.filter((command) => command.args[0] === '-c').length, 1);
   assert.equal(commands.filter((command) => command.args[0] === 'push').length, 1);
@@ -753,10 +1135,26 @@ test('runDevelopPullRequestHandoff requires BA local evidence before side effect
 
 test('runRuntimeDevelopPullRequestHandoff blocks denied create_pull_request before handoff side effects', async () => {
   const config = parseWorkspaceConfig(githubMcpWorkspaceConfig(`mcp_policy:
-  mode: read_only
+  mode: custom
+  tools:
+    list_branches:
+      decision: allow
+    create_branch:
+      decision: allow
+    pull_request_read:
+      decision: allow
+    list_pull_requests:
+      decision: allow
+    add_issue_comment:
+      decision: allow
 `));
   const client = new MockMcpClient([
-    createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: {}, isError: false }))
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listBranches, () => ({ content: { branches: [] }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.createBranch, () => ({ content: { branch: { headSha: 'github-head' } }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: {}, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: { pullRequests: [] }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: {}, isError: false }))
   ]);
   const state = createState('LOCAL_CHECKS_PASSED', [qualityReport]);
   const store = new MemoryRunStateStore();
@@ -849,7 +1247,8 @@ test('runRuntimeDevelopPullRequestHandoff keeps mock GitHub mode working without
     now: fixedClock()
   });
 
-  assert.equal(result.state, 'DEVELOP_CHECKS_PASSED');
+  assert.equal(result.state, 'PR_TO_DEVELOP_OPENED');
+  assert.equal(result.developPullRequestFollowUp?.decision, 'wait');
   assert.deepEqual(commands.map((command) => command.args[0]), ['show-ref', 'checkout', 'rev-parse', 'reset', 'add', 'diff', '-c', 'rev-parse', 'push', 'rev-parse']);
 });
 
@@ -1040,6 +1439,12 @@ class CountingGitHubConnector extends MockGitHubConnector {
   pullRequestCount = 0;
   commentCount = 0;
   checkCount = 0;
+  readCount = 0;
+  mergeCount = 0;
+
+  constructor(options: ConstructorParameters<typeof MockGitHubConnector>[0] = {}) {
+    super(options);
+  }
 
   override async createBranch(input: Parameters<MockGitHubConnector['createBranch']>[0]): Promise<BranchRef> {
     this.createBranchCount += 1;
@@ -1056,19 +1461,52 @@ class CountingGitHubConnector extends MockGitHubConnector {
     return super.openPullRequest(input);
   }
 
-  override async getChecks(): Promise<PullRequestCheckSummary> {
+  override async getChecks(input: Parameters<MockGitHubConnector['getChecks']>[0]): Promise<PullRequestCheckSummary> {
     this.checkCount += 1;
-    return {
-      status: 'passed',
-      totalCount: 1,
-      passedCount: 1,
-      failedCount: 0,
-      pendingCount: 0
-    };
+    return super.getChecks(input);
+  }
+
+  override async readPullRequest(input: Parameters<MockGitHubConnector['readPullRequest']>[0]): Promise<PullRequestRef> {
+    this.readCount += 1;
+    return super.readPullRequest(input);
+  }
+
+  override async mergePullRequest(input: Parameters<MockGitHubConnector['mergePullRequest']>[0]): Promise<PullRequestMergeResult> {
+    this.mergeCount += 1;
+    return super.mergePullRequest(input);
   }
 
   override async commentOnPullRequest(input: PullRequestCommentInput): Promise<void> {
     this.commentCount += 1;
     return super.commentOnPullRequest(input);
   }
+}
+
+function deliveryConfig(options: {
+  readonly noRemoteChecks?: DeliveryConfig['checks']['noRemoteChecks'] | undefined;
+  readonly autoMerge?: boolean | undefined;
+  readonly requireChecks?: DeliveryConfig['pullRequests']['develop']['requireChecks'] | undefined;
+  readonly requireHumanApproval?: boolean | undefined;
+} = {}): DeliveryConfig {
+  return {
+    checks: {
+      noRemoteChecks: options.noRemoteChecks ?? 'wait'
+    },
+    pullRequests: {
+      develop: {
+        autoMerge: options.autoMerge ?? false,
+        mergeMethod: 'squash',
+        requireChecks: options.requireChecks ?? 'pass',
+        requireHumanApproval: options.requireHumanApproval ?? false,
+        afterMerge: { verifyDeployment: true }
+      },
+      main: {
+        autoMerge: false,
+        mergeMethod: 'squash',
+        requireChecks: 'pass',
+        requireHumanApproval: true,
+        afterMerge: { verifyDeployment: false }
+      }
+    }
+  };
 }

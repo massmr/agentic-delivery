@@ -180,8 +180,9 @@ test('smoke command uses fake GitHub and Railway MCP tools for staging verificat
     defaultGitHubMcpToolNames.createBranch,
     defaultGitHubMcpToolNames.openPullRequest,
     defaultGitHubMcpToolNames.commentOnPullRequest,
-    defaultGitHubMcpToolNames.listPullRequests,
-    defaultGitHubMcpToolNames.getChecks
+    defaultGitHubMcpToolNames.getChecks,
+    defaultGitHubMcpToolNames.getChecks,
+    defaultGitHubMcpToolNames.mergePullRequest
   ]);
   assert.deepEqual(clients.railway.toolCallRequests.map((call) => call.toolName), [
     defaultRailwayMcpToolNames.environmentStatus,
@@ -225,7 +226,8 @@ test('smoke command reports GitHub handoff failures without Jira read wrapper', 
     createMockMcpTool('github', defaultGitHubMcpToolNames.openPullRequest, () => ({ content: { error: 'create_pull_request failed with 422: no commits between develop and agent branch' }, isError: true })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: { pullRequests: [] }, isError: false })),
     createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: { checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } }, isError: false })),
-    createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false }))
+    createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false })),
+    createMockMcpTool('github', defaultGitHubMcpToolNames.mergePullRequest, () => ({ content: { ok: true }, isError: false }))
   ]);
 
   const exitCode = await createCliProgram({
@@ -246,7 +248,7 @@ test('smoke command reports GitHub handoff failures without Jira read wrapper', 
   }).run(['node', 'ewokbot', 'smoke', 'AE-101', '--confirm-real-provider-smoke', '--run-id', 'smoke-run-1']);
 
   assert.equal(exitCode, 1);
-  assert.match(captured.stderr, /GitHub develop PR handoff failed/u);
+  assert.match(captured.stderr, /GitHub develop PR handoff or follow-up failed/u);
   assert.doesNotMatch(captured.stderr, /unable to read Jira work item/u);
   assert.deepEqual(clients.github.toolCallRequests.map((call) => call.toolName), [
     defaultGitHubMcpToolNames.listBranches,
@@ -520,8 +522,41 @@ function createSmokeMcpClients(): Record<string, MockMcpClient> {
         return { content: { pullRequest: { number, url: `https://github.example.test/pull/${number}`, targetBranch } }, isError: false };
       }),
       createMockMcpTool('github', defaultGitHubMcpToolNames.listPullRequests, () => ({ content: { pullRequests: [{ number: 9101, head: { ref: 'agent/AE-101-smoke-frontend-real-provider-path' } }] }, isError: false })),
-      createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, () => ({ content: { checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } }, isError: false })),
-      createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false }))
+      createMockMcpTool('github', defaultGitHubMcpToolNames.getChecks, (input) => {
+        if (input.arguments.method === 'get') {
+          return {
+            content: {
+              pullRequest: {
+                number: 9101,
+                title: 'AE-101 Smoke frontend real provider path',
+                url: 'https://github.example.test/pull/9101',
+                status: 'open',
+                sourceBranch: 'agent/AE-101-smoke-frontend-real-provider-path',
+                targetBranch: 'develop'
+              }
+            },
+            isError: false
+          };
+        }
+
+        return { content: { checks: { status: 'passed', totalCount: 1, passedCount: 1, failedCount: 0, pendingCount: 0 } }, isError: false };
+      }),
+      createMockMcpTool('github', defaultGitHubMcpToolNames.commentOnPullRequest, () => ({ content: { ok: true }, isError: false })),
+      createMockMcpTool('github', defaultGitHubMcpToolNames.mergePullRequest, () => ({
+        content: {
+          pullRequest: {
+            number: 9101,
+            title: 'AE-101 Smoke frontend real provider path',
+            url: 'https://github.example.test/pull/9101',
+            status: 'merged',
+            sourceBranch: 'agent/AE-101-smoke-frontend-real-provider-path',
+            targetBranch: 'develop'
+          },
+          merge_commit_sha: 'develop-merge-head',
+          merged_at: '2026-06-05T00:00:04.000Z'
+        },
+        isError: false
+      }))
     ]),
     railway: new MockMcpClient(createRailwayTools())
   };
@@ -823,6 +858,19 @@ jira:
 github:
   mode: mcp
   mcp_server: github
+delivery:
+  checks:
+    no_remote_checks: wait
+  pull_requests:
+    develop:
+      auto_merge: true
+      merge_method: squash
+      require_checks: pass
+      after_merge:
+        verify_deployment: true
+    main:
+      auto_merge: false
+      require_human_approval: true
 railway:
   mode: mcp
   staging_branch: develop
@@ -877,6 +925,8 @@ mcp_policy:
     pull_request_read:
       decision: allow
     add_issue_comment:
+      decision: allow
+    merge_pull_request:
       decision: allow
     environment_status:
       decision: allow

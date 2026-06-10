@@ -1363,7 +1363,68 @@ Explicit safety constraints:
 - Do not perform real remote pushes in tests.
 - Production merge and production deployment remain human-only.
 
-### Milestone BC: Cubic Review Provider
+### Milestone BC: Develop PR Follow-Up Policy
+
+Goal:
+
+Turn the develop pull-request handoff into a supervised follow-up loop instead of stopping at "PR opened". Ewokbot should be able to keep tracking a develop PR, decide what to do when remote CI checks are present or absent, optionally auto-merge approved develop PRs according to workspace policy, and then proceed to Railway staging verification only after the develop branch is actually ready.
+
+Build:
+
+- Add workspace configuration for develop PR follow-up policy, scoped by branch.
+- Support `auto_merge` for non-production branches such as `develop`; keep production/main human-only.
+- Support `merge_method` options such as `merge`, `squash`, or `rebase` where the code-host adapter supports them.
+- Add a `no_remote_checks` policy with explicit decisions such as `pass`, `wait`, `needs_human`, or `fail`.
+- Add follow-up states for waiting on develop PR checks/merge, stopped closed PRs, merged develop PRs, and staging-ready runs.
+- Poll GitHub MCP for PR state, merge state, and checks/status at bounded intervals through the typed `CodeHostPort`.
+- If the PR is closed without merge, stop the run cleanly and stop monitoring.
+- If the PR is merged by a human, continue into Railway staging verification.
+- If checks pass and develop `auto_merge` is enabled, merge the develop PR through a typed develop-only GitHub action that also requires explicit MCP policy allow; raw `merge_pull_request` remains human-only outside that typed path.
+- If no remote checks exist and `no_remote_checks: pass`, treat local Ewokbot quality evidence as sufficient only when `require_checks: pass_or_absent` is configured; merge develop before staging-ready when develop auto-merge is enabled, and otherwise wait for a human merge rather than staging an open PR.
+- If no remote checks exist and policy requires waiting or human review, surface the run as waiting or `NEEDS_HUMAN` with a precise reason.
+- Fix misleading error wrapping so staging/follow-up failures are not reported as Jira ticket-read failures.
+- Persist follow-up evidence in the run directory and surface it through `ewokbot status`, `ewokbot inspect`, final reports, and operation ledger entries.
+
+Acceptance:
+
+- Fake GitHub integrations prove `0` remote checks can pass, wait, fail, or require human according to config.
+- Fake GitHub integrations prove passing checks plus `develop.auto_merge: true` merges the develop PR before staging verification.
+- Fake GitHub integrations prove passing checks plus `develop.auto_merge: false` waits for a human merge.
+- Fake GitHub integrations prove human-merged PRs continue into staging verification.
+- Fake GitHub integrations prove closed-unmerged PRs stop monitoring without Railway verification.
+- Fake GitHub integrations prove failed checks stop as `NEEDS_HUMAN` or `FAILED` according to policy.
+- Tests prove `main` and production PRs are never auto-merged.
+- Tests prove no Railway staging verification runs before the develop PR is accepted, merged, or explicitly considered ready by policy.
+- Tests remain fake-only and do not call live GitHub, live Railway, live MCP servers, Docker, OpenCode, OAuth, or networks.
+
+Explicit safety constraints:
+
+- Do not auto-merge `main`, production branches, or production PRs.
+- Do not treat absent remote CI checks as passing unless workspace config explicitly says so.
+- Do not call Railway mutating tools.
+- Do not deploy, rollback, scale, mutate variables, create domains, or delete resources in BC.
+- Do not implement Cubic review provider in BC.
+- Production merge and production deployment remain human-only.
+
+Example target config shape:
+
+```yaml
+delivery:
+  checks:
+    no_remote_checks: pass
+  pull_requests:
+    develop:
+      auto_merge: true
+      merge_method: squash
+      require_checks: pass_or_absent
+      after_merge:
+        verify_deployment: true
+    main:
+      auto_merge: false
+      require_human_approval: true
+```
+
+### Milestone BD: Cubic Review Provider
 
 Goal:
 
@@ -1403,10 +1464,10 @@ Explicit safety constraints:
 - Do not review or stage files outside the scoped allowed agent diff.
 - Do not let `cubic-cli` bypass meaningful diff, agent completion, core safety, test relevance, or quality gates.
 - Do not make Cubic mandatory unless explicitly configured.
-- Do not merge PRs, open production PRs, deploy, or mutate providers in BC.
+- Do not merge PRs, open production PRs, deploy, or mutate providers in BD.
 - Production merge and production deployment remain human-only.
 
-### Milestone BD: Operator Agent Action Sandbox
+### Milestone BE: Operator Agent Action Sandbox
 
 Goal:
 

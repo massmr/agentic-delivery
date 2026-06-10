@@ -110,7 +110,35 @@ function extractSummaryText(text: string): string {
   const matches = [...text.matchAll(/(?:##\s*)?Required Final Completion Summary/giu)];
   const marker = matches.at(-1);
   const summary = marker === undefined ? findLastCompletionFieldBlock(text) ?? '' : text.slice(marker.index);
-  return summary.trim().slice(0, 4000);
+  return trimTrailingSummaryNoise(summary.trim()).slice(0, 4000);
+}
+
+function trimTrailingSummaryNoise(text: string): string {
+  const endIndex = findSummaryEndIndex(text);
+  return endIndex === -1 ? text : text.slice(0, endIndex).trim();
+}
+
+function findSummaryEndIndex(text: string): number {
+  const endMarkers = [
+    /\r?\n###\s+Stderr\b/u,
+    /\r?\n###\s+Stdout\b/u,
+    /\r?\n##\s+Attempt\s+\d+/iu,
+    /\r?\n````?\s*/u
+  ];
+
+  let minimum = -1;
+  for (const marker of endMarkers) {
+    const match = marker.exec(text);
+    if (match?.index === undefined) {
+      continue;
+    }
+
+    if (minimum === -1 || match.index < minimum) {
+      minimum = match.index;
+    }
+  }
+
+  return minimum;
 }
 
 function findLastCompletionFieldBlock(text: string): string | undefined {

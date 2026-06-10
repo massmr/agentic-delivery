@@ -8,6 +8,7 @@ import type { DevRunner } from '../../domain/index.js';
 import { mapMcpError } from '../../mcp/index.js';
 import type { GitCommandRunner } from '../../git/index.js';
 import { createRuntimeWorkspaceAdapters } from '../../providers/index.js';
+import type { RuntimeGitHubMcpAction } from '../../providers/index.js';
 import { loadWorkspaceEnvironment, runLocalDoctor } from '../../setup/index.js';
 import type { DoctorCheck, DoctorProbeOptions, DoctorReport } from '../../setup/index.js';
 import { ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
@@ -71,11 +72,17 @@ export async function runSmokeCommand(ticketKey: string, options: SmokeCommandOp
   }
 
   try {
+    const requiredGitHubMcpActions: RuntimeGitHubMcpAction[] = ['createBranch', 'openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks'];
+
+    if (config.delivery.pullRequests.develop.autoMerge) {
+      requiredGitHubMcpActions.push('mergePullRequest');
+    }
+
     const adapters = await createRuntimeWorkspaceAdapters({
       config,
       environment,
       requiredJiraMcpActions: ['getTicket'],
-      requiredGitHubMcpActions: ['createBranch', 'openPullRequest', 'getChecks', 'commentOnPullRequest'],
+      requiredGitHubMcpActions,
       requiredRailwayMcpActions: ['waitForDeployment', 'getServiceUrl'],
       ...(options.runtimeMcp ?? {})
     });
@@ -226,13 +233,18 @@ function inferSmokeFailureProviderContext(message: string): string | undefined {
     lowerMessage.includes('github') ||
     lowerMessage.includes('codehostport') ||
     lowerMessage.includes('openpullrequest') ||
+    lowerMessage.includes('readpullrequest') ||
+    lowerMessage.includes('mergepullrequest') ||
     lowerMessage.includes('create_pull_request') ||
+    lowerMessage.includes('pull_request_read') ||
+    lowerMessage.includes('merge_pull_request') ||
+    lowerMessage.includes('follow-up') ||
     lowerMessage.includes('pull request')
   ) {
-    return 'GitHub develop PR handoff failed';
+    return 'GitHub develop PR handoff or follow-up failed';
   }
 
-  if (lowerMessage.includes('railway') || lowerMessage.includes('deploymentport') || lowerMessage.includes('waitfordeployment')) {
+  if (lowerMessage.includes('railway') || lowerMessage.includes('deploymentport') || lowerMessage.includes('waitfordeployment') || lowerMessage.includes('staging verification')) {
     return 'Railway staging verification failed';
   }
 

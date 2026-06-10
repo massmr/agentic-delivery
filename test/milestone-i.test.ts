@@ -25,6 +25,7 @@ import {
   type PullRequestCheckSummary,
   type PullRequestCommentInput,
   type PullRequestInput,
+  type PullRequestMergeResult,
   type PullRequestRef,
   type QualityReport,
   type RepositoryConfig,
@@ -635,5 +636,18 @@ class CapturingGitHubConnector implements GitHubConnector {
 
   async commentOnPullRequest(_input: PullRequestCommentInput): Promise<void> {
     return undefined;
+  }
+
+  async readPullRequest(input: { readonly pullRequest: PullRequestRef }): Promise<PullRequestRef> {
+    return input.pullRequest;
+  }
+
+  async mergePullRequest(input: { readonly pullRequest: PullRequestRef; readonly method: 'merge' | 'squash' | 'rebase' }): Promise<PullRequestMergeResult> {
+    return {
+      pullRequest: { ...input.pullRequest, status: 'merged' },
+      mergeMethod: input.method,
+      commitSha: 'mock-production-merge',
+      mergedAt: '2026-06-03T10:00:00.000Z'
+    };
   }
 }

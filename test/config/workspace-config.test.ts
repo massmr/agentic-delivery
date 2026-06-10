@@ -249,9 +249,70 @@ test('workspace config accepts GitHub MCP settings', () => {
     listPullRequests: 'github.listPullRequests',
     openPullRequest: 'github.createPullRequest',
     getChecks: 'github.pullRequestRead',
-    commentOnPullRequest: 'github.addIssueComment'
+    commentOnPullRequest: 'github.addIssueComment',
+    mergePullRequest: 'github.mergePullRequest'
   });
   assert.equal(config.mcpServers[0]?.id, 'github');
+});
+
+test('workspace config defaults no remote checks policy to wait', () => {
+  const config = parseWorkspaceConfig(minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`));
+
+  assert.equal(config.delivery.checks.noRemoteChecks, 'wait');
+  assert.equal(config.delivery.pullRequests.develop.autoMerge, false);
+  assert.equal(config.delivery.pullRequests.main.autoMerge, false);
+  assert.equal(config.delivery.pullRequests.main.requireHumanApproval, true);
+});
+
+test('workspace config parses explicit delivery PR follow-up policy', () => {
+  const config = parseWorkspaceConfig(`${minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`)}delivery:
+  checks:
+    no_remote_checks: pass
+  pull_requests:
+    develop:
+      auto_merge: true
+      merge_method: rebase
+      require_checks: pass_or_absent
+      after_merge:
+        verify_deployment: true
+    main:
+      auto_merge: false
+      require_human_approval: true
+`);
+
+  assert.equal(config.delivery.checks.noRemoteChecks, 'pass');
+  assert.equal(config.delivery.pullRequests.develop.autoMerge, true);
+  assert.equal(config.delivery.pullRequests.develop.mergeMethod, 'rebase');
+  assert.equal(config.delivery.pullRequests.develop.requireChecks, 'pass_or_absent');
+  assert.equal(config.delivery.pullRequests.main.autoMerge, false);
+  assert.equal(config.delivery.pullRequests.main.requireHumanApproval, true);
+});
+
+test('workspace config rejects unsafe or invalid delivery policy values', () => {
+  const error = captureWorkspaceConfigError(() => parseWorkspaceConfig(`${minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`)}delivery:
+  checks:
+    no_remote_checks: maybe
+  pull_requests:
+    develop:
+      merge_method: fast_forward
+    main:
+      auto_merge: true
+`));
+
+  assert.ok(error.issues.some((issue) => issue.path === 'delivery.checks.no_remote_checks'));
+  assert.ok(error.issues.some((issue) => issue.path === 'delivery.pull_requests.develop.merge_method'));
+  assert.ok(error.issues.some((issue) => issue.path === 'delivery.pull_requests.main.auto_merge'));
+  assert.match(error.message, /delivery\.checks\.no_remote_checks must be one of: pass, wait, needs_human, fail/u);
+  assert.match(error.message, /Main\/production pull requests cannot be auto-merged by Ewokbot/u);
 });
 
 test('workspace config accepts Railway MCP settings', () => {
@@ -459,6 +520,7 @@ github:
     open_pull_request: github.createPullRequest
     get_checks: github.pullRequestRead
     comment_pull_request: github.addIssueComment
+    merge_pull_request: github.mergePullRequest
 railway:
   mode: mock
   staging_branch: develop

@@ -1,13 +1,15 @@
 import type { OperationLedger } from '../agent/index.js';
 import { InMemoryOperationLedger, JsonOperationLedger } from '../agent/index.js';
+import type { DeliveryConfig } from '../config/index.js';
+import { getDefaultDeliveryConfig } from '../config/index.js';
 import type { GitHubConnector } from '../connectors/github/index.js';
 import { buildDevelopPullRequestBody } from '../connectors/github/index.js';
-import type { BranchRef, DeliveryRunStateRecord, DeliveryTicket, DevelopHandoffCommit, PullRequestCheckSummary, PullRequestRef, QualityReport, RepositoryConfig } from '../domain/index.js';
+import type { BranchRef, DeliveryRunStateRecord, DeliveryTicket, DevelopHandoffCommit, DevelopPullRequestFollowUpEvidence, PullRequestCheckSummary, PullRequestMergeResult, PullRequestRef, QualityReport, RepositoryConfig } from '../domain/index.js';
 import type { LocalGitAdapter } from '../git/index.js';
-import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
+import type { RuntimeGitHubMcpAction, RuntimeProviderFactoryOptions } from '../providers/index.js';
 import { createRuntimeCodeHostPort } from '../providers/index.js';
 import type { RunStateStore } from '../state/index.js';
-import { recordBranchCreated, recordBranchPushed, recordDevelopHandoffCommit, recordPullRequestOpened, transitionDeliveryRunState } from '../state/index.js';
+import { recordBranchCreated, recordBranchPushed, recordDevelopHandoffCommit, recordDevelopPullRequestFollowUp, recordPullRequestOpened } from '../state/index.js';
 import { redactSensitiveText } from '../runners/opencode/redaction.js';
 
 export interface DevelopPullRequestHandoffInput {
@@ -20,6 +22,7 @@ export interface DevelopPullRequestHandoffInput {
   readonly operationLedger?: OperationLedger | undefined;
   readonly operationLedgerRootPath?: string | undefined;
   readonly stateStore: RunStateStore;
+  readonly deliveryConfig?: DeliveryConfig | undefined;
   readonly now?: () => Date;
 }
 
@@ -27,17 +30,79 @@ export interface RuntimeDevelopPullRequestHandoffInput extends Omit<DevelopPullR
   readonly runtimeProviders: RuntimeProviderFactoryOptions;
 }
 
+export interface DevelopPullRequestFollowUpInput {
+  readonly state: DeliveryRunStateRecord;
+  readonly repository: RepositoryConfig;
+  readonly github: GitHubConnector;
+  readonly operationLedger?: OperationLedger | undefined;
+  readonly operationLedgerRootPath?: string | undefined;
+  readonly stateStore: RunStateStore;
+  readonly deliveryConfig?: DeliveryConfig | undefined;
+  readonly now?: () => Date;
+}
+
+export interface RuntimeDevelopPullRequestFollowUpInput extends Omit<DevelopPullRequestFollowUpInput, 'github'> {
+  readonly runtimeProviders: RuntimeProviderFactoryOptions;
+}
+
+interface DevelopPullRequestWorkflowInput {
+  readonly state: DeliveryRunStateRecord;
+  readonly repository: RepositoryConfig;
+  readonly github: GitHubConnector;
+  readonly operationLedger?: OperationLedger | undefined;
+  readonly operationLedgerRootPath?: string | undefined;
+  readonly stateStore: RunStateStore;
+  readonly deliveryConfig?: DeliveryConfig | undefined;
+  readonly now?: () => Date;
+}
+
 export async function runRuntimeDevelopPullRequestHandoff(input: RuntimeDevelopPullRequestHandoffInput): Promise<DeliveryRunStateRecord> {
   assertReadyForDevelopPullRequestHandoff(input.state);
+  const requiredGitHubMcpActions: RuntimeGitHubMcpAction[] = ['createBranch', 'openPullRequest', 'commentOnPullRequest', 'readPullRequest', 'getChecks'];
   const github = await createRuntimeCodeHostPort({
     ...input.runtimeProviders,
-    requiredGitHubMcpActions: ['openPullRequest']
+    requiredGitHubMcpActions: runtimeFollowUpActions(input.runtimeProviders.config.delivery, requiredGitHubMcpActions)
   });
 
   return runDevelopPullRequestHandoff({
     ...input,
-    github
+    github,
+    deliveryConfig: input.runtimeProviders.config.delivery
   });
+}
+
+export async function runRuntimeDevelopPullRequestFollowUp(input: RuntimeDevelopPullRequestFollowUpInput): Promise<DeliveryRunStateRecord> {
+  assertReadyForDevelopPullRequestFollowUp(input.state);
+  const github = await createRuntimeCodeHostPort({
+    ...input.runtimeProviders,
+    requiredGitHubMcpActions: runtimeFollowUpActions(input.runtimeProviders.config.delivery, ['readPullRequest', 'getChecks'])
+  });
+
+  return runDevelopPullRequestFollowUp({
+    ...input,
+    github,
+    deliveryConfig: input.runtimeProviders.config.delivery
+  });
+}
+
+export async function runDevelopPullRequestFollowUp(input: DevelopPullRequestFollowUpInput): Promise<DeliveryRunStateRecord> {
+  assertReadyForDevelopPullRequestFollowUp(input.state);
+  const now = input.now ?? (() => new Date());
+  const operationLedger = resolveOperationLedger(input);
+  const pullRequest = requireDevelopPullRequestForFollowUp(input.state, input.repository);
+  const branch = requireBranchForPullRequest(input.state, input.repository, pullRequest);
+  const followUpState = await followDevelopPullRequest({
+    state: input.state,
+    input,
+    operationLedger,
+    now,
+    branch,
+    pullRequest,
+    freshReadOperations: true
+  });
+
+  await input.stateStore.write(followUpState);
+  return followUpState;
 }
 
 export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHandoffInput): Promise<DeliveryRunStateRecord> {
@@ -90,18 +155,28 @@ export async function runDevelopPullRequestHandoff(input: DevelopPullRequestHand
     qualityReport: latestQualityReport
   });
 
-  const checks = await readDevelopChecks({ state: pullRequestState, input, operationLedger, now, branch: pushedBranch });
+  const followUpState = await followDevelopPullRequest({
+    state: pullRequestState,
+    input,
+    operationLedger,
+    now,
+    branch: pushedBranch,
+    pullRequest
+  });
 
-  if (checks.status !== 'passed') {
-    return pullRequestState;
-  }
-
-  const checksPassedState = transitionDeliveryRunState(pullRequestState, 'DEVELOP_CHECKS_PASSED', now().toISOString());
-  await input.stateStore.write(checksPassedState);
-  return checksPassedState;
+  await input.stateStore.write(followUpState);
+  return followUpState;
 }
 
-function resolveOperationLedger(input: DevelopPullRequestHandoffInput): OperationLedger {
+function runtimeFollowUpActions(deliveryConfig: DeliveryConfig, baseActions: readonly RuntimeGitHubMcpAction[]): readonly RuntimeGitHubMcpAction[] {
+  if (!deliveryConfig.pullRequests.develop.autoMerge) {
+    return baseActions;
+  }
+
+  return [...baseActions, 'mergePullRequest'];
+}
+
+function resolveOperationLedger(input: DevelopPullRequestWorkflowInput): OperationLedger {
   if (input.operationLedger !== undefined) {
     return input.operationLedger;
   }
@@ -115,12 +190,13 @@ function resolveOperationLedger(input: DevelopPullRequestHandoffInput): Operatio
 
 interface WorkflowInput {
   readonly state: DeliveryRunStateRecord;
-  readonly input: DevelopPullRequestHandoffInput;
+  readonly input: DevelopPullRequestWorkflowInput;
   readonly operationLedger: OperationLedger;
   readonly now: () => Date;
+  readonly freshReadOperations?: boolean | undefined;
 }
 
-async function createCodeHostBranch(input: WorkflowInput & { readonly branch: BranchRef }): Promise<BranchRef> {
+async function createCodeHostBranch(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly branch: BranchRef }): Promise<BranchRef> {
   const operationInput = { repository: input.input.repository.ref, branch: input.branch };
   const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'github', 'CodeHostPort', 'createBranch', operationInput));
 
@@ -139,7 +215,7 @@ async function createCodeHostBranch(input: WorkflowInput & { readonly branch: Br
   });
 }
 
-async function pushLocalBranch(input: WorkflowInput & { readonly branch: BranchRef }): Promise<BranchRef> {
+async function pushLocalBranch(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly branch: BranchRef }): Promise<BranchRef> {
   const operationInput = { repository: input.input.repository.ref, branch: input.branch };
   const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'git', 'LocalGitAdapter', 'pushBranch', operationInput));
 
@@ -162,7 +238,7 @@ async function pushLocalBranch(input: WorkflowInput & { readonly branch: BranchR
   });
 }
 
-async function commitScopedAgentDiff(input: WorkflowInput & { readonly branch: BranchRef }): Promise<DevelopHandoffCommit> {
+async function commitScopedAgentDiff(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly branch: BranchRef }): Promise<DevelopHandoffCommit> {
   const files = getScopedAgentProductFiles(input.state);
   const message = buildScopedAgentDiffCommitMessage(input.input.ticket);
   const operationInput = {
@@ -201,7 +277,7 @@ async function commitScopedAgentDiff(input: WorkflowInput & { readonly branch: B
   });
 }
 
-async function openDevelopPullRequest(input: WorkflowInput & { readonly branch: BranchRef; readonly handoffCommit: DevelopHandoffCommit; readonly qualityReport: QualityReport }): Promise<PullRequestRef> {
+async function openDevelopPullRequest(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly branch: BranchRef; readonly handoffCommit: DevelopHandoffCommit; readonly qualityReport: QualityReport }): Promise<PullRequestRef> {
   const operationInput = {
     repository: input.input.repository.ref,
     title: `${input.input.ticket.ref.key} ${input.input.ticket.summary}`,
@@ -237,7 +313,7 @@ async function openDevelopPullRequest(input: WorkflowInput & { readonly branch: 
   });
 }
 
-async function commentOnDevelopPullRequest(input: WorkflowInput & { readonly pullRequest: PullRequestRef; readonly qualityReport: QualityReport }): Promise<void> {
+async function commentOnDevelopPullRequest(input: WorkflowInput & { readonly input: DevelopPullRequestHandoffInput; readonly pullRequest: PullRequestRef; readonly qualityReport: QualityReport }): Promise<void> {
   const operationInput = {
     pullRequest: input.pullRequest,
     body: buildDevelopPullRequestComment(input.state, input.qualityReport)
@@ -261,14 +337,15 @@ async function commentOnDevelopPullRequest(input: WorkflowInput & { readonly pul
   });
 }
 
-async function readDevelopChecks(input: WorkflowInput & { readonly branch: BranchRef }): Promise<PullRequestCheckSummary> {
+async function readDevelopChecks(input: WorkflowInput & { readonly branch: BranchRef; readonly pullRequest: PullRequestRef }): Promise<PullRequestCheckSummary> {
   const operationInput = {
     repository: input.input.repository.ref,
-    branchName: input.branch.name
+    branchName: input.branch.name,
+    pullRequest: input.pullRequest
   };
   const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'github', 'CodeHostPort', 'getChecks', operationInput));
 
-  if (existing?.result !== undefined) {
+  if (!input.freshReadOperations && existing?.result !== undefined) {
     return existing.result as PullRequestCheckSummary;
   }
 
@@ -279,7 +356,278 @@ async function readDevelopChecks(input: WorkflowInput & { readonly branch: Branc
     action: 'getChecks',
     operationInput,
     run: async () => input.input.github.getChecks(operationInput),
-    external: (checks) => ({ externalId: input.branch.name, result: checks })
+    external: (checks) => ({ externalId: String(input.pullRequest.number), externalUrl: input.pullRequest.url, result: checks })
+  });
+}
+
+async function followDevelopPullRequest(input: WorkflowInput & { readonly branch: BranchRef; readonly pullRequest: PullRequestRef }): Promise<DeliveryRunStateRecord> {
+  const deliveryConfig = input.input.deliveryConfig ?? getDefaultDeliveryConfig();
+  const developPolicy = deliveryConfig.pullRequests.develop;
+  const observedPullRequest = await readDevelopPullRequest(input);
+  const checks = await readDevelopChecks({ ...input, pullRequest: observedPullRequest });
+  const observedAt = input.now().toISOString();
+
+  if (observedPullRequest.status === 'closed') {
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: 'stopped',
+      reason: 'Develop pull request was closed without merge; monitoring stopped before staging verification.',
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: developPolicy.autoMerge,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, 'SKIPPED', observedAt);
+  }
+
+  if (observedPullRequest.status === 'merged') {
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: 'ready_for_staging',
+      reason: 'Develop pull request is already merged; staging verification may continue.',
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: developPolicy.autoMerge,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, 'DEVELOP_CHECKS_PASSED', observedAt);
+  }
+
+  if (observedPullRequest.status === 'draft') {
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: 'needs_human',
+      reason: 'Develop pull request is still a draft; staging is blocked until a human marks it ready for review or merges develop.',
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: developPolicy.autoMerge,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, 'NEEDS_HUMAN', observedAt);
+  }
+
+  if (checks.totalCount === 0) {
+    return recordNoRemoteChecksDecision(input, observedPullRequest, checks, deliveryConfig, observedAt);
+  }
+
+  if (checks.status === 'failed' || checks.status === 'cancelled') {
+    const nextState = developPolicy.requireHumanApproval ? 'NEEDS_HUMAN' : 'FAILED';
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: nextState === 'FAILED' ? 'fail' : 'needs_human',
+      reason: developPolicy.requireHumanApproval
+        ? `Develop pull request checks are ${checks.status}; require_human_approval keeps staging blocked for human review.`
+        : `Develop pull request checks are ${checks.status}; require_checks=${developPolicy.requireChecks} blocks staging verification.`,
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: developPolicy.autoMerge,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, nextState, observedAt);
+  }
+
+  if (checks.status === 'pending') {
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: 'wait',
+      reason: 'Develop pull request checks are still pending; staging verification is waiting.',
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: developPolicy.autoMerge,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, 'PR_TO_DEVELOP_OPENED', observedAt);
+  }
+
+  if (developPolicy.requireHumanApproval) {
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: 'needs_human',
+      reason: 'Develop pull request checks passed, but require_human_approval=true keeps staging blocked until a human merges develop.',
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: developPolicy.autoMerge,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, 'NEEDS_HUMAN', observedAt);
+  }
+
+  if (!developPolicy.autoMerge) {
+    return recordFollowUp(input, {
+      pullRequest: observedPullRequest,
+      checks,
+      decision: 'wait',
+      reason: 'Develop pull request checks passed; waiting for a human to merge develop because develop auto_merge is disabled.',
+      noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+      autoMerge: false,
+      mergeMethod: developPolicy.mergeMethod,
+      observedAt
+    }, 'PR_TO_DEVELOP_OPENED', observedAt);
+  }
+
+  const mergeResult = await mergeDevelopPullRequest({ ...input, pullRequest: observedPullRequest, method: developPolicy.mergeMethod });
+  return recordFollowUp(input, {
+    pullRequest: mergeResult.pullRequest,
+    checks,
+    decision: 'ready_for_staging',
+    reason: `Develop pull request checks passed and auto_merge merged the PR with ${developPolicy.mergeMethod}.`,
+    noRemoteChecksPolicy: deliveryConfig.checks.noRemoteChecks,
+    autoMerge: true,
+    mergeMethod: developPolicy.mergeMethod,
+    observedAt,
+    mergeResult
+  }, 'DEVELOP_CHECKS_PASSED', observedAt);
+}
+
+async function recordNoRemoteChecksDecision(
+  input: WorkflowInput & { readonly branch: BranchRef },
+  pullRequest: PullRequestRef,
+  checks: PullRequestCheckSummary,
+  deliveryConfig: DeliveryConfig,
+  observedAt: string
+): Promise<DeliveryRunStateRecord> {
+  const policy = deliveryConfig.checks.noRemoteChecks;
+  const developPolicy = deliveryConfig.pullRequests.develop;
+
+  switch (policy) {
+    case 'pass':
+      if (developPolicy.requireChecks === 'pass') {
+        return recordFollowUp(input, {
+          pullRequest,
+          checks,
+          decision: 'wait',
+          reason: 'Develop pull request has no remote checks, but require_checks=pass requires passing remote checks before staging.',
+          noRemoteChecksPolicy: policy,
+          autoMerge: developPolicy.autoMerge,
+          mergeMethod: developPolicy.mergeMethod,
+          observedAt
+        }, 'PR_TO_DEVELOP_OPENED', observedAt);
+      }
+
+      if (developPolicy.requireHumanApproval) {
+        return recordFollowUp(input, {
+          pullRequest,
+          checks,
+          decision: 'needs_human',
+          reason: 'Develop pull request has no remote checks; no_remote_checks=pass is configured, but require_human_approval=true requires a human merge before staging.',
+          noRemoteChecksPolicy: policy,
+          autoMerge: developPolicy.autoMerge,
+          mergeMethod: developPolicy.mergeMethod,
+          observedAt
+        }, 'NEEDS_HUMAN', observedAt);
+      }
+
+      if (!developPolicy.autoMerge) {
+        return recordFollowUp(input, {
+          pullRequest,
+          checks,
+          decision: 'wait',
+          reason: 'Develop pull request has no remote checks and no_remote_checks=pass is configured; waiting for a human merge because develop auto_merge is disabled.',
+          noRemoteChecksPolicy: policy,
+          autoMerge: false,
+          mergeMethod: developPolicy.mergeMethod,
+          observedAt
+        }, 'PR_TO_DEVELOP_OPENED', observedAt);
+      }
+
+      const mergeResult = await mergeDevelopPullRequest({ ...input, pullRequest, method: developPolicy.mergeMethod });
+      return recordFollowUp(input, {
+        pullRequest: mergeResult.pullRequest,
+        checks,
+        decision: 'ready_for_staging',
+        reason: `Develop pull request has no remote checks; explicit no_remote_checks=pass with require_checks=pass_or_absent allowed auto_merge to merge the PR with ${developPolicy.mergeMethod}.`,
+        noRemoteChecksPolicy: policy,
+        autoMerge: true,
+        mergeMethod: developPolicy.mergeMethod,
+        observedAt,
+        mergeResult
+      }, 'DEVELOP_CHECKS_PASSED', observedAt);
+    case 'needs_human':
+      return recordFollowUp(input, {
+        pullRequest,
+        checks,
+        decision: 'needs_human',
+        reason: 'Develop pull request has no remote checks and no_remote_checks=needs_human requires human review before staging.',
+        noRemoteChecksPolicy: policy,
+        autoMerge: developPolicy.autoMerge,
+        mergeMethod: developPolicy.mergeMethod,
+        observedAt
+      }, 'NEEDS_HUMAN', observedAt);
+    case 'fail':
+      return recordFollowUp(input, {
+        pullRequest,
+        checks,
+        decision: 'fail',
+        reason: 'Develop pull request has no remote checks and no_remote_checks=fail blocks staging.',
+        noRemoteChecksPolicy: policy,
+        autoMerge: developPolicy.autoMerge,
+        mergeMethod: developPolicy.mergeMethod,
+        observedAt
+      }, 'FAILED', observedAt);
+    case 'wait':
+      return recordFollowUp(input, {
+        pullRequest,
+        checks,
+        decision: 'wait',
+        reason: 'Develop pull request has no remote checks and no_remote_checks=wait keeps monitoring before staging.',
+        noRemoteChecksPolicy: policy,
+        autoMerge: developPolicy.autoMerge,
+        mergeMethod: developPolicy.mergeMethod,
+        observedAt
+      }, 'PR_TO_DEVELOP_OPENED', observedAt);
+  }
+}
+
+function recordFollowUp(
+  input: WorkflowInput,
+  evidence: DevelopPullRequestFollowUpEvidence,
+  nextState: DeliveryRunStateRecord['state'],
+  updatedAt: string
+): DeliveryRunStateRecord {
+  return recordDevelopPullRequestFollowUp(input.state, evidence, nextState, updatedAt);
+}
+
+async function readDevelopPullRequest(input: WorkflowInput & { readonly pullRequest: PullRequestRef }): Promise<PullRequestRef> {
+  const operationInput = { pullRequest: input.pullRequest };
+  const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'github', 'CodeHostPort', 'readPullRequest', operationInput));
+
+  if (!input.freshReadOperations && existing?.result !== undefined) {
+    return existing.result as PullRequestRef;
+  }
+
+  return runLedgeredOperation({
+    workflow: input,
+    provider: 'github',
+    port: 'CodeHostPort',
+    action: 'readPullRequest',
+    operationInput,
+    run: async () => input.input.github.readPullRequest(operationInput),
+    external: (pullRequest) => ({ externalId: String(pullRequest.number), externalUrl: pullRequest.url, result: pullRequest })
+  });
+}
+
+async function mergeDevelopPullRequest(input: WorkflowInput & { readonly pullRequest: PullRequestRef; readonly method: PullRequestMergeResult['mergeMethod'] }): Promise<PullRequestMergeResult> {
+  const stagingTarget = input.input.repository.branchPolicy.stagingTarget;
+
+  if (input.pullRequest.targetBranch !== stagingTarget || input.pullRequest.targetBranch !== 'develop') {
+    throw new Error(`Develop auto-merge can only merge develop pull requests targeting ${stagingTarget}; target branch is ${input.pullRequest.targetBranch}.`);
+  }
+
+  const operationInput = { pullRequest: input.pullRequest, method: input.method };
+  const existing = await input.operationLedger.findCompletedOperation(toOperationLookup(input.state, 'github', 'CodeHostPort', 'mergePullRequest', operationInput));
+
+  if (existing?.result !== undefined) {
+    return existing.result as PullRequestMergeResult;
+  }
+
+  return runLedgeredOperation({
+    workflow: input,
+    provider: 'github',
+    port: 'CodeHostPort',
+    action: 'mergePullRequest',
+    operationInput,
+    run: async () => input.input.github.mergePullRequest(operationInput),
+    external: (result) => ({ externalId: String(result.pullRequest.number), externalUrl: result.pullRequest.url, result })
   });
 }
 
@@ -357,6 +705,46 @@ function buildScopedAgentDiffCommitMessage(ticket: DeliveryTicket): string {
 
 export function assertReadyForDevelopPullRequestHandoff(state: DeliveryRunStateRecord): void {
   requireReadyForDevelopPullRequest(state);
+}
+
+export function assertReadyForDevelopPullRequestFollowUp(state: DeliveryRunStateRecord): void {
+  if (state.state !== 'PR_TO_DEVELOP_OPENED') {
+    throw new Error(`Develop PR follow-up requires PR_TO_DEVELOP_OPENED state; current state is ${state.state}.`);
+  }
+}
+
+function requireDevelopPullRequestForFollowUp(state: DeliveryRunStateRecord, repository: RepositoryConfig): PullRequestRef {
+  const pullRequest = [...state.pullRequests].reverse().find((candidate) => candidate.provider === 'github'
+    && candidate.repositoryOwner === repository.ref.owner
+    && candidate.repositoryName === repository.ref.name
+    && candidate.targetBranch === repository.branchPolicy.stagingTarget);
+
+  if (pullRequest === undefined) {
+    throw new Error('Develop PR follow-up requires a persisted develop pull request before reading checks or merge state.');
+  }
+
+  return pullRequest;
+}
+
+function requireBranchForPullRequest(state: DeliveryRunStateRecord, repository: RepositoryConfig, pullRequest: PullRequestRef): BranchRef {
+  const branch = [...state.branches].reverse().find((candidate) => candidate.repository.owner === repository.ref.owner
+    && candidate.repository.name === repository.ref.name
+    && candidate.name === pullRequest.sourceBranch);
+
+  if (branch !== undefined) {
+    return branch;
+  }
+
+  if (state.developHandoffCommit !== undefined) {
+    return {
+      repository: repository.ref,
+      name: pullRequest.sourceBranch,
+      baseBranch: repository.branchPolicy.stagingTarget,
+      headSha: state.developHandoffCommit.commitSha
+    };
+  }
+
+  throw new Error('Develop PR follow-up requires a persisted pushed branch or develop handoff commit before reading checks.');
 }
 
 function requireReadyForDevelopPullRequest(state: DeliveryRunStateRecord): QualityReport {

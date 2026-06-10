@@ -142,6 +142,10 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
     '',
     renderDevelopHandoffCommit(state.developHandoffCommit),
     '',
+    '## Develop Pull Request Follow-Up',
+    '',
+    renderDevelopPullRequestFollowUp(state.developPullRequestFollowUp),
+    '',
     '## Meaningful Diff',
     '',
     renderMeaningfulDiff(state.meaningfulDiff),
@@ -247,6 +251,23 @@ function renderDevelopHandoffCommit(commit: DeliveryRunStateRecord['developHando
   ].join('\n');
 }
 
+function renderDevelopPullRequestFollowUp(evidence: DeliveryRunStateRecord['developPullRequestFollowUp']): string {
+  if (evidence === undefined) {
+    return '- None';
+  }
+
+  return [
+    `- Decision: ${evidence.decision.toUpperCase()}`,
+    `- Reason: ${evidence.reason}`,
+    `- PR: #${evidence.pullRequest.number} ${evidence.pullRequest.status}`,
+    `- Checks: ${evidence.checks.status.toUpperCase()} (${evidence.checks.passedCount}/${evidence.checks.totalCount} passed, ${evidence.checks.failedCount} failed, ${evidence.checks.pendingCount} pending)`,
+    `- No Remote Checks Policy: ${evidence.noRemoteChecksPolicy}`,
+    `- Develop Auto Merge: ${evidence.autoMerge ? 'enabled' : 'disabled'}`,
+    `- Merge Method: ${evidence.mergeMethod}`,
+    `- Merge Result: ${evidence.mergeResult === undefined ? 'none' : `${evidence.mergeResult.pullRequest.status} ${evidence.mergeResult.commitSha ?? 'unknown commit'}`}`
+  ].join('\n');
+}
+
 function renderCoreSafety(report: DeliveryRunStateRecord['coreSafety']): string {
   if (report === undefined) {
     return '- None';
@@ -307,7 +328,7 @@ const nextActionByState: Record<DeliveryRunState, string> = {
   LOCAL_CHECKS_RUNNING: 'Finish local quality gates.',
   LOCAL_CHECKS_PASSED: 'Push the branch and open the develop pull request.',
   PUSHED: 'Open the develop pull request.',
-  PR_TO_DEVELOP_OPENED: 'Wait for develop pull request checks.',
+  PR_TO_DEVELOP_OPENED: 'Continue develop pull request follow-up by policy before staging.',
   DEVELOP_CHECKS_PASSED: 'Verify the staging deployment.',
   STAGING_DEPLOYING: 'Wait for staging deployment and smoke checks.',
   STAGING_VERIFIED: 'Prepare the production pull request for human approval.',
