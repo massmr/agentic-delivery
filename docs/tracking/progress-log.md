@@ -26,6 +26,19 @@ Verification commands run for BC:
 - `pnpm test` (`404/404`)
 - `git diff --check`
 
+## 2026-06-10
+
+- Ran graphify AST extraction and clustering locally (no LLM backend). Results were written to the local, unversioned `graphify-out/` directory:
+  - Nodes: 2591
+  - Edges: 6320
+  - Communities (clusters): 121
+  - Files produced locally: `graphify-out/graph.json`, `graphify-out/GRAPH_REPORT.md`
+
+- Notes & next steps:
+  - The extraction was run without an LLM backend (no GEMINI/OPENAI key), so community names remain "Community N" placeholders. To enable LLM-based community naming and deeper semantic edges, set an API key (e.g. GOOGLE_API_KEY or OPENAI_API_KEY) and run `graphify label` or `graphify extract --backend <name>`.
+  - For focused architecture questions use `graphify query "<question>"` against a freshly generated local `graphify-out/graph.json` to limit scope and token usage.
+  - Action items: add a short CI proposal to `docs/tracking/next-actions.md` (draft for review), keep generated `graphify-out/` artifacts out of Git, and upload them only as explicit CI artifacts when reviewers opt in.
+
 Planned Milestone BC Develop PR Follow-Up Policy after real SCRUM-6 smoke:
 
 - Recorded that the SCRUM-6 real smoke reached GitHub PR handoff successfully after BB1: OpenCode produced scoped product changes, local quality passed, the scoped commit was created, the branch was pushed, GitHub MCP opened PR #3, GitHub MCP added a PR comment, and PR number parsing worked.

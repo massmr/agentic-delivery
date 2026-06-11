@@ -1,0 +1,82 @@
+name: CI (manual safe run)
+
+# This workflow is intentionally manual (workflow_dispatch) to avoid automatic runs
+# on push until reviewers accept the CI proposal. To enable automatic runs on push
+# and pull_request update the 'on' section to include 'push' and 'pull_request' and
+# ensure reviewers approve the change before merging.
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.0.9 --activate
+
+      - name: Locate pnpm store
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run tests
+        run: pnpm test
+
+  graphify-artifact:
+    if: env.GRAPHIFY == 'true'
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Create venv and install graphify
+        run: |
+          python -m venv .venv-graphify
+          . .venv-graphify/bin/activate
+          python -m pip install --upgrade pip setuptools wheel
+          pip install graphifyy
+
+      - name: Run graphify (no LLM by default)
+        run: |
+          . .venv-graphify/bin/activate
+          .venv-graphify/bin/graphify update . --no-cluster
+          .venv-graphify/bin/graphify cluster-only . --no-viz
+
+      - name: Upload graphify artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: graphify-out
+          path: graphify-out

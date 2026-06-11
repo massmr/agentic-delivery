@@ -343,3 +343,9 @@ Non-goals for the immediate next milestone:
 - Demanding OpenAI/Anthropic API keys during Ewokbot init when OpenCode owns the selected runner auth flow.
 - Sentry, PostHog, Notion, support, SEO, or other signal ingestion.
 - Autonomous production merge or production deployment.
+
+## Safety: GitNexus impact (short)
+
+Before editing any symbol in src/delivery/*, run the GitNexus impact analysis and follow the safety checklist in docs/tracking/gitnexus-safety.md. Recent analysis shows runDevelopPullRequestHandoff → RISK=HIGH. See docs/tracking/gitnexus-safety.md for the exact steps to follow and the required PR process when a change is proposed.
+
+Related: a conservative CI proposal was added at docs/tracking/ci-proposal.md. The CI is intentionally gated: GRAPHIFY must be opt-in and no secrets are used by default.

@@ -1,38 +1,60 @@
 ---
 name: Bug report
-about: Create a report to help us improve
-title: ''
-labels: ''
-assignees: ''
-
+about: Report an Ewokbot CLI, MCP, provider, or delivery workflow bug
+title: "bug: "
+labels: bug
+assignees: ""
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+## Summary
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+What happened?
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+## Command
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+```bash
+ewokbot ...
+```
 
-**Desktop (please complete the following information):**
- - OS: [e.g. iOS]
- - Browser [e.g. chrome, safari]
- - Version [e.g. 22]
+## Expected behavior
 
-**Smartphone (please complete the following information):**
- - Device: [e.g. iPhone6]
- - OS: [e.g. iOS8.1]
- - Browser [e.g. stock browser, safari]
- - Version [e.g. 22]
+What should Ewokbot have done instead?
 
-**Additional context**
-Add any other context about the problem here.
+## Actual behavior
+
+What did Ewokbot do?
+
+## Environment
+
+- Ewokbot version or commit:
+- Node.js version:
+- pnpm version:
+- OS:
+- Workspace layout: `.ewokbot/` parent workspace, single repo, other:
+
+## Providers
+
+- Ticket provider: mock / Atlassian MCP / other
+- Code host: mock / GitHub MCP / other
+- Deployment monitor: none / Railway MCP / Vercel / other
+- Dev runner: mock / OpenCode / other
+
+## Redacted Config
+
+Paste only safe, redacted config. Do not include tokens, emails, secrets, cookies, or API keys.
+
+```yaml
+# .ewokbot/workspace.yml excerpt
+```
+
+## Evidence
+
+- Run id:
+- Final state:
+- Relevant report path(s):
+- Redacted error output:
+
+## Safety Check
+
+- [ ] I removed secrets and provider tokens from this issue.
+- [ ] I included the exact command and run id when available.
