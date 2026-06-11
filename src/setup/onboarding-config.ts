@@ -1,7 +1,7 @@
 import { parseWorkspaceConfig } from '../config/index.js';
 import { defaultDevRunnerEnvVarNames } from '../config/workspace-config.js';
 import { atlassianJiraMcpPreset, railwayCliMcpPreset } from './connector-presets.js';
-import { defaultSetupSelections, getDeploymentMonitors, getRequiredEnvPlaceholders, type McpServerSelection, type SetupSelections } from './provider-capability.js';
+import { defaultSetupSelections, getDeploymentMonitors, getRequiredEnvPlaceholders, type McpServerSelection, type SetupRepositoryDeploymentSelection, type SetupSelections } from './provider-capability.js';
 
 export interface OnboardingFiles {
   readonly workspaceYaml: string;
@@ -26,6 +26,7 @@ interface NormalizedSetupSelections {
   readonly githubMcpServer: McpServerSelection;
   readonly railwayProvider: NonNullable<SetupSelections['railwayProvider']>;
   readonly railwayMcpServer: McpServerSelection;
+  readonly repositoryDeployments: readonly SetupRepositoryDeploymentSelection[];
   readonly envValues: Readonly<Record<string, string | undefined>>;
 }
 
@@ -88,8 +89,7 @@ ${renderMcpServers(mcpServers)}quality:
   default_profile: node
 
 repos:
-  discovery: sibling-git-directories
-  exclude: []
+${renderRepositories(normalized.repositoryDeployments)}
 `;
 }
 
@@ -138,8 +138,34 @@ function normalizeSelections(selections: SetupSelections): NormalizedSetupSelect
     githubMcpServer: selections.githubMcpServer ?? { id: 'github', command: 'docker', args: ['run', '-i', '--rm', '-e', 'GITHUB_PERSONAL_ACCESS_TOKEN', 'ghcr.io/github/github-mcp-server'], envVarNames: ['GITHUB_PERSONAL_ACCESS_TOKEN'] },
     railwayProvider: selections.railwayProvider ?? defaultSetupSelections.railwayProvider ?? 'mock',
     railwayMcpServer: selections.railwayMcpServer ?? railwayCliMcpPreset.server,
+    repositoryDeployments: selections.repositoryDeployments ?? [],
     envValues: selections.envValues ?? {}
   };
+}
+
+function renderRepositories(repositories: readonly SetupRepositoryDeploymentSelection[]): string {
+  if (repositories.length === 0) {
+    return '  discovery: sibling-git-directories\n  exclude: []';
+  }
+
+  return `  discovery: sibling-git-directories
+  exclude: []
+  deployments:
+${repositories.map(renderRepositoryDeploymentOverride).join('\n')}`;
+}
+
+function renderRepositoryDeploymentOverride(repository: SetupRepositoryDeploymentSelection): string {
+  return `    ${repository.name}:
+      staging:
+        provider: railway
+${renderOptionalYamlField('project_id', repository.railwayProjectId, 8)}${renderOptionalYamlField('environment_id', repository.railwayEnvironmentId, 8)}${renderOptionalYamlField('service_id', repository.railwayServiceId, 8)}        branch: ${repository.railwayBranch}
+        verification:
+          mode: ${repository.verificationMode}
+          smoke_urls:${renderYamlList(repository.stagingSmokeUrls, 10)}`;
+}
+
+function renderOptionalYamlField(name: string, value: string | undefined, indent: number): string {
+  return value === undefined ? '' : `${' '.repeat(indent)}${name}: ${value}\n`;
 }
 
 function collectMcpServers(selections: NormalizedSetupSelections): readonly McpServerSelection[] {

@@ -1,4 +1,5 @@
 import type { QualityGateDefinition } from './quality.js';
+import type { RailwayDeploymentMapping } from './deployment.js';
 
 export type RepositoryProvider = 'github';
 
@@ -25,6 +26,7 @@ export interface RepositoryConfig {
   readonly branchPolicy: BranchPolicy;
   readonly qualityGates: readonly QualityGateDefinition[];
   readonly stagingSmokeUrls: readonly string[];
+  readonly stagingDeployment?: RailwayDeploymentMapping | undefined;
 }
 
 export interface RepositoryMatch {

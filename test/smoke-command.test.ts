@@ -201,6 +201,7 @@ test('smoke command uses fake GitHub and Railway MCP tools for staging verificat
   assert.equal(state.developHandoffCommit?.commitSha, 'local-head');
   assert.deepEqual(state.developHandoffCommit?.stagedFiles, ['src/app.ts']);
   assert.equal(state.stagingDeployments.length, 1);
+  assert.equal(state.stagingDeployments[0]?.commitSha, 'develop-merge-head');
   assert.equal(state.stagingDeployments[0]?.serviceUrl, 'https://frontend.example.test');
   assert.equal((await stat(join(rootPath, '.ewokbot', 'runs', 'AE-101', 'smoke-run-1', 'staging-report.md'))).isFile(), true);
   assert.equal((await stat(join(rootPath, getOperationLedgerFilePath('AE-101', 'smoke-run-1')))).isFile(), true);
@@ -569,7 +570,7 @@ function createRailwayTools(): ReturnType<typeof createMockMcpTool>[] {
     }
 
     if (toolName === defaultRailwayMcpToolNames.waitForDeployment) {
-      return { content: { deployment: railwayDeployment('develop', 'local-head') }, isError: false };
+      return { content: { deployment: railwayDeployment('develop', 'develop-merge-head') }, isError: false };
     }
 
     return { content: { ok: true }, isError: false };
@@ -606,8 +607,9 @@ function jiraIssue(): JsonObject {
 function railwayDeployment(branch: string, commitSha: string): JsonObject {
   return {
     ref: {
-      projectId: 'project-1',
-      serviceId: 'service-1',
+      projectId: 'mock-project-agentic',
+      environmentId: 'mock-environment-staging',
+      serviceId: 'mock-service-frontend',
       deploymentId: 'deployment-1',
       environment: 'staging'
     },
@@ -838,6 +840,17 @@ repos:
       - frontend
     staging_smoke_urls:
       - /health
+    deployments:
+      staging:
+        provider: railway
+        project_id: mock-project-agentic
+        environment_id: mock-environment-staging
+        service_id: mock-service-frontend
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health
 `;
 }
 
@@ -943,5 +956,16 @@ repos:
       - frontend
     staging_smoke_urls:
       - /health
+    deployments:
+      staging:
+        provider: railway
+        project_id: mock-project-agentic
+        environment_id: mock-environment-staging
+        service_id: mock-service-frontend
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health
 `;
 }

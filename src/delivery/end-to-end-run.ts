@@ -14,6 +14,7 @@ import type {
   DeliveryTicket,
   MeaningfulDiffEvidence,
   QualityReport,
+  RailwayDeploymentMapping,
   RepositoryConfig,
   RepositoryRef,
   TestRelevanceReport
@@ -263,7 +264,22 @@ function toRepositoryConfig(repository: WorkspaceRepositoryConfig, owner: string
       productionTarget: 'main'
     },
     qualityGates: [],
-    stagingSmokeUrls: repository.stagingSmokeUrls
+    stagingSmokeUrls: repository.stagingSmokeUrls,
+    stagingDeployment: repository.deployments?.staging ?? createMockRailwayDeploymentMapping(repository)
+  };
+}
+
+function createMockRailwayDeploymentMapping(repository: WorkspaceRepositoryConfig): RailwayDeploymentMapping {
+  return {
+    provider: 'railway',
+    projectId: `mock-project-${repository.name}`,
+    environmentId: 'mock-environment-staging',
+    serviceId: `mock-service-${repository.name}`,
+    branch: repository.defaultBranch,
+    verification: {
+      mode: 'railway_mcp',
+      smokeUrls: repository.stagingSmokeUrls
+    }
   };
 }
 

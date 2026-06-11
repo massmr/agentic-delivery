@@ -44,14 +44,14 @@ Current capabilities:
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
 - Atlassian MCP ticket intake boundary with Jira as the first supported work-item surface.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
-- Railway staging verification boundary for deployment state and service URLs.
+- Railway staging verification boundary for per-repository deployment state, service URLs, and explicit Railway project/environment/service mappings.
 - OpenCode execution contract with subprocess guardrails.
 - Local quality-gate runner.
 - Foreground `ewokbot worker start` runtime with bounded or continuous operation, dry-run preview, workspace locking, graceful shutdown, and restart-safe state reuse.
 - Operation ledger for idempotent GitHub delivery handoffs.
 - MCP tool discovery, allowlist, audit records, and error mapping.
 - Read-only MCP schema inspection with human-readable and JSON output, plus policy-gated tool registry metadata for configured provider servers.
-- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Atlassian MCP Jira work-item read, validated local evidence, develop PR handoff, and read-only Railway staging verification evidence.
+- Explicit `ewokbot smoke <ticket-key> --confirm-real-provider-smoke` flow for one Atlassian MCP Jira work-item read, validated local evidence, develop PR handoff, and read-only Railway staging verification evidence using the selected repository's deployment mapping.
 
 Default behavior is safe:
 
@@ -286,7 +286,7 @@ The default inspect output stays compact and human-readable. `--schema` adds san
 
 ## Configuration
 
-`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. In an interactive terminal, init uses an `@inquirer/prompts` TUI with guided selections for OpenCode command readiness, optional oh-my-openagent intent, Atlassian MCP for Jira work items, GitHub MCP, Railway MCP, and Railway/Vercel deployment-monitor intent while keeping deterministic non-interactive init mock-safe by default. Missing or not-ready OpenCode states offer mock mode, setup instructions, or explicit custom-command/acknowledged continuation choices only; Ewokbot does not install OpenCode, launch auth, or copy OpenCode-owned auth and model/provider credentials into `.ewokbot/.env`.
+`ewokbot init` creates mock-safe `.ewokbot/workspace.yml`, `.ewokbot/.env`, `.ewokbot/.env.example`, `.ewokbot/runs/`, `.ewokbot/logs/`, and `.ewokbot/cache/` owned paths. It does not create root `config/workspace.yml`, root `.env`, root `.env.example`, or root `runs/` defaults. It also prepares the user-level Ewokbot directories used for machine-wide config, auth metadata, durable user state, and cache. In an interactive terminal, init uses an `@inquirer/prompts` TUI with guided selections for OpenCode command readiness, optional oh-my-openagent intent, Atlassian MCP for Jira work items, GitHub MCP, Railway MCP, Railway/Vercel deployment-monitor intent, and optional per-repository Railway staging mappings while keeping deterministic non-interactive init mock-safe by default. Missing or not-ready OpenCode states offer mock mode, setup instructions, or explicit custom-command/acknowledged continuation choices only; Ewokbot does not install OpenCode, launch auth, or copy OpenCode-owned auth and model/provider credentials into `.ewokbot/.env`.
 
 For GitHub MCP, init configures the official Docker-based local MCP server preset and asks only for `GITHUB_PERSONAL_ACCESS_TOKEN`. Ewokbot should derive repository owners and names from the local git remotes in the directory where it is launched, so there is no global GitHub organization prompt in the onboarding flow. Run `ewokbot doctor` after init to verify Docker, provider secrets, local MCP commands, OpenCode, and repository readiness before using `ewokbot mcp inspect github`.
 
@@ -313,6 +313,33 @@ repos:
 
 Discovery watches direct child directories that contain `.git/`, sorts them by folder name, ignores `.ewokbot/`, hidden directories, `node_modules/`, non-Git directories, nested repositories, and any names listed in `exclude`. Discovered repositories use the folder basename as the repo name and `./<folder>` as the local path. Explicit `repos: [...]` entries remain supported for workspaces that need manual repository metadata.
 
+Repository deployment mappings are explicit per repository. Discovery mode can keep watching every sibling Git repository while storing per-repository deployment overrides under `repos.deployments`. A Railway smoke run requires the selected repository to have a valid staging mapping unless the repository explicitly chooses `github_only` or `none` verification. Repositories that do verify staging can use `railway_mcp`, `http_smoke`, `github_only`, or `none` verification modes:
+
+```yaml
+repos:
+  discovery: sibling-git-directories
+  exclude: []
+  deployments:
+    api:
+      staging:
+        provider: railway
+        project_id: prj_api
+        environment_id: env_staging
+        service_id: svc_api
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health
+    worker:
+      staging:
+        provider: railway
+        branch: develop
+        verification:
+          mode: none
+          smoke_urls: []
+```
+
 Examples:
 
 ```bash
@@ -321,11 +348,11 @@ ewokbot init --non-interactive --deployment-monitor vercel
 ewokbot init --non-interactive --deployment-monitor both
 ```
 
-`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Atlassian/Jira, Railway, Vercel, discovered or explicit repository paths, staging/production branch settings, and static quality gate presence. OpenCode readiness uses a dev-tool setup adapter with normalized states for missing commands, command failures, unsupported versions, missing authentication, missing model configuration, and ready setups. It checks configured/custom command paths, OpenCode config presence at `~/.config/opencode/opencode.json`, OpenCode auth presence at `~/.local/share/opencode/auth.json` or an explicitly injected `opencode auth list` probe, and project config at `<workspace-root>/opencode.json` without printing raw config or auth values. Discovery mode warns clearly when no direct sibling Git repositories are found.
+`ewokbot doctor` validates local readiness before worker use. It reports PASS/WARN/FAIL checks for Node.js, pnpm, OpenCode, optional oh-my-openagent markers, workspace config, `.ewokbot/.env.example`, `.ewokbot/.env`, GitHub, Atlassian/Jira, Railway, Vercel, discovered or explicit repository paths, per-repository deployment mappings, staging/production branch settings, and static quality gate presence. OpenCode readiness uses a dev-tool setup adapter with normalized states for missing commands, command failures, unsupported versions, missing authentication, missing model configuration, and ready setups. It checks configured/custom command paths, OpenCode config presence at `~/.config/opencode/opencode.json`, OpenCode auth presence at `~/.local/share/opencode/auth.json` or an explicitly injected `opencode auth list` probe, and project config at `<workspace-root>/opencode.json` without printing raw config or auth values. Discovery mode warns clearly when no direct sibling Git repositories are found. Railway mapping checks are static and actionable: `railway_mcp` requires `project_id`, `environment_id`, and `service_id`; `http_smoke` requires absolute HTTP(S) smoke URLs; `github_only` and `none` do not require Railway IDs.
 
 Doctor output is redacted for all secret-related diagnostics. It names missing environment keys, but it does not print token, email, organization, URL, or secret values. It does not call Atlassian/Jira, GitHub, Railway, Vercel, MCP servers, OpenCode, package managers, git, package scripts, installers, or network APIs.
 
-Providers default to `mock` mode. The Atlassian/Jira ticket provider, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The BB smoke command requires `jira.mode`, `github.mode`, and `railway.mode` to all be `mcp`; it fails before run state, git, OpenCode, quality, provider handoff, operation ledger, staging report, production PR, merge, or deploy side effects if any of those providers remain in mock mode. When the modes are valid, smoke validates scoped readiness for Jira `TicketPort.getTicket`, GitHub develop PR handoff tools, and Railway read-only staging evidence; Vercel readiness is not required or contacted by smoke. The existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
+Providers default to `mock` mode. The Atlassian/Jira ticket provider, GitHub, and Railway also support `mcp` mode. Runtime commands load `.ewokbot/.env` before provider, OpenCode, and MCP construction without mutating `process.env`; MCP subprocesses receive only the configured allowlisted environment variable names. The public CLI constructs supported stdio MCP clients from `.ewokbot/workspace.yml` when provider modes reference configured `mcp_servers`; tests can still inject mock MCP clients directly. The controlled `run-dev` command requires only the Jira ticket read boundary and does not require GitHub or Railway MCP readiness. The BB/BD smoke command requires `jira.mode`, `github.mode`, and `railway.mode` to all be `mcp`; it fails before run state, git, OpenCode, quality, provider handoff, operation ledger, staging report, production PR, merge, or deploy side effects if any of those providers remain in mock mode. When the modes are valid, smoke validates scoped readiness for Jira `TicketPort.getTicket`, GitHub develop PR handoff tools, and Railway read-only staging evidence, then uses only the selected repository's `deployments.staging` mapping for Railway calls. Vercel readiness is not required or contacted by smoke. The existing mock `run` command remains unchanged and loads `.ewokbot/workspace.yml` by default.
 
 MCP policy defaults to `read_only` and is configured through top-level `mcp_policy`. Supported modes are `read_only`, `supervised`, `trusted`, and `custom`; supported decisions are `allow`, `allow_redacted`, `require_human`, and `deny`. Overrides can target providers, servers, or tools, with tool overrides taking precedence. Runtime MCP readiness evaluates the inspected registry classification and configured policy before typed-port allowlist checks; autonomous runtime execution proceeds only for `allow`, while `deny`, `require_human`, and `allow_redacted` stop before provider side effects. Secret-sensitive tools, unknown tools, destructive deletes, production merge, and production deploy are not autonomously allowed by default.
 
@@ -427,9 +454,9 @@ mcp_servers:
     env_var_names: []
 ```
 
-Railway MCP uses the Railway CLI session owned by Railway. Install the Railway CLI and run `railway login` outside Ewokbot before enabling this path; `ewokbot init` does not collect `RAILWAY_TOKEN` for the default Railway MCP preset.
+Railway MCP uses the Railway CLI session owned by Railway. Install the Railway CLI and run `railway login` outside Ewokbot before enabling this path; `ewokbot init` does not collect `RAILWAY_TOKEN` for the default Railway MCP preset. Interactive init can prompt for explicit repository-to-Railway mappings and manual project/environment/service IDs when discovery is unavailable, so runtime staging verification does not rely on `railway link` or the current working directory. When Railway MCP discovery is available, `ewokbot init` can list sibling Git repositories and discovered Railway projects/services through read-only setup tools, let operators map each repository to a staging service or explicitly choose `none`/`github_only`, and persist the same `repos.deployments` mapping shape without forcing operators to type opaque ids.
 
-Railway MCP runtime mapping uses the inspected tools documented in `docs/reference/railway-mcp-tools.md`. The default Railway `DeploymentPort` mapping calls only the read-only deployment evidence tools it currently uses: `environment_status` and `list_deployments`. Service URLs must come from deployment evidence or from an explicitly configured safe URL tool; `get_service_config` is parsed and classified for future safe reads but is not treated as a default service URL lookup. Custom `railway.mcp_tools.get_service_url` overrides remain supported when an operator has a safe read-only URL tool. Ewokbot does not call Railway deploy, source/link mutation, variable mutation, variable-value reads, domain generation, scaling/removal, staging mutation, or production deployment tools by default; `list_variables` is treated as secret-sensitive/redacted/denied, and `whoami`, `http_error_rate`, `http_requests`, and `http_response_time` remain unmapped and denied until a later classifier explicitly approves them.
+Railway MCP runtime mapping uses the inspected tools documented in `docs/reference/railway-mcp-tools.md`. The default Railway `DeploymentPort` mapping calls the read-only deployment evidence tools it currently uses, `environment_status` and `list_deployments`, with explicit `project_id`, `environment_id`, and `service_id` arguments from the selected repository mapping. The read-only setup/discovery tools `list_projects`, `list_services`, and `get_service_config` are parsed, classified, and allowlisted for typed discovery/setup surfaces, but they remain non-mutating. Service URLs must come from deployment evidence or from an explicitly configured safe URL tool; custom `railway.mcp_tools.get_service_url` overrides remain supported when an operator has a safe read-only URL tool. Ewokbot does not call Railway deploy, source/link mutation, variable mutation, variable-value reads, domain generation, scaling/removal, staging mutation, or production deployment tools by default; `list_variables` is treated as secret-sensitive/redacted/denied, and `whoami`, `http_error_rate`, `http_requests`, and `http_response_time` remain unmapped and denied until a later classifier explicitly approves them.
 
 First real smoke launch sequence after configuring local MCP/OAuth sessions:
 

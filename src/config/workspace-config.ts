@@ -6,6 +6,7 @@ import type { McpPolicyConfig, McpPolicyDecision, McpPolicyMode, McpPolicyOverri
 import { createDefaultMcpPolicyConfig, defaultMcpToolTimeoutMs, mcpPolicyDecisions, mcpPolicyModes } from '../mcp/index.js';
 import { validateJiraProjectKeys } from '../connectors/jira/jira-project-key-validation.js';
 import { defaultRailwayMcpToolNames } from '../connectors/railway/index.js';
+import type { DeploymentVerificationMode, RailwayDeploymentMapping } from '../domain/index.js';
 import {
   discoverSiblingGitDirectories,
   type WorkspaceRepositoryDiscoveryConfig,
@@ -163,6 +164,11 @@ export interface WorkspaceRepositoryConfig {
   readonly qualityProfile: string;
   readonly hints: readonly string[];
   readonly stagingSmokeUrls: readonly string[];
+  readonly deployments?: WorkspaceRepositoryDeploymentsConfig | undefined;
+}
+
+export interface WorkspaceRepositoryDeploymentsConfig {
+  readonly staging?: RailwayDeploymentMapping | undefined;
 }
 
 type StringField = {
@@ -785,17 +791,62 @@ function parseRepositoryDiscovery(value: WorkspaceConfigInput, issues: Workspace
   const exclude = value.exclude === undefined
     ? []
     : readStringArray(value.exclude, 'repos.exclude', 'Set repos.exclude to an array of direct child directory names to skip.', issues);
+  const deployments = parseRepositoryDiscoveryDeployments(value.deployments, 'repos.deployments', issues);
 
-  if (mode === undefined || exclude === undefined) {
+  if (mode === undefined || exclude === undefined || deployments === undefined) {
     return undefined;
   }
 
   const discovery = { discovery: mode, exclude };
   const repos = options.workspaceRoot === undefined
     ? []
-    : discoverSiblingGitDirectories(options.workspaceRoot, { exclude });
+    : discoverSiblingGitDirectories(options.workspaceRoot, { exclude }).map((repo) => ({
+      ...repo,
+      deployments: deployments[repo.name] ?? repo.deployments
+    }));
 
   return { repos, discovery };
+}
+
+function parseRepositoryDiscoveryDeployments(
+  value: unknown,
+  path: string,
+  issues: WorkspaceConfigIssue[]
+): Readonly<Record<string, WorkspaceRepositoryDeploymentsConfig | undefined>> | undefined {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      message: `${path} must be a YAML mapping keyed by repository name.`,
+      action: 'Set repos.deployments.<repo-name>.staging, or remove repos.deployments.'
+    });
+    return undefined;
+  }
+
+  const deployments: Record<string, WorkspaceRepositoryDeploymentsConfig | undefined> = {};
+
+  for (const [name, deploymentValue] of Object.entries(value)) {
+    if (name.trim().length === 0) {
+      issues.push({
+        path,
+        message: `${path} keys must be non-empty repository names.`,
+        action: 'Use repository folder names as keys under repos.deployments.'
+      });
+      return undefined;
+    }
+
+    const parsed = parseRepositoryDeploymentsConfig(deploymentValue, `${path}.${name}`, [], issues);
+    if (parsed === undefined) {
+      return undefined;
+    }
+
+    deployments[name] = parsed;
+  }
+
+  return deployments;
 }
 
 function readRepositoryDiscoveryMode(value: unknown, issues: WorkspaceConfigIssue[]): RepositoryDiscoveryMode | undefined {
@@ -832,8 +883,9 @@ function parseRepositoryConfig(section: WorkspaceConfigInput, path: string, issu
     'Set staging_smoke_urls to an array of smoke paths or URLs; use [] to skip smoke checks for this repository.',
     issues
   );
+  const deployments = parseRepositoryDeploymentsConfig(section.deployments, `${path}.deployments`, stagingSmokeUrls ?? [], issues);
 
-  if (strings === undefined || hints === undefined || stagingSmokeUrls === undefined) {
+  if (strings === undefined || hints === undefined || stagingSmokeUrls === undefined || deployments === undefined) {
     return undefined;
   }
 
@@ -845,8 +897,120 @@ function parseRepositoryConfig(section: WorkspaceConfigInput, path: string, issu
     productionBranch: strings.productionBranch,
     qualityProfile: strings.qualityProfile,
     hints,
-    stagingSmokeUrls
+    stagingSmokeUrls,
+    deployments
   };
+}
+
+function parseRepositoryDeploymentsConfig(
+  value: unknown,
+  path: string,
+  defaultSmokeUrls: readonly string[],
+  issues: WorkspaceConfigIssue[]
+): WorkspaceRepositoryDeploymentsConfig | undefined {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      message: `${path} must be a YAML mapping.`,
+      action: 'Set deployments.staging to a mapping, or omit deployments for repositories with no deployment mapping.'
+    });
+    return undefined;
+  }
+
+  const staging = parseRepositoryStagingDeploymentConfig(value.staging, `${path}.staging`, defaultSmokeUrls, issues);
+  return staging === undefined && value.staging !== undefined ? undefined : { staging };
+}
+
+function parseRepositoryStagingDeploymentConfig(
+  value: unknown,
+  path: string,
+  defaultSmokeUrls: readonly string[],
+  issues: WorkspaceConfigIssue[]
+): RailwayDeploymentMapping | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      message: `${path} must be a YAML mapping.`,
+      action: 'Set deployments.staging.provider, branch, ids, and verification mode, or omit deployments.staging.'
+    });
+    return undefined;
+  }
+
+  if (value.provider !== 'railway') {
+    issues.push({
+      path: `${path}.provider`,
+      message: `${path}.provider must be railway.`,
+      action: 'Set provider to railway for Railway staging mappings, or omit deployments.staging for repositories without Railway deployment.'
+    });
+    return undefined;
+  }
+
+  const branch = readOptionalNonEmptyString(value.branch, `${path}.branch`, 'Set deployments.staging.branch to the Railway deployment branch, or omit it to use the repository staging branch.', issues) ?? 'develop';
+  const projectId = readOptionalNonEmptyString(value.project_id, `${path}.project_id`, 'Set the Railway project id for railway_mcp/http_smoke verification.', issues);
+  const environmentId = readOptionalNonEmptyString(value.environment_id, `${path}.environment_id`, 'Set the Railway environment id for railway_mcp/http_smoke verification.', issues);
+  const serviceId = readOptionalNonEmptyString(value.service_id, `${path}.service_id`, 'Set the Railway service id for railway_mcp/http_smoke verification.', issues);
+  const verification = parseRepositoryDeploymentVerification(value.verification, `${path}.verification`, defaultSmokeUrls, issues);
+
+  if (verification === undefined) {
+    return undefined;
+  }
+
+  return {
+    provider: 'railway',
+    ...(projectId === undefined ? {} : { projectId }),
+    ...(environmentId === undefined ? {} : { environmentId }),
+    ...(serviceId === undefined ? {} : { serviceId }),
+    branch,
+    verification
+  };
+}
+
+function parseRepositoryDeploymentVerification(
+  value: unknown,
+  path: string,
+  defaultSmokeUrls: readonly string[],
+  issues: WorkspaceConfigIssue[]
+): RailwayDeploymentMapping['verification'] | undefined {
+  if (value === undefined) {
+    return { mode: 'railway_mcp', smokeUrls: defaultSmokeUrls };
+  }
+
+  if (!isRecord(value)) {
+    issues.push({
+      path,
+      message: `${path} must be a YAML mapping.`,
+      action: 'Set verification.mode to railway_mcp, http_smoke, github_only, or none.'
+    });
+    return undefined;
+  }
+
+  const mode = readDeploymentVerificationMode(value.mode, `${path}.mode`, issues);
+  const smokeUrls = value.smoke_urls === undefined
+    ? defaultSmokeUrls
+    : readStringArray(value.smoke_urls, `${path}.smoke_urls`, 'Set smoke_urls to HTTP paths or URLs; use [] when smoke checks are not required.', issues);
+
+  return mode === undefined || smokeUrls === undefined ? undefined : { mode, smokeUrls };
+}
+
+function readDeploymentVerificationMode(value: unknown, path: string, issues: WorkspaceConfigIssue[]): DeploymentVerificationMode | undefined {
+  if (value === 'railway_mcp' || value === 'http_smoke' || value === 'github_only' || value === 'none') {
+    return value;
+  }
+
+  issues.push({
+    path,
+    message: `${path} must be one of railway_mcp, http_smoke, github_only, or none.`,
+    action: 'Choose how this repository verifies staging deployment.'
+  });
+  return undefined;
 }
 
 function parseMcpServers(section: WorkspaceConfigInput, issues: WorkspaceConfigIssue[]): readonly McpServerConfig[] | undefined {

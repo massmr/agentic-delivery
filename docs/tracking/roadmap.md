@@ -137,17 +137,21 @@ Status legend:
 - `[x]` Railway MCP real mapping for read-only staging evidence
 - `[x]` GitHub MCP real mapping for PR handoff tools
 - `[x]` GitHub draft PR handoff after validated local evidence and accepted MCP policy
-- `[~]` Real staging verification through policy-approved Railway read-only evidence
+- `[x]` Real staging verification through policy-approved Railway read-only evidence
 - `[x]` Commit scoped agent diff before develop PR handoff
 - `[x]` Develop PR follow-up policy: branch-scoped auto-merge, no-CI behavior, PR polling, and staging handoff
-- `[ ]` Cubic review provider: init, doctor, pre-commit diff review, and PR review verification
+- `[x]` Railway deployment mapping per repository
+- `[x]` Railway MCP discovery and repository mapping in `ewokbot init`
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
+- `[ ]` Ewokbot control UI v1 for workspace setup, Railway mapping, tickets, flows, and approvals
+- `[ ]` Cubic review provider: init, doctor, pre-commit diff review, and PR review verification
 
 ## Future Control Surfaces
 
+- `[ ]` First local/self-hosted web UI for Ewokbot workspace control
 - `[ ]` Telegram control plane
 - `[ ]` WhatsApp control plane
-- `[ ]` Web or mobile dashboard
+- `[ ]` Mobile-friendly dashboard
 
 ## Optional Dashboard
 

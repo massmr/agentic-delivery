@@ -26,6 +26,7 @@ import type { SmokeCommandDeliveryOptions } from './commands/smoke.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
+import type { RailwayDiscoveryPort } from '../connectors/railway/index.js';
 import type { DevToolCommandResult, DoctorProbeOptions } from '../setup/index.js';
 import type { ResolveEwokbotUserLayoutOptions } from '../user-layout.js';
 import { ewokbotWorkspaceConfigPath, getEwokbotWorkspaceControlFilePath } from '../workspace-layout.js';
@@ -109,6 +110,7 @@ export interface CliProgramOptions {
   readonly initRunCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
   readonly initOpenCodeHomeDirectory?: string | undefined;
   readonly initUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
+  readonly initRailwayDiscovery?: RailwayDiscoveryPort | undefined;
   readonly authUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
@@ -173,7 +175,8 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
           commandExists: options.initCommandExists,
           runCommand: options.initRunCommand,
           opencodeHomeDirectory: options.initOpenCodeHomeDirectory,
-          userLayoutOptions: options.initUserLayoutOptions
+          userLayoutOptions: options.initUserLayoutOptions,
+          railwayDiscovery: options.initRailwayDiscovery
         });
       }
 

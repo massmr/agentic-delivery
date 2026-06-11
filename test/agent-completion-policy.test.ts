@@ -18,6 +18,85 @@ test('evaluateAgentCompletion passes completed implementation summaries with pro
   assert.deepEqual(report.findings, []);
 });
 
+test('evaluateAgentCompletion parses noisy OpenCode stdout with final SCRUM-9 completion block', () => {
+  const report = evaluateAgentCompletion({
+    implementationLogText: [
+      'I’m locating the home page entry point and checking the existing app structure before making the smallest UI-only change.',
+      'Found the server-rendered entry point and adding the visible smoke marker now.',
+      'Added a small visible marker on the frontend home page and covered it with the existing HTTP test.',
+      '',
+      'Tests run: `npm run lint && npm run typecheck && npm test && npm run build`',
+      'Changed files: `src/server.js`, `test/app.test.js`',
+      'Known limits: none',
+      'Blockers: none',
+      'Background agents: none',
+      'Status: completed'
+    ].join('\n'),
+    meaningfulDiff: meaningfulDiff({
+      afterAgentChangedFiles: ['src/server.js', 'test/app.test.js'],
+      newChangedFiles: ['src/server.js', 'test/app.test.js'],
+      changedFiles: ['src/server.js', 'test/app.test.js'],
+      productFiles: ['src/server.js']
+    })
+  });
+
+  assert.equal(report.decision, 'pass');
+  assert.equal(report.statusSignal, 'completed');
+  assert.deepEqual(report.changedFilesMentioned, ['src/server.js', 'test/app.test.js']);
+  assert.equal(report.testsMentioned, true);
+  assert.equal(report.knownLimitsMentioned, true);
+  assert.deepEqual(report.blockers, []);
+});
+
+test('evaluateAgentCompletion does not merge stale fields with a newer partial status block', () => {
+  const report = evaluateAgentCompletion({
+    implementationLogText: [
+      'Changed files: src/app.ts',
+      'Tests run: pnpm test',
+      'Known limits: none',
+      'Blockers: none',
+      'Background agents: none',
+      '',
+      'Status: completed'
+    ].join('\n'),
+    meaningfulDiff: meaningfulDiff()
+  });
+
+  assert.equal(report.decision, 'fail');
+  assert.equal(report.statusSignal, 'completed');
+  assert.deepEqual(report.changedFilesMentioned, []);
+  assert.equal(report.findings.some((finding) => finding.kind === 'missing_changed_files'), true);
+});
+
+test('evaluateAgentCompletion prefers the last valid complete contiguous field block', () => {
+  const report = evaluateAgentCompletion({
+    implementationLogText: [
+      'Status: completed',
+      'Changed files: none',
+      '',
+      'Implementation finished in the final block.',
+      'Tests run: pnpm test',
+      'Changed files: src/final.ts',
+      'Known limits: none',
+      'Blockers: none',
+      'Background agents: none',
+      'Status: completed'
+    ].join('\n'),
+    meaningfulDiff: meaningfulDiff({
+      afterAgentChangedFiles: ['src/final.ts'],
+      newChangedFiles: ['src/final.ts'],
+      changedFiles: ['src/final.ts'],
+      productFiles: ['src/final.ts']
+    })
+  });
+
+  assert.equal(report.decision, 'pass');
+  assert.equal(report.statusSignal, 'completed');
+  assert.deepEqual(report.changedFilesMentioned, ['src/final.ts']);
+  assert.equal(report.testsMentioned, true);
+  assert.equal(report.knownLimitsMentioned, true);
+});
+
 test('evaluateAgentCompletion fails exploration-only output despite product diff evidence', () => {
   const report = evaluateAgentCompletion({
     implementationLogText: [
@@ -50,6 +129,41 @@ test('evaluateAgentCompletion fails when background agents are still pending', (
 
   assert.equal(report.decision, 'fail');
   assert.equal(report.findings.some((finding) => finding.kind === 'pending_background_agents'), true);
+});
+
+test('evaluateAgentCompletion preserves required field failure checks', () => {
+  const cases = [
+    {
+      log: completionLog({ status: undefined }).replace('Status: completed', 'Status: done'),
+      findingKind: 'missing_completed_status'
+    },
+    {
+      log: completionLog({ changedFiles: 'none' }),
+      findingKind: 'missing_changed_files'
+    },
+    {
+      log: completionLog({ testsRun: 'none' }),
+      findingKind: 'missing_tests'
+    },
+    {
+      log: completionLog({ knownLimits: '' }),
+      findingKind: 'missing_known_limits'
+    },
+    {
+      log: completionLog({ blockers: 'flaky smoke test remains unresolved' }),
+      findingKind: 'unresolved_blockers'
+    }
+  ] as const;
+
+  for (const item of cases) {
+    const report = evaluateAgentCompletion({
+      implementationLogText: item.log,
+      meaningfulDiff: meaningfulDiff()
+    });
+
+    assert.equal(report.decision, 'fail');
+    assert.equal(report.findings.some((finding) => finding.kind === item.findingKind), true);
+  }
 });
 
 test('evaluateAgentCompletion fails incomplete and todo-like output', () => {

@@ -178,6 +178,7 @@ export function renderRunStatus(state: DeliveryRunStateRecord, runIds: readonly 
       ? '- None'
       : [
           `- Status: ${latestDeployment.status.toUpperCase()}`,
+          `- Mapping: project ${latestDeployment.mapping?.projectId ?? latestDeployment.ref.projectId}, environment ${latestDeployment.mapping?.environmentId ?? latestDeployment.ref.environmentId ?? 'not configured'}, service ${latestDeployment.mapping?.serviceId ?? latestDeployment.ref.serviceId}, mode ${latestDeployment.mapping?.verification.mode ?? 'not configured'}`,
           `- Deployment: ${latestDeployment.ref.deploymentId}`,
           `- Branch: ${latestDeployment.branch}`,
           `- Service URL: ${latestDeployment.serviceUrl}`,

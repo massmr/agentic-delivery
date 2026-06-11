@@ -470,6 +470,7 @@ function checkRepositoryReadiness(cwd: string, config: WorkspaceConfig, probes: 
 
     return [
       passCheck(`Repository ${repo.name}`, `${repo.localPath} exists locally.`),
+      ...checkRepositoryDeploymentMapping(repo),
       checkQualityReadiness(repo, repoPath, probes)
     ];
   });
@@ -482,6 +483,64 @@ function formatDiscoveredRepositories(repos: readonly WorkspaceRepositoryConfig[
   const names = repos.map((repo) => repo.name).join(', ');
 
   return `Found ${repos.length} direct sibling Git ${noun}: ${names}.`;
+}
+
+function checkRepositoryDeploymentMapping(repo: WorkspaceRepositoryConfig): readonly DoctorCheck[] {
+  const mapping = repo.deployments?.staging;
+
+  if (mapping === undefined) {
+    return [passCheck(`Deployment ${repo.name}`, 'No staging deployment mapping configured; Railway staging verification will be skipped for this repository.')];
+  }
+
+  const mode = mapping.verification.mode;
+
+  if (mode === 'none' || mode === 'github_only') {
+    return [passCheck(`Deployment ${repo.name}`, `Verification mode ${mode} does not require Railway project, environment, or service IDs.`)];
+  }
+
+  if (mode === 'http_smoke') {
+    const invalidUrls = mapping.verification.smokeUrls.filter((url) => !isHttpUrl(url));
+
+    if (mapping.verification.smokeUrls.length === 0) {
+      return [failCheck(`Deployment ${repo.name}`, 'Verification mode http_smoke requires at least one configured smoke URL.', 'Set repos[].deployments.staging.verification.smoke_urls or choose none/github_only.')];
+    }
+
+    if (invalidUrls.length > 0) {
+      return [failCheck(`Deployment ${repo.name}`, `Smoke URL(s) must be absolute HTTP(S) URLs: ${invalidUrls.join(', ')}.`, 'Update repos[].deployments.staging.verification.smoke_urls.')];
+    }
+
+    return [passCheck(`Deployment ${repo.name}`, `HTTP smoke verification has ${mapping.verification.smokeUrls.length} configured URL(s); Railway IDs are optional for this mode.`)];
+  }
+
+  const missing = [
+    mapping.projectId === undefined ? 'project_id' : undefined,
+    mapping.environmentId === undefined ? 'environment_id' : undefined,
+    mapping.serviceId === undefined ? 'service_id' : undefined
+  ].filter((field): field is string => field !== undefined);
+
+  if (missing.length > 0) {
+    return [failCheck(`Deployment ${repo.name}`, `Railway MCP verification is missing ${missing.join(', ')}.`, 'Set repos[].deployments.staging project_id, environment_id, and service_id for this repository.')];
+  }
+
+  const smokeSummary = mapping.verification.smokeUrls.length === 0
+    ? 'No smoke URLs configured after Railway deployment polling.'
+    : `${mapping.verification.smokeUrls.length} smoke URL(s) configured after Railway deployment polling.`;
+
+  return [
+    passCheck(
+      `Deployment ${repo.name}`,
+      `Railway MCP mapping is complete for project ${mapping.projectId}, environment ${mapping.environmentId}, service ${mapping.serviceId}, branch ${mapping.branch}. ${smokeSummary}`
+    )
+  ];
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 function checkQualityReadiness(repo: WorkspaceRepositoryConfig, repoPath: string, probes: DoctorProbeSet): DoctorCheck {

@@ -133,6 +133,155 @@ test('doctor validates Railway MCP through the Railway CLI preset instead of env
   assert.equal(readyCliReport.checks.some((check) => check.label === 'Railway' && check.status === 'pass' && /railway command is available/u.test(check.message)), true);
 });
 
+test('doctor validates per-repository Railway deployment mappings locally', async () => {
+  const cwd = await createWorkspace('ewokbot-doctor-bd-deployment-mapping-');
+  const apiPath = join(cwd, 'api');
+  const frontendPath = join(cwd, 'frontend');
+  const workerPath = join(cwd, 'worker');
+  mkdirSync(join(apiPath, '.git'), { recursive: true });
+  mkdirSync(join(frontendPath, '.git'), { recursive: true });
+  mkdirSync(join(workerPath, '.git'), { recursive: true });
+  for (const repoPath of [apiPath, frontendPath, workerPath]) {
+    writeFileSync(join(repoPath, 'package.json'), JSON.stringify({ scripts: { test: 'node --test' } }), 'utf8');
+  }
+  const source = createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false, railwayProvider: 'railway-mcp' }).workspaceYaml.replace(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`, `repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ./api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+    deployments:
+      staging:
+        provider: railway
+        project_id: project-api
+        environment_id: env-staging
+        service_id: service-api
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health
+  - name: frontend
+    url: git@github.com:agentic/frontend.git
+    local_path: ./frontend
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - frontend
+    staging_smoke_urls: []
+    deployments:
+      staging:
+        provider: railway
+        branch: develop
+        verification:
+          mode: http_smoke
+          smoke_urls:
+            - https://frontend.example.test/health
+  - name: worker
+    url: git@github.com:agentic/worker.git
+    local_path: ./worker
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - worker
+    staging_smoke_urls: []
+    deployments:
+      staging:
+        provider: railway
+        branch: develop
+        verification:
+          mode: none
+          smoke_urls: []
+`);
+  mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
+  writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), source, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env.example'), createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false }).envExample, 'utf8');
+
+  const report = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode' || command === 'railway',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
+  });
+
+  assert.equal(report.ok, true);
+  assert.equal(report.checks.some((check) => check.label === 'Deployment api' && check.status === 'pass' && /project project-api/u.test(check.message)), true);
+  assert.equal(report.checks.some((check) => check.label === 'Deployment frontend' && check.status === 'pass' && /HTTP smoke verification/u.test(check.message)), true);
+  assert.equal(report.checks.some((check) => check.label === 'Deployment worker' && check.status === 'pass' && /does not require Railway project/u.test(check.message)), true);
+});
+
+test('doctor reports actionable per-repository deployment mapping gaps', async () => {
+  const cwd = await createWorkspace('ewokbot-doctor-bd-deployment-gaps-');
+  const apiPath = join(cwd, 'api');
+  const frontendPath = join(cwd, 'frontend');
+  mkdirSync(join(apiPath, '.git'), { recursive: true });
+  mkdirSync(join(frontendPath, '.git'), { recursive: true });
+  const source = createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false, railwayProvider: 'railway-mcp' }).workspaceYaml.replace(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+`, `repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ./api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls: []
+    deployments:
+      staging:
+        provider: railway
+        project_id: project-api
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls: []
+  - name: frontend
+    url: git@github.com:agentic/frontend.git
+    local_path: ./frontend
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - frontend
+    staging_smoke_urls: []
+    deployments:
+      staging:
+        provider: railway
+        branch: develop
+        verification:
+          mode: http_smoke
+          smoke_urls:
+            - /health
+`);
+  mkdirSync(join(cwd, '.ewokbot'), { recursive: true });
+  writeFileSync(join(cwd, '.ewokbot', 'workspace.yml'), source, 'utf8');
+  writeFileSync(join(cwd, '.ewokbot', '.env.example'), createOnboardingFiles({ deploymentMonitor: 'railway', includeOhMyOpenAgent: false }).envExample, 'utf8');
+
+  const report = runLocalDoctor(cwd, {
+    env: {},
+    nodeVersion: 'v20.11.1',
+    commandExists: (command) => command === 'pnpm' || command === 'opencode' || command === 'railway',
+    opencodeHomeDirectory: join(cwd, 'opencode-home'),
+    userLayoutOptions: createTestUserLayoutOptions(cwd)
+  });
+
+  assert.equal(report.ok, false);
+  assert.equal(report.checks.some((check) => check.label === 'Deployment api' && check.status === 'fail' && /environment_id, service_id/u.test(check.message)), true);
+  assert.equal(report.checks.some((check) => check.label === 'Deployment frontend' && check.status === 'fail' && /absolute HTTP\(S\)/u.test(check.message)), true);
+});
+
 test('doctor describes the Atlassian MCP preset when Jira work-item setup is missing the local command', async () => {
   const cwd = await createWorkspace('ewokbot-doctor-ax0-atlassian-mcp-');
   const files = createOnboardingFiles({

@@ -1424,50 +1424,115 @@ delivery:
       require_human_approval: true
 ```
 
-### Milestone BD: Cubic Review Provider
+### Milestone BD: Railway Deployment Mapping Per Repository
 
 Goal:
 
-Add Cubic as Ewokbot's first full review provider. Operators should be able to select Cubic during `ewokbot init`; Ewokbot should use `cubic-cli` to review the scoped agent diff after local evidence gates pass and before commit/PR handoff; and after the develop PR is opened, Ewokbot should verify the expected Cubic review result/evidence.
+Make Railway staging verification explicit per repository in the Ewokbot workspace. A workspace can contain many repositories, and each repository may map to a different Railway project, environment, and service. Ewokbot must stop relying on `railway link` or the current working directory to infer deployment targets.
+
+Target config shape:
+
+```yaml
+repos:
+  - id: frontend
+    path: ./frontend
+    provider: github
+    owner: massmr
+    name: frontend
+    default_branch: develop
+    production_branch: main
+    deployments:
+      staging:
+        provider: railway
+        project_id: prj_xxx
+        environment_id: env_xxx
+        service_id: svc_xxx
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health
+      production:
+        provider: railway
+        project_id: prj_xxx
+        environment_id: env_yyy
+        service_id: svc_xxx
+        branch: main
+        verification:
+          mode: require_human
+```
 
 Build:
 
-- Add review-provider workspace configuration with at least `none` and `cubic`.
-- Update `ewokbot init` so the operator can choose Cubic as the review provider.
-- When Cubic is selected, detect `cubic-cli`, write review-provider config, and provide setup guidance if `cubic-cli` is missing.
-- Update `ewokbot doctor` to validate Cubic readiness without executing a real review.
-- Introduce a typed `ReviewToolPort` or `DiffReviewPort` for reviewing scoped agent diffs and verifying PR review evidence.
-- Add a `cubic-cli` adapter behind that port, while keeping the port interchangeable for later review providers.
-- Use an injectable subprocess/executor boundary with command, args, working directory, environment allowlist, timeout, cancellation, stdout/stderr capture, and redaction.
-- Pass structured review input containing ticket key, run id, repository, base branch, agent branch, scoped changed files, and diff summary.
-- Run the pre-commit Cubic review only after meaningful diff, agent completion, core safety, test relevance, and quality gates pass.
-- Run the pre-commit Cubic review before local commit, branch push, and PR creation.
-- Parse structured review output into deterministic decisions: `pass`, `warn`, `needs_human`, or `fail`; `fail` blocks, and `needs_human` stops safely.
-- Persist Cubic review evidence under the run directory and expose it in status/final reports.
-- After the develop PR is opened, verify the expected Cubic review result/evidence is present and attach or surface the Cubic report as configured.
+- Extend workspace config so each explicit or discovered repository can declare deployment mappings.
+- Support repositories with no deployment mapping.
+- Support at least `railway_mcp`, `http_smoke`, `github_only`, and `none` verification modes.
+- Add a typed Railway discovery/setup surface that can list Railway projects, services, and environments through Railway MCP read-only tools.
+- Use inspected Railway MCP read-only tools such as `list_projects`, `list_services`, `environment_status`, `list_deployments`, and `get_service_config` where applicable.
+- Update `ewokbot init` so operators can map each repository to Railway project/environment/service ids through guided choices when Railway MCP is available.
+- Preserve manual id entry for VPS/non-interactive setup or when Railway MCP is unavailable.
+- Update `ewokbot doctor` to validate per-repo Railway mappings and report missing ids, missing Railway session, missing MCP tools, and missing smoke URL configuration without printing secrets.
+- Update staging verification so the selected repository's configured `project_id`, `environment_id`, and `service_id` are passed into Railway MCP calls.
+- Ensure reports and status output show which repository deployment mapping was used.
+- Keep production deployment observation human-gated and production deployment mutation unimplemented.
 
 Acceptance:
 
-- `ewokbot init` can configure no review provider or Cubic.
-- `ewokbot doctor` reports Cubic readiness when Cubic is configured and gives actionable setup guidance when missing.
-- Unit tests cover review-provider config parsing/rendering, Cubic setup detection, command construction, working-directory scoping, environment allowlist, timeout/cancellation mapping, non-zero exit handling, invalid output handling, and structured pass/warn/needs-human/fail output.
-- Tests prove only scoped agent diff metadata is passed to the adapter.
-- Tests prove secret-looking output is redacted before persistence/reporting.
-- Fake delivery integration proves Cubic runs before local commit/push/PR and blocks unsafe review outcomes.
-- Fake delivery integration proves PR review verification happens after PR creation when Cubic is configured.
-- Tests remain fake-only and do not execute real `cubic-cli`, OpenCode, MCP servers, Docker, OAuth, provider APIs, or networks.
-- The Cubic provider is not a raw shell escape hatch and cannot access provider credentials beyond an explicit allowlist.
+- A workspace can represent several repositories with different Railway services, plus repositories with no deployment.
+- Real staging verification no longer depends on `railway link`.
+- Init can discover Railway choices via MCP when available and can fall back to manual ids.
+- Doctor gives actionable missing-configuration output per repository.
+- The BB/BC smoke path uses the selected repository's deployment mapping for Railway staging verification.
+- Tests use fake Railway MCP clients only and do not call live Railway CLI, live MCP servers, Docker, OAuth, network, or deployed URLs.
+- Railway mutating tools such as deploy, scale, variables, domain generation, source/link mutation, remove, and production deployment remain denied by default.
 
 Explicit safety constraints:
 
-- Do not expose raw shell access through the review provider.
-- Do not review or stage files outside the scoped allowed agent diff.
-- Do not let `cubic-cli` bypass meaningful diff, agent completion, core safety, test relevance, or quality gates.
-- Do not make Cubic mandatory unless explicitly configured.
-- Do not merge PRs, open production PRs, deploy, or mutate providers in BD.
+- Do not store Railway tokens or secret values in tracked files.
+- Do not print Railway variable values or credential-like values.
+- Do not make live Railway calls in tests.
+- Do not implement Cubic, the operator-agent sandbox, the web UI, Telegram, WhatsApp, production merge automation, or production deploy in BD.
 - Production merge and production deployment remain human-only.
 
-### Milestone BE: Operator Agent Action Sandbox
+### Milestone BE: Railway MCP Discovery And Repository Mapping
+
+Goal:
+
+Turn the static Railway mapping model from BD into a guided setup flow. Operators should be able to run `ewokbot init`, let Ewokbot discover Railway projects/services through read-only Railway MCP tools, and map each controlled repository to its staging Railway target without relying on `railway link` or typing opaque ids when discovery is available.
+
+Build:
+
+- Add a typed `RailwayDiscoveryPort` or equivalent setup-only boundary.
+- Implement a Railway MCP discovery adapter using only approved read-only setup tools such as `list_projects`, `list_services`, `get_service_config`, and safe environment/status reads when available.
+- Keep discovery separate from runtime staging verification so init/setup can list choices, while smoke/runtime still uses explicit persisted mappings.
+- Update interactive `ewokbot init` so discovered sibling repositories can be mapped to Railway project/environment/service choices through the TUI.
+- Preserve manual project/environment/service id entry for non-interactive setup, VPS setup, unavailable Railway sessions, or incomplete MCP discovery results.
+- Persist mappings under discovery mode as `repos.deployments.<repo>.staging` so sibling Git repository discovery is preserved and unmapped repositories are not dropped.
+- Let operators explicitly choose `none` or `github_only` for repositories that should not run Railway verification.
+- Update `ewokbot doctor` and docs so missing Railway mappings are actionable: a Railway smoke run must fail before staging verification unless the selected repository has a valid mapping or an explicit skip mode.
+- Record discovery/setup decisions without printing Railway variable values, tokens, or credential-like data.
+
+Acceptance:
+
+- `ewokbot init` can present discovered local repositories and discovered Railway projects/services using fake Railway MCP discovery data in tests.
+- The generated workspace config keeps `repos.discovery: sibling-git-directories` and writes per-repository overrides under `repos.deployments`.
+- A workspace can map `frontend -> Railway service A`, `api -> Railway service B`, and `worker -> none` without losing any sibling Git repository.
+- Manual id entry remains available and produces the same persisted mapping shape.
+- Runtime smoke/staging verification still uses only the selected repository's persisted mapping and does not depend on Railway CLI link state.
+- Missing mapping fails clearly unless the repo has an explicit `none` or `github_only` verification mode.
+- Tests remain fake-only with mock Railway MCP clients; no live Railway CLI, live MCP server, Docker, OAuth, network, provider deployment, or deployed URL calls happen in tests.
+- Railway mutating tools such as deploy, scale, variable mutation, variable reads, domain generation, source/link mutation, remove, and production deployment remain denied by default.
+
+Explicit safety constraints:
+
+- Do not call Railway mutating tools from init, doctor, tests, smoke, or runtime discovery.
+- Do not read or print Railway environment variable values.
+- Do not store Railway tokens or secret values in tracked files.
+- Do not make live Railway calls in tests.
+- Do not implement Cubic, the operator-agent sandbox, the web UI, Telegram, WhatsApp, production merge automation, or production deploy in BE.
+- Production merge and production deployment remain human-only.
+
+### Milestone BF: Operator Agent Action Sandbox
 
 Goal:
 
@@ -1496,5 +1561,5 @@ Explicit safety constraints:
 - Do not expose a raw shell to the operator agent.
 - Do not expose raw MCP tool calling to the operator agent.
 - Do not expose provider credentials or OpenCode credentials to the operator agent.
-- Do not implement Telegram, WhatsApp, or dashboard surfaces in BD.
+- Do not implement Telegram, WhatsApp, or dashboard surfaces in BF.
 - Production merge and production deployment remain human-only.

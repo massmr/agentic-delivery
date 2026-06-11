@@ -1,6 +1,6 @@
 import type { RailwayConnector } from '../connectors/railway/index.js';
 import type { SmokeUrlVerifier } from '../deployment/index.js';
-import type { DeliveryRunStateRecord, DeploymentResult, RepositoryConfig } from '../domain/index.js';
+import type { DeliveryRunStateRecord, DeploymentResult, RailwayDeploymentMapping, RepositoryConfig } from '../domain/index.js';
 import type { MarkdownReportWriter } from '../reports/index.js';
 import type { RunStateStore } from '../state/index.js';
 import { recordStagingDeploying, recordStagingFailed, recordStagingVerified } from '../state/index.js';
@@ -28,29 +28,59 @@ export async function runStagingVerification(input: RunStagingVerificationInput)
 
   let verifiedDeployment: DeploymentResult;
   let failureReason: string | undefined;
+  const mapping = input.repository.stagingDeployment;
 
   try {
-    const deployment = await input.railway.waitForDeployment({
-      repository: input.repository.ref,
-      branch: input.branch,
-      commitSha: input.commitSha,
-      environment: 'staging'
-    });
-    if (deployment.status !== 'success') {
-      verifiedDeployment = normalizeUnavailableServiceUrl(deployment);
-      failureReason = buildStagingFailureReason(verifiedDeployment);
-    } else {
-      const serviceUrl = assertValidStagingServiceUrl(hasUsableServiceUrl(deployment) ? deployment.serviceUrl : await input.railway.getServiceUrl({ ref: deployment.ref }));
-      const smokeChecks = await input.smokeVerifier.verify({ serviceUrl, urls: input.repository.stagingSmokeUrls });
+    if (mapping === undefined) {
+      throw new Error('No staging deployment mapping is configured for this repository. Configure repos.deployments.<repo>.staging or set verification.mode to none/github_only explicitly.');
+    }
 
+    if (mapping.verification.mode === 'none' || mapping.verification.mode === 'github_only') {
+      verifiedDeployment = createSkippedStagingDeployment(input, mapping, now().toISOString());
+      failureReason = undefined;
+    } else if (mapping.verification.mode === 'http_smoke') {
+      const smokeChecks = await input.smokeVerifier.verify({ serviceUrl: '', urls: mapping.verification.smokeUrls });
       verifiedDeployment = {
-        ...deployment,
-        serviceUrl,
-        smokeChecks
+        ...createSkippedStagingDeployment(input, mapping, now().toISOString()),
+        smokeChecks,
+        summary: 'Verified staging by HTTP smoke URLs from the repository deployment mapping.'
       };
       failureReason = smokeChecks.every((check) => check.status !== 'failed')
         ? undefined
         : buildStagingFailureReason(verifiedDeployment);
+    } else {
+      assertCompleteRailwayMcpMapping(mapping);
+      const deployment = await input.railway.waitForDeployment({
+        repository: input.repository.ref,
+        branch: mapping.branch,
+        commitSha: input.commitSha,
+        environment: 'staging',
+        mapping
+      });
+      if (deployment.status !== 'success') {
+        verifiedDeployment = normalizeUnavailableServiceUrl(deployment);
+        failureReason = buildStagingFailureReason(verifiedDeployment);
+      } else {
+        const smokeUrls = mapping.verification.smokeUrls;
+        const serviceUrl = hasUsableServiceUrl(deployment)
+          ? deployment.serviceUrl
+          : smokeUrls.length === 0
+            ? 'unavailable'
+            : await input.railway.getServiceUrl({ ref: deployment.ref, mapping });
+        const smokeChecks = smokeUrls.length === 0
+          ? []
+          : await input.smokeVerifier.verify({ serviceUrl: assertValidStagingServiceUrl(serviceUrl), urls: smokeUrls });
+
+        verifiedDeployment = {
+          ...deployment,
+          mapping,
+          serviceUrl: smokeUrls.length === 0 ? serviceUrl : assertValidStagingServiceUrl(serviceUrl),
+          smokeChecks
+        };
+        failureReason = smokeChecks.every((check) => check.status !== 'failed')
+          ? undefined
+          : buildStagingFailureReason(verifiedDeployment);
+      }
     }
   } catch (error) {
     verifiedDeployment = createFailedStagingDeployment(input, String(readErrorMessage(error)), now().toISOString());
@@ -65,6 +95,18 @@ export async function runStagingVerification(input: RunStagingVerificationInput)
   await input.reportWriter.writeStaging(finalState.ticket.key, finalState.runId, verifiedDeployment, finalState.failure);
 
   return finalState;
+}
+
+function assertCompleteRailwayMcpMapping(mapping: RailwayDeploymentMapping): void {
+  const missing = [
+    mapping.projectId === undefined ? 'project_id' : undefined,
+    mapping.environmentId === undefined ? 'environment_id' : undefined,
+    mapping.serviceId === undefined ? 'service_id' : undefined
+  ].filter((field): field is string => field !== undefined);
+
+  if (missing.length > 0) {
+    throw new Error(`Railway MCP staging verification requires repository deployment mapping field(s): ${missing.join(', ')}.`);
+  }
 }
 
 function hasUsableServiceUrl(deployment: DeploymentResult): boolean {
@@ -116,14 +158,17 @@ function parseUrl(serviceUrl: string): URL | undefined {
 }
 
 function createFailedStagingDeployment(input: RunStagingVerificationInput, summary: string, occurredAt: string): DeploymentResult {
+  const mapping = input.repository.stagingDeployment;
   return {
     ref: {
       provider: 'railway',
-      projectId: 'unavailable',
-      serviceId: 'unavailable',
+      projectId: mapping?.projectId ?? 'unavailable',
+      ...(mapping?.environmentId === undefined ? {} : { environmentId: mapping.environmentId }),
+      serviceId: mapping?.serviceId ?? 'unavailable',
       deploymentId: `unavailable-${input.repository.ref.owner}-${input.repository.ref.name}-${input.branch}-${input.commitSha}`,
       environment: 'staging'
     },
+    ...(mapping === undefined ? {} : { mapping }),
     status: 'failed',
     branch: input.branch,
     commitSha: input.commitSha,
@@ -132,6 +177,30 @@ function createFailedStagingDeployment(input: RunStagingVerificationInput, summa
     startedAt: occurredAt,
     finishedAt: occurredAt,
     summary
+  };
+}
+
+function createSkippedStagingDeployment(input: RunStagingVerificationInput, mapping: RailwayDeploymentMapping | undefined, occurredAt: string): DeploymentResult {
+  return {
+    ref: {
+      provider: 'railway',
+      projectId: mapping?.projectId ?? 'not-configured',
+      ...(mapping?.environmentId === undefined ? {} : { environmentId: mapping.environmentId }),
+      serviceId: mapping?.serviceId ?? 'not-configured',
+      deploymentId: `not-configured-${input.repository.ref.owner}-${input.repository.ref.name}-${input.branch}-${input.commitSha}`,
+      environment: 'staging'
+    },
+    ...(mapping === undefined ? {} : { mapping }),
+    status: 'success',
+    branch: mapping?.branch ?? input.branch,
+    commitSha: input.commitSha,
+    serviceUrl: 'unavailable',
+    smokeChecks: [],
+    startedAt: occurredAt,
+    finishedAt: occurredAt,
+    summary: mapping === undefined
+      ? 'No staging deployment mapping is configured for this repository; Railway staging verification was skipped.'
+      : `Repository staging verification mode ${mapping.verification.mode} does not require Railway deployment polling.`
   };
 }
 

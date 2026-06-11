@@ -31,6 +31,7 @@ export type {
   WorkspaceConfigIssue,
   WorkspaceConfigParseOptions,
   WorkspaceConfigValidationResult,
+  WorkspaceRepositoryDeploymentsConfig,
   WorkspaceRepositoryConfig,
   WorkspaceSettings
 } from './workspace-config.js';

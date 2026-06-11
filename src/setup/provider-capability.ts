@@ -1,4 +1,5 @@
 import type { WorkspaceConfig } from '../config/index.js';
+import type { DeploymentVerificationMode } from '../domain/index.js';
 import { atlassianJiraMcpPreset } from './connector-presets.js';
 import { OpenCodeSetupAdapter } from './opencode-setup-adapter.js';
 
@@ -13,6 +14,22 @@ export interface McpServerSelection {
   readonly command: string;
   readonly args: readonly string[];
   readonly envVarNames: readonly string[];
+}
+
+export interface SetupRepositoryDeploymentSelection {
+  readonly name: string;
+  readonly url: string;
+  readonly localPath: string;
+  readonly defaultBranch: string;
+  readonly productionBranch: string;
+  readonly qualityProfile: string;
+  readonly hints: readonly string[];
+  readonly stagingSmokeUrls: readonly string[];
+  readonly railwayProjectId?: string | undefined;
+  readonly railwayEnvironmentId?: string | undefined;
+  readonly railwayServiceId?: string | undefined;
+  readonly railwayBranch: string;
+  readonly verificationMode: DeploymentVerificationMode;
 }
 
 export interface SetupSelections {
@@ -32,6 +49,7 @@ export interface SetupSelections {
   readonly githubMcpServer?: McpServerSelection | undefined;
   readonly railwayProvider?: RailwayProviderSelection | undefined;
   readonly railwayMcpServer?: McpServerSelection | undefined;
+  readonly repositoryDeployments?: readonly SetupRepositoryDeploymentSelection[] | undefined;
   readonly envValues?: Readonly<Record<string, string | undefined>> | undefined;
 }
 

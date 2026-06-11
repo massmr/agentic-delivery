@@ -4,7 +4,11 @@ import { delimiter, dirname, join } from 'node:path';
 
 import { checkbox, confirm, input as promptInput, select } from '@inquirer/prompts';
 
-import { atlassianJiraMcpPreset, createOnboardingFiles, defaultSetupSelections, railwayCliMcpPreset, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
+import type { WorkspaceRepositoryConfig } from '../../config/index.js';
+import { discoverSiblingGitDirectories } from '../../config/index.js';
+import type { RailwayDiscoveryPort, RailwayDiscoveryService, RailwayDiscoverySnapshot } from '../../connectors/railway/index.js';
+import { atlassianJiraMcpPreset, createOnboardingFiles, defaultSetupSelections, railwayCliMcpPreset, type CodeHostSelection, type DeploymentMonitorSelection, type DevRunnerModeSelection, type McpServerSelection, type RailwayProviderSelection, type SetupRepositoryDeploymentSelection, type SetupSelections, type TicketProviderSelection } from '../../setup/index.js';
+import type { DeploymentVerificationMode } from '../../domain/index.js';
 import { OpenCodeSetupAdapter, type DevToolCommandResult, type DevToolDetectionResult, type DevToolReadinessState } from '../../setup/index.js';
 import { createEwokbotUserLayout, type ResolveEwokbotUserLayoutOptions } from '../../user-layout.js';
 import { ewokbotCacheDirectory, ewokbotEnvExamplePath, ewokbotEnvPath, ewokbotLogsDirectory, ewokbotRunsDirectory, ewokbotWorkspaceConfigPath } from '../../workspace-layout.js';
@@ -19,6 +23,7 @@ export interface InitCommandOptions {
   readonly runCommand?: ((command: string, args: readonly string[]) => DevToolCommandResult) | undefined;
   readonly opencodeHomeDirectory?: string | undefined;
   readonly userLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
+  readonly railwayDiscovery?: RailwayDiscoveryPort | undefined;
 }
 
 export type InitPrompter = (defaults: SetupSelections, context: InitPromptContext) => Promise<SetupSelections>;
@@ -28,6 +33,8 @@ export interface InitPromptContext {
   readonly detectOpenCode: (command?: string | undefined) => DevToolDetectionResult;
   readonly debug: boolean;
   readonly io: CliProgramIO;
+  readonly workspaceRoot: string;
+  readonly railwayDiscovery?: RailwayDiscoveryPort | undefined;
 }
 
 export interface InitPromptChoice<T extends string | boolean> {
@@ -149,7 +156,9 @@ function createInitPromptContext(cwd: string, options: InitCommandOptions, comma
     opencodeDetection: detectOpenCode(cwd, options, command),
     detectOpenCode: (customCommand) => detectOpenCode(cwd, options, customCommand ?? command),
     debug,
-    io: options.io
+    io: options.io,
+    workspaceRoot: cwd,
+    railwayDiscovery: options.railwayDiscovery
   };
 }
 
@@ -335,6 +344,7 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
   }));
   let railwayProvider = defaults.railwayProvider;
   let railwayMcpServer = defaults.railwayMcpServer;
+  let repositoryDeployments = defaults.repositoryDeployments;
 
   if (deploymentMonitor === 'railway' || deploymentMonitor === 'both') {
     railwayProvider = await prompts.select({ message: 'Railway provider', choices: [
@@ -344,6 +354,7 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
 
     if (railwayProvider === 'railway-mcp') {
       railwayMcpServer = defaults.railwayMcpServer ?? railwayCliMcpPreset.server;
+      repositoryDeployments = await promptForRailwayRepositoryDeployments(defaults, prompts, githubOrganization, context);
     }
   }
 
@@ -368,8 +379,234 @@ export async function promptForSelectionsWithPromptAdapter(defaults: SetupSelect
     githubMcpServer,
     railwayProvider,
     railwayMcpServer,
+    repositoryDeployments,
     envValues
   };
+}
+
+async function promptForRailwayRepositoryDeployments(
+  defaults: SetupSelections,
+  prompts: InitPromptAdapter,
+  githubOrganization: string | undefined,
+  context: InitPromptContext
+): Promise<readonly SetupRepositoryDeploymentSelection[] | undefined> {
+  if (context.railwayDiscovery === undefined) {
+    return promptForRepositoryDeployments(defaults, prompts, githubOrganization);
+  }
+
+  const repositories = discoverSiblingGitDirectories(context.workspaceRoot);
+  let snapshot: RailwayDiscoverySnapshot;
+
+  try {
+    snapshot = await context.railwayDiscovery.discover();
+  } catch (error) {
+    if (context.debug) {
+      context.io.stdout(`Railway MCP discovery unavailable; falling back to manual Railway mapping. ${error instanceof Error ? error.message : String(error)}\n`);
+    }
+
+    return promptForRepositoryDeployments(defaults, prompts, githubOrganization);
+  }
+
+  if (repositories.length === 0 || snapshot.services.length === 0) {
+    return promptForRepositoryDeployments(defaults, prompts, githubOrganization);
+  }
+
+  const useDiscovery = await prompts.confirm({
+    message: 'Use Railway MCP discovery to map sibling Git repositories?',
+    defaultValue: true
+  });
+
+  if (!useDiscovery) {
+    return promptForRepositoryDeployments(defaults, prompts, githubOrganization);
+  }
+
+  return promptForDiscoveredRepositoryDeployments({
+    defaults,
+    prompts,
+    githubOrganization,
+    repositories,
+    services: snapshot.services
+  });
+}
+
+async function promptForDiscoveredRepositoryDeployments(input: {
+  readonly defaults: SetupSelections;
+  readonly prompts: InitPromptAdapter;
+  readonly githubOrganization: string | undefined;
+  readonly repositories: readonly WorkspaceRepositoryConfig[];
+  readonly services: readonly RailwayDiscoveryService[];
+}): Promise<readonly SetupRepositoryDeploymentSelection[]> {
+  const mappings: SetupRepositoryDeploymentSelection[] = [];
+
+  for (const repository of input.repositories) {
+    const existing = input.defaults.repositoryDeployments?.find((repo) => repo.name === repository.name);
+    const defaultMode = existing?.verificationMode ?? 'railway_mcp';
+    const mode = await input.prompts.select({ message: `Railway mapping for ${repository.name}`, choices: [
+      { label: 'Discovered Railway service', value: 'discovered_railway_mcp' as const, description: 'Persist selected project/environment/service IDs.' },
+      { label: 'Manual Railway IDs', value: 'manual_railway_mcp' as const, description: 'Enter explicit Railway IDs by hand.' },
+      { label: 'HTTP smoke', value: 'http_smoke' as const, description: 'Skip Railway polling and verify configured URLs only.' },
+      { label: 'GitHub only', value: 'github_only' as const, description: 'Explicitly skip deployment verification for this repository.' },
+      { label: 'None', value: 'none' as const, description: 'Explicitly disable staging verification.' },
+      { label: 'Leave unmapped', value: 'unmapped' as const, description: 'Keep sibling repo discovery without a deployment override.' }
+    ], defaultValue: defaultMode === 'railway_mcp' ? 'discovered_railway_mcp' : defaultMode });
+
+    if (mode === 'unmapped') {
+      continue;
+    }
+
+    const baseSelection = createDiscoveredRepositorySelection(repository, existing, input.githubOrganization);
+
+    if (mode === 'discovered_railway_mcp') {
+      const service = await promptForRailwayService(input.prompts, repository.name, input.services, existing?.railwayServiceId);
+      const environmentId = service.environmentId ?? optionalPromptValue(await input.prompts.input({ message: `Railway environment_id for ${repository.name}`, defaultValue: existing?.railwayEnvironmentId ?? '' }));
+
+      mappings.push({
+        ...baseSelection,
+        railwayProjectId: service.projectId,
+        railwayEnvironmentId: environmentId,
+        railwayServiceId: service.id,
+        railwayBranch: service.branch ?? existing?.railwayBranch ?? 'develop',
+        verificationMode: 'railway_mcp'
+      });
+      continue;
+    }
+
+    if (mode === 'manual_railway_mcp') {
+      mappings.push({
+        ...baseSelection,
+        railwayProjectId: optionalPromptValue(await input.prompts.input({ message: `Railway project_id for ${repository.name}`, defaultValue: existing?.railwayProjectId ?? '' })),
+        railwayEnvironmentId: optionalPromptValue(await input.prompts.input({ message: `Railway environment_id for ${repository.name}`, defaultValue: existing?.railwayEnvironmentId ?? '' })),
+        railwayServiceId: optionalPromptValue(await input.prompts.input({ message: `Railway service_id for ${repository.name}`, defaultValue: existing?.railwayServiceId ?? '' })),
+        railwayBranch: nonEmptyPromptValue(await input.prompts.input({ message: `Railway branch for ${repository.name}`, defaultValue: existing?.railwayBranch ?? 'develop' }), existing?.railwayBranch ?? 'develop'),
+        verificationMode: 'railway_mcp'
+      });
+      continue;
+    }
+
+    if (mode === 'http_smoke') {
+      mappings.push({
+        ...baseSelection,
+        stagingSmokeUrls: parseCsv(await input.prompts.input({ message: `Smoke URLs for ${repository.name}, comma-separated`, defaultValue: existing?.stagingSmokeUrls.join(',') ?? '' })),
+        verificationMode: 'http_smoke'
+      });
+      continue;
+    }
+
+    mappings.push({
+      ...baseSelection,
+      verificationMode: mode
+    });
+  }
+
+  return mappings;
+}
+
+async function promptForRailwayService(
+  prompts: InitPromptAdapter,
+  repositoryName: string,
+  services: readonly RailwayDiscoveryService[],
+  existingServiceId: string | undefined
+): Promise<RailwayDiscoveryService> {
+  const defaultService = services.find((service) => service.id === existingServiceId)
+    ?? services.find((service) => service.name.toLowerCase() === repositoryName.toLowerCase())
+    ?? services[0];
+
+  const selectedId = await prompts.select({
+    message: `Railway service for ${repositoryName}`,
+    choices: services.map((service) => ({
+      label: renderRailwayServiceChoice(service),
+      value: service.id,
+      description: service.environmentName === undefined ? undefined : `Environment: ${service.environmentName}`
+    })),
+    defaultValue: defaultService.id
+  });
+
+  return services.find((service) => service.id === selectedId) ?? defaultService;
+}
+
+function createDiscoveredRepositorySelection(
+  repository: WorkspaceRepositoryConfig,
+  existing: SetupRepositoryDeploymentSelection | undefined,
+  githubOrganization: string | undefined
+): SetupRepositoryDeploymentSelection {
+  const defaultUrl = existing?.url ?? (githubOrganization === undefined ? `git@github.com:OWNER/${repository.name}.git` : `git@github.com:${githubOrganization}/${repository.name}.git`);
+
+  return {
+    name: repository.name,
+    url: defaultUrl,
+    localPath: existing?.localPath ?? repository.localPath,
+    defaultBranch: existing?.defaultBranch ?? repository.defaultBranch,
+    productionBranch: existing?.productionBranch ?? repository.productionBranch,
+    qualityProfile: existing?.qualityProfile ?? repository.qualityProfile,
+    hints: existing?.hints ?? repository.hints,
+    stagingSmokeUrls: existing?.stagingSmokeUrls ?? repository.stagingSmokeUrls,
+    railwayBranch: existing?.railwayBranch ?? 'develop',
+    verificationMode: existing?.verificationMode ?? 'railway_mcp'
+  };
+}
+
+function renderRailwayServiceChoice(service: RailwayDiscoveryService): string {
+  const project = service.projectName ?? service.projectId ?? 'unknown project';
+  return `${service.name} (${project})`;
+}
+
+async function promptForRepositoryDeployments(
+  defaults: SetupSelections,
+  prompts: InitPromptAdapter,
+  githubOrganization: string | undefined
+): Promise<readonly SetupRepositoryDeploymentSelection[] | undefined> {
+  const configureMappings = await prompts.confirm({
+    message: 'Configure explicit per-repository Railway staging mappings now?',
+    defaultValue: (defaults.repositoryDeployments?.length ?? 0) > 0
+  });
+
+  if (!configureMappings) {
+    return defaults.repositoryDeployments;
+  }
+
+  const repositoryNames = parseCsv(await prompts.input({
+    message: 'Repository names to map, comma-separated',
+    defaultValue: defaults.repositoryDeployments?.map((repo) => repo.name).join(',') ?? ''
+  }));
+
+  if (repositoryNames.length === 0) {
+    return [];
+  }
+
+  const mappings: SetupRepositoryDeploymentSelection[] = [];
+
+  for (const name of repositoryNames) {
+    const existing = defaults.repositoryDeployments?.find((repo) => repo.name === name);
+    const defaultUrl = existing?.url ?? (githubOrganization === undefined ? `git@github.com:OWNER/${name}.git` : `git@github.com:${githubOrganization}/${name}.git`);
+    const verificationMode: DeploymentVerificationMode = await prompts.select({ message: `Verification mode for ${name}`, choices: [
+      { label: 'Railway MCP', value: 'railway_mcp' as const, description: 'Poll Railway with explicit project/environment/service IDs.' },
+      { label: 'HTTP smoke', value: 'http_smoke' as const, description: 'Skip Railway polling and verify configured URLs only.' },
+      { label: 'GitHub only', value: 'github_only' as const, description: 'No deployment check for this repository.' },
+      { label: 'None', value: 'none' as const, description: 'Explicitly disable staging verification.' }
+    ], defaultValue: existing?.verificationMode ?? 'railway_mcp' });
+    const stagingSmokeUrls = parseCsv(await prompts.input({
+      message: `Smoke URLs for ${name}, comma-separated (optional)`,
+      defaultValue: existing?.stagingSmokeUrls.join(',') ?? ''
+    }));
+
+    mappings.push({
+      name,
+      url: nonEmptyPromptValue(await prompts.input({ message: `Git URL for ${name}`, defaultValue: defaultUrl }), defaultUrl),
+      localPath: nonEmptyPromptValue(await prompts.input({ message: `Local path for ${name}`, defaultValue: existing?.localPath ?? `./${name}` }), existing?.localPath ?? `./${name}`),
+      defaultBranch: nonEmptyPromptValue(await prompts.input({ message: `Default/staging branch for ${name}`, defaultValue: existing?.defaultBranch ?? 'develop' }), existing?.defaultBranch ?? 'develop'),
+      productionBranch: nonEmptyPromptValue(await prompts.input({ message: `Production branch for ${name}`, defaultValue: existing?.productionBranch ?? 'main' }), existing?.productionBranch ?? 'main'),
+      qualityProfile: nonEmptyPromptValue(await prompts.input({ message: `Quality profile for ${name}`, defaultValue: existing?.qualityProfile ?? 'node' }), existing?.qualityProfile ?? 'node'),
+      hints: withDefaultList(parseCsv(await prompts.input({ message: `Planning hints for ${name}, comma-separated`, defaultValue: existing?.hints.join(',') ?? name })), [name]),
+      stagingSmokeUrls,
+      railwayProjectId: optionalPromptValue(await prompts.input({ message: `Railway project_id for ${name}`, defaultValue: existing?.railwayProjectId ?? '' })),
+      railwayEnvironmentId: optionalPromptValue(await prompts.input({ message: `Railway environment_id for ${name}`, defaultValue: existing?.railwayEnvironmentId ?? '' })),
+      railwayServiceId: optionalPromptValue(await prompts.input({ message: `Railway service_id for ${name}`, defaultValue: existing?.railwayServiceId ?? '' })),
+      railwayBranch: nonEmptyPromptValue(await prompts.input({ message: `Railway branch for ${name}`, defaultValue: existing?.railwayBranch ?? 'develop' }), existing?.railwayBranch ?? 'develop'),
+      verificationMode
+    });
+  }
+
+  return mappings;
 }
 
 async function promptForOpenCodeSelection(
@@ -507,6 +744,11 @@ function createInquirerPromptAdapter(): InitPromptAdapter {
 function nonEmptyPromptValue(value: string, fallback: string | undefined): string {
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : fallback ?? '';
+}
+
+function optionalPromptValue(value: string): string | undefined {
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
 }
 
 function deploymentMonitorToChoices(selection: DeploymentMonitorSelection): readonly ('railway' | 'vercel')[] {

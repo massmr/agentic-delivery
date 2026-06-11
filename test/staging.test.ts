@@ -51,7 +51,18 @@ const repository = {
     productionTarget: 'main'
   },
   qualityGates: [],
-  stagingSmokeUrls: ['/', '/health']
+  stagingSmokeUrls: ['/', '/health'],
+  stagingDeployment: {
+    provider: 'railway',
+    projectId: 'mock-project-agentic',
+    environmentId: 'mock-environment-staging',
+    serviceId: 'mock-service-delivery-cli',
+    branch: 'develop',
+    verification: {
+      mode: 'railway_mcp',
+      smokeUrls: ['/', '/health']
+    }
+  }
 } satisfies RepositoryConfig;
 
 test('MockRailwayConnector returns deterministic successful and failed staging deployment results', async () => {
@@ -114,6 +125,54 @@ test('runStagingVerification writes STAGING_DEPLOYING then STAGING_VERIFIED on s
   assert.equal(result.state, 'STAGING_VERIFIED');
   assert.equal(result.stagingDeployments.length, 1);
   assert.deepEqual(result.stagingDeployments[0]?.smokeChecks.map((check) => check.status), ['passed', 'passed']);
+});
+
+test('runStagingVerification fails when repository deployment mapping is missing', async (t) => {
+  const store = new MemoryRunStateStore();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository: { ...repository, stagingDeployment: undefined },
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway: new ThrowingRailwayConnector('Railway should not be called.'),
+    smokeVerifier: new FailIfCalledSmokeVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(await createTempRoot(t)),
+    now: fixedClock()
+  });
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'FAILED']);
+  assert.equal(result.state, 'FAILED');
+  assert.match(result.failure?.reason ?? '', /No staging deployment mapping is configured/u);
+});
+
+test('runStagingVerification verifies http_smoke mappings without Railway polling', async (t) => {
+  const store = new MemoryRunStateStore();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository: {
+      ...repository,
+      stagingDeployment: {
+        provider: 'railway',
+        branch: 'develop',
+        verification: {
+          mode: 'http_smoke',
+          smokeUrls: ['https://frontend.example.test/health']
+        }
+      }
+    },
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway: new ThrowingRailwayConnector('Railway should not be called.'),
+    smokeVerifier: new MockSmokeUrlVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(await createTempRoot(t)),
+    now: fixedClock()
+  });
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'STAGING_VERIFIED']);
+  assert.equal(result.stagingDeployments[0]?.smokeChecks[0]?.url, 'https://frontend.example.test/health');
+  assert.equal(result.stagingDeployments[0]?.mapping?.verification.mode, 'http_smoke');
 });
 
 test('runStagingVerification records FAILED for failed deployment and never reaches STAGING_VERIFIED', async (t) => {
@@ -252,6 +311,37 @@ test('runStagingVerification verifies successful deployment whose service URL is
   assert.deepEqual(result.stagingDeployments[0]?.smokeChecks.map((check) => check.status), ['passed', 'passed']);
 });
 
+test('runStagingVerification accepts successful Railway MCP deployment without service URL when no smoke URLs are configured', async (t) => {
+  const store = new MemoryRunStateStore();
+  const railway = new SuccessWithoutServiceUrlRailwayConnector();
+  const result = await runStagingVerification({
+    state: createState('DEVELOP_CHECKS_PASSED'),
+    repository: {
+      ...repository,
+      stagingDeployment: {
+        ...repository.stagingDeployment,
+        verification: {
+          mode: 'railway_mcp',
+          smokeUrls: []
+        }
+      }
+    },
+    branch: 'develop',
+    commitSha: 'abc123',
+    railway,
+    smokeVerifier: new FailIfCalledSmokeVerifier(),
+    stateStore: store,
+    reportWriter: new MarkdownReportWriter(await createTempRoot(t)),
+    now: fixedClock()
+  });
+
+  assert.deepEqual(store.writes.map((write) => write.state), ['STAGING_DEPLOYING', 'STAGING_VERIFIED']);
+  assert.equal(railway.getServiceUrlCalls, 0);
+  assert.equal(result.state, 'STAGING_VERIFIED');
+  assert.equal(result.stagingDeployments[0]?.serviceUrl, 'unavailable');
+  assert.deepEqual(result.stagingDeployments[0]?.smokeChecks, []);
+});
+
 test('staging state helpers and production readiness guard enforce staging lifecycle', () => {
   const ready = createState('DEVELOP_CHECKS_PASSED');
   const deploying = recordStagingDeploying(ready, '2026-06-03T10:20:00.000Z');
@@ -278,6 +368,10 @@ test('MarkdownReportWriter writes deterministic staging report path and content'
   assert.equal(body, renderStagingReportMarkdown(ticket.key, 'run-1', deployment));
   assert.match(body, /Branch: develop/u);
   assert.match(body, /Commit SHA: abc123/u);
+  assert.match(body, /Project ID: mock-project-agentic/u);
+  assert.match(body, /Environment ID: mock-environment-staging/u);
+  assert.match(body, /Service ID: mock-service-delivery-cli/u);
+  assert.match(body, /Verification Mode: railway_mcp/u);
   assert.match(body, /Service URL: https:\/\/delivery-cli-staging\.mock-railway\.local/u);
   assert.match(body, /https:\/\/delivery-cli-staging\.mock-railway\.local\/health: PASSED \(200\)/u);
   assert.match(body, /Failure Summary\n\n- None/u);
@@ -312,9 +406,21 @@ function createDeployment(status: DeploymentResult['status']): DeploymentResult 
     ref: {
       provider: 'railway',
       projectId: 'mock-project-agentic',
+      environmentId: 'mock-environment-staging',
       serviceId: 'mock-service-delivery-cli',
       deploymentId: 'mock-agentic-delivery-cli-staging-develop-abc123',
       environment: 'staging'
+    },
+    mapping: {
+      provider: 'railway',
+      projectId: 'mock-project-agentic',
+      environmentId: 'mock-environment-staging',
+      serviceId: 'mock-service-delivery-cli',
+      branch: 'develop',
+      verification: {
+        mode: 'railway_mcp',
+        smokeUrls: ['/health']
+      }
     },
     status,
     branch: 'develop',
@@ -364,7 +470,11 @@ class MemoryRunStateStore implements RunStateStore {
 }
 
 class ThrowingRailwayConnector implements DeploymentPort {
-  constructor(private readonly message: string) {}
+  private readonly message: string;
+
+  constructor(message: string) {
+    this.message = message;
+  }
 
   async waitForDeployment(): Promise<DeploymentResult> {
     throw new Error(this.message);

@@ -1,10 +1,11 @@
-import type { DeploymentEnvironment, DeploymentRef, DeploymentResult, DeploymentStatus, SmokeCheckResult } from '../../domain/index.js';
+import type { DeploymentEnvironment, DeploymentRef, DeploymentResult, DeploymentStatus, RailwayDeploymentMapping, SmokeCheckResult } from '../../domain/index.js';
 import type { JsonObject, JsonValue, McpClient, McpToolAllowlistRule, McpToolCallAuditRecord, McpToolCallExecutionResult } from '../../mcp/index.js';
 import { callAllowedMcpTool, discoverMcpTools, isJsonObject, requireDiscoveredMcpTool } from '../../mcp/index.js';
 import type { DeploymentPort, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from '../../ports/index.js';
 import type { RailwayConnector } from './railway-connector.js';
 
 const portName = 'DeploymentPort';
+type RailwayMcpAction = 'waitForDeployment' | 'readDeployment' | 'getServiceUrl' | 'listProjects' | 'listServices' | 'getServiceConfig';
 
 export interface RailwayMcpToolNames {
   readonly waitForDeployment: string;
@@ -60,31 +61,36 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
   }
 
   async waitForDeployment(input: WaitForDeploymentInput): Promise<DeploymentResult> {
-    await this.callRailwayTool(this.toolNames.environmentStatus, 'waitForDeployment', {});
+    await this.callRailwayTool(this.toolNames.environmentStatus, 'waitForDeployment', buildRailwayMcpArguments(input.mapping, { includeService: false }));
 
     const execution = await this.callRailwayTool(this.toolNames.waitForDeployment, 'waitForDeployment', {
+      ...buildRailwayMcpArguments(input.mapping, { includeService: true }),
       limit: 25
     });
 
     const deployment = readDeploymentResult(execution.result.content, {
       branch: input.branch,
       commitSha: input.commitSha,
-      environment: input.environment
+      environment: input.environment,
+      projectId: input.mapping?.projectId,
+      environmentId: input.mapping?.environmentId,
+      serviceId: input.mapping?.serviceId
     });
     assertMatchingDeploymentWaitResult(deployment, input);
-    return deployment;
+    return withDeploymentMapping(deployment, input.mapping);
   }
 
   async readDeployment(input: ReadDeploymentInput): Promise<DeploymentResult> {
     const execution = await this.callRailwayTool(this.toolNames.readDeployment, 'readDeployment', {
       project_id: input.ref.projectId,
+      ...(input.ref.environmentId === undefined ? {} : { environment_id: input.ref.environmentId }),
       service_id: input.ref.serviceId,
       limit: 25
     });
 
     const deployment = readDeploymentResult(execution.result.content, input.ref);
     assertMatchingDeploymentRef(deployment.ref, input.ref);
-    return deployment;
+    return withDeploymentMapping(deployment, input.mapping);
   }
 
   async getServiceUrl(input: ServiceUrlInput): Promise<string> {
@@ -92,15 +98,17 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
       throw new Error('Railway MCP service URL lookup is not configured. Configure repository staging service URLs or set railway.mcp_tools.get_service_url to a safe read-only tool that returns a service URL.');
     }
 
+    const environmentId = input.mapping?.environmentId ?? input.ref.environmentId;
     const execution = await this.callRailwayTool(this.toolNames.getServiceUrl, 'getServiceUrl', {
       project_id: input.ref.projectId,
+      ...(environmentId === undefined ? {} : { environment_id: environmentId }),
       service_id: input.ref.serviceId
     });
 
     return assertHttpServiceUrl(readServiceUrl(execution.result.content));
   }
 
-  private async callRailwayTool(configuredToolName: string, action: 'waitForDeployment' | 'readDeployment' | 'getServiceUrl', argumentsObject: JsonObject): Promise<McpToolCallExecutionResult> {
+  private async callRailwayTool(configuredToolName: string, action: RailwayMcpAction, argumentsObject: JsonObject): Promise<McpToolCallExecutionResult> {
     const toolName = await this.requireTool(configuredToolName);
 
     try {
@@ -141,7 +149,10 @@ export function createRailwayMcpToolRequirements(serverId: string, toolNames: Pa
   const requirements: McpToolAllowlistRule[] = [
     { serverId, toolName: resolvedToolNames.environmentStatus, port: portName, action: 'waitForDeployment', safety: 'read' },
     { serverId, toolName: resolvedToolNames.waitForDeployment, port: portName, action: 'waitForDeployment', safety: 'read' },
-    { serverId, toolName: resolvedToolNames.readDeployment, port: portName, action: 'readDeployment', safety: 'read' }
+    { serverId, toolName: resolvedToolNames.readDeployment, port: portName, action: 'readDeployment', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.listProjects, port: portName, action: 'listProjects', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.listServices, port: portName, action: 'listServices', safety: 'read' },
+    { serverId, toolName: resolvedToolNames.getServiceConfig, port: portName, action: 'getServiceConfig', safety: 'read' }
   ];
 
   if (resolvedToolNames.getServiceUrl.trim().length !== 0) {
@@ -151,10 +162,40 @@ export function createRailwayMcpToolRequirements(serverId: string, toolNames: Pa
   return requirements;
 }
 
+function buildRailwayMcpArguments(mapping: RailwayDeploymentMapping | undefined, options: { readonly includeService: boolean }): JsonObject {
+  if (mapping === undefined) {
+    return {};
+  }
+
+  return {
+    ...(mapping.projectId === undefined ? {} : { project_id: mapping.projectId }),
+    ...(mapping.environmentId === undefined ? {} : { environment_id: mapping.environmentId }),
+    ...(!options.includeService || mapping.serviceId === undefined ? {} : { service_id: mapping.serviceId })
+  };
+}
+
+function withDeploymentMapping(deployment: DeploymentResult, mapping: RailwayDeploymentMapping | undefined): DeploymentResult {
+  if (mapping === undefined) {
+    return deployment;
+  }
+
+  return {
+    ...deployment,
+    ref: {
+      ...deployment.ref,
+      ...(mapping.environmentId === undefined ? {} : { environmentId: mapping.environmentId })
+    },
+    mapping
+  };
+}
+
 type DeploymentResultSelector = DeploymentRef | {
   readonly branch: string;
   readonly commitSha: string;
   readonly environment: DeploymentEnvironment;
+  readonly projectId?: string | undefined;
+  readonly environmentId?: string | undefined;
+  readonly serviceId?: string | undefined;
 };
 
 function readDeploymentResult(content: JsonValue | undefined, selector?: DeploymentResultSelector): DeploymentResult {
@@ -175,7 +216,7 @@ function readDeploymentResult(content: JsonValue | undefined, selector?: Deploym
 }
 
 function readDeploymentObject(content: JsonValue | undefined, selector: DeploymentResultSelector | undefined): JsonObject {
-  const root = readObject(content, 'content');
+  const root = readObject(normalizeRailwayMcpContent(content, selector), 'content');
 
   if (root.deployment !== undefined) {
     return readObject(root.deployment, 'content.deployment');
@@ -193,6 +234,159 @@ function readDeploymentObject(content: JsonValue | undefined, selector: Deployme
   }
 
   throw new Error('content.deployment must be an object, or content.deployments must be an array.');
+}
+
+function normalizeRailwayMcpContent(content: JsonValue | undefined, selector: DeploymentResultSelector | undefined): JsonValue | undefined {
+  if (typeof content === 'string') {
+    return parseRailwayTextContent(content, selector) ?? content;
+  }
+
+  if (Array.isArray(content)) {
+    const text = content.map(readMcpTextContent).filter((value): value is string => value !== undefined).join('\n').trim();
+    if (text.length > 0) {
+      return parseRailwayTextContent(text, selector) ?? text;
+    }
+
+    return { deployments: content };
+  }
+
+  if (content !== undefined && isJsonObject(content)) {
+    const nestedContent = content.content;
+    if (nestedContent !== undefined && nestedContent !== content) {
+      const normalized = normalizeRailwayMcpContent(nestedContent, selector);
+      if (normalized !== undefined && normalized !== nestedContent) {
+        return normalized;
+      }
+    }
+  }
+
+  return content;
+}
+
+function readMcpTextContent(value: JsonValue): string | undefined {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (!isJsonObject(value) || value.type !== 'text' || typeof value.text !== 'string') {
+    return undefined;
+  }
+
+  return value.text;
+}
+
+function parseRailwayTextContent(text: string, selector: DeploymentResultSelector | undefined): JsonObject | undefined {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as JsonValue;
+    return isJsonObject(parsed) ? parsed : { deployments: Array.isArray(parsed) ? parsed : [parsed] };
+  } catch (error) {
+    void error;
+  }
+
+  const deployments = parseRailwayDeploymentTable(trimmed, selector);
+  return deployments.length === 0 ? undefined : { deployments };
+}
+
+function parseRailwayDeploymentTable(text: string, selector: DeploymentResultSelector | undefined): readonly JsonObject[] {
+  return text
+    .split(/\r?\n/u)
+    .map((line) => parseRailwayDeploymentTableLine(line, selector))
+    .filter((deployment): deployment is JsonObject => deployment !== undefined);
+}
+
+function parseRailwayDeploymentTableLine(line: string, selector: DeploymentResultSelector | undefined): JsonObject | undefined {
+  const parts = line.split('|').map((part) => part.trim());
+  if (parts.length < 4 || !isUuidLike(parts[0])) {
+    return undefined;
+  }
+
+  const [deploymentId, rawStatus, startedAt, commitSha] = parts;
+  const environment = selector === undefined ? 'staging' : readSelectorEnvironment(selector);
+
+  return {
+    ref: {
+      provider: 'railway',
+      projectId: readSelectorProjectId(selector),
+      ...(readSelectorEnvironmentId(selector) === undefined ? {} : { environmentId: readSelectorEnvironmentId(selector) }),
+      serviceId: readSelectorServiceId(selector),
+      deploymentId,
+      environment
+    },
+    status: normalizeRailwayDeploymentStatus(rawStatus),
+    branch: readSelectorBranch(selector),
+    commitSha,
+    serviceUrl: 'unavailable',
+    smokeChecks: [],
+    startedAt,
+    summary: `Railway deployment ${deploymentId} returned by text deployment list.`
+  };
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/iu.test(value);
+}
+
+function readSelectorProjectId(selector: DeploymentResultSelector | undefined): string {
+  if (selector === undefined) {
+    return 'unknown-project';
+  }
+
+  return 'deploymentId' in selector ? selector.projectId : selector.projectId ?? 'unknown-project';
+}
+
+function readSelectorEnvironmentId(selector: DeploymentResultSelector | undefined): string | undefined {
+  if (selector === undefined) {
+    return undefined;
+  }
+
+  return 'deploymentId' in selector ? selector.environmentId : selector.environmentId;
+}
+
+function readSelectorServiceId(selector: DeploymentResultSelector | undefined): string {
+  if (selector === undefined) {
+    return 'unknown-service';
+  }
+
+  return 'deploymentId' in selector ? selector.serviceId : selector.serviceId ?? 'unknown-service';
+}
+
+function readSelectorEnvironment(selector: DeploymentResultSelector): DeploymentEnvironment {
+  return 'deploymentId' in selector ? selector.environment : selector.environment;
+}
+
+function readSelectorBranch(selector: DeploymentResultSelector | undefined): string {
+  if (selector === undefined || 'deploymentId' in selector) {
+    return 'unknown';
+  }
+
+  return selector.branch;
+}
+
+function normalizeRailwayDeploymentStatus(status: string): DeploymentStatus {
+  const normalized = status.trim().toUpperCase();
+
+  if (normalized === 'SUCCESS' || normalized === 'SUCCEEDED') {
+    return 'success';
+  }
+
+  if (normalized === 'FAILED' || normalized === 'FAILURE' || normalized === 'CRASHED') {
+    return 'failed';
+  }
+
+  if (normalized === 'REMOVED' || normalized === 'CANCELED' || normalized === 'CANCELLED') {
+    return 'cancelled';
+  }
+
+  if (normalized === 'BUILDING' || normalized === 'DEPLOYING' || normalized === 'ROLLING_OUT') {
+    return 'deploying';
+  }
+
+  return 'pending';
 }
 
 function deploymentMatchesSelector(deployment: JsonObject, selector: DeploymentResultSelector): boolean {
@@ -215,6 +409,7 @@ function readDeploymentRef(value: JsonValue | undefined): DeploymentRef {
   return {
     provider: 'railway',
     projectId: readString(ref.projectId ?? ref.project_id, 'content.deployment.ref.projectId'),
+    ...(ref.environmentId === undefined && ref.environment_id === undefined ? {} : { environmentId: readString(ref.environmentId ?? ref.environment_id, 'content.deployment.ref.environmentId') }),
     serviceId: readString(ref.serviceId ?? ref.service_id, 'content.deployment.ref.serviceId'),
     deploymentId: readString(ref.deploymentId ?? ref.deployment_id, 'content.deployment.ref.deploymentId'),
     environment: readDeploymentEnvironment(ref.environment ?? ref.deploymentEnvironment)
@@ -274,6 +469,18 @@ function assertMatchingDeploymentWaitResult(deployment: DeploymentResult, input:
   if (deployment.ref.environment !== input.environment) {
     throw new Error(`Railway MCP deployment result environment ${deployment.ref.environment} does not match requested environment ${input.environment}.`);
   }
+
+  if (input.mapping?.projectId !== undefined && deployment.ref.projectId !== input.mapping.projectId) {
+    throw new Error(`Railway MCP deployment result projectId ${deployment.ref.projectId} does not match repository mapping projectId ${input.mapping.projectId}.`);
+  }
+
+  if (input.mapping?.serviceId !== undefined && deployment.ref.serviceId !== input.mapping.serviceId) {
+    throw new Error(`Railway MCP deployment result serviceId ${deployment.ref.serviceId} does not match repository mapping serviceId ${input.mapping.serviceId}.`);
+  }
+
+  if (input.mapping?.environmentId !== undefined && deployment.ref.environmentId !== undefined && deployment.ref.environmentId !== input.mapping.environmentId) {
+    throw new Error(`Railway MCP deployment result environmentId ${deployment.ref.environmentId} does not match repository mapping environmentId ${input.mapping.environmentId}.`);
+  }
 }
 
 function assertMatchingDeploymentRef(actual: DeploymentRef, expected: DeploymentRef): void {
@@ -283,6 +490,10 @@ function assertMatchingDeploymentRef(actual: DeploymentRef, expected: Deployment
 
   if (actual.serviceId !== expected.serviceId) {
     throw new Error(`Railway MCP deployment ref serviceId ${actual.serviceId} does not match requested serviceId ${expected.serviceId}.`);
+  }
+
+  if (expected.environmentId !== undefined && actual.environmentId !== expected.environmentId) {
+    throw new Error(`Railway MCP deployment ref environmentId ${actual.environmentId ?? 'missing'} does not match requested environmentId ${expected.environmentId}.`);
   }
 
   if (actual.deploymentId !== expected.deploymentId) {

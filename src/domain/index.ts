@@ -1,4 +1,14 @@
-export type { DeploymentEnvironment, DeploymentProvider, DeploymentRef, DeploymentResult, DeploymentStatus, SmokeCheckResult } from './deployment.js';
+export type {
+  DeploymentEnvironment,
+  DeploymentProvider,
+  DeploymentRef,
+  DeploymentResult,
+  DeploymentStatus,
+  DeploymentVerificationConfig,
+  DeploymentVerificationMode,
+  RailwayDeploymentMapping,
+  SmokeCheckResult
+} from './deployment.js';
 export type { DevRunAttemptResult, DevRunInput, DevRunProvider, DevRunResult, DevRunStatus, DevRunner } from './dev-runner.js';
 export type {
   DevelopPullRequestFollowUpEvidence,

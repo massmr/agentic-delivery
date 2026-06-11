@@ -155,7 +155,9 @@ export {
 export { JiraMcpTicketPort, MockJiraConnector, createJiraMcpToolRequirements, defaultJiraMcpToolNames } from './connectors/jira/index.js';
 export {
   MockRailwayConnector,
+  RailwayMcpDiscoveryPort,
   RailwayMcpDeploymentPort,
+  createRailwayDiscoveryMcpToolRequirements,
   createRailwayMcpToolRequirements,
   defaultRailwayMcpToolNames
 } from './connectors/railway/index.js';
@@ -391,7 +393,7 @@ export type {
 } from './connectors/github/index.js';
 export type { JiraConnector, JiraMcpAuditSink, JiraMcpTicketPortOptions, JiraMcpToolNames } from './connectors/jira/index.js';
 export type { CodeHostPort, DeploymentPort, TicketPort } from './ports/index.js';
-export type { RailwayConnector, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
+export type { RailwayConnector, RailwayDiscoveryPort, RailwayDiscoveryProject, RailwayDiscoveryService, RailwayDiscoverySnapshot, RailwayMcpDiscoveryPortOptions, ReadDeploymentInput, ServiceUrlInput, WaitForDeploymentInput } from './connectors/railway/index.js';
 export type { HttpSmokeUrlVerifierOptions, MockSmokeUrlVerifierOptions, SmokeUrlVerificationInput, SmokeUrlVerifier } from './deployment/index.js';
 export type {
   AgentWorkerLoopSummary,

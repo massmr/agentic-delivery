@@ -90,6 +90,18 @@ repos:
     staging_smoke_urls:
       - /
       - /health
+    deployments:
+      staging:
+        provider: railway
+        project_id: prj_frontend
+        environment_id: env_staging
+        service_id: svc_frontend
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /
+            - /health
 
   - name: api
     url: git@github.com:your-org/api.git
@@ -104,3 +116,14 @@ repos:
       - database
     staging_smoke_urls:
       - /health
+    deployments:
+      staging:
+        provider: railway
+        project_id: prj_api
+        environment_id: env_staging
+        service_id: svc_api
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health

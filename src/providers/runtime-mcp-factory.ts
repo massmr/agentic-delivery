@@ -14,7 +14,7 @@ export type RuntimeMcpClientFactory = (server: McpServerConfig) => McpClient | P
 export type RuntimeMcpAuditSink = (records: readonly McpToolCallAuditRecord[]) => void;
 export type RuntimeJiraMcpAction = 'listBacklog' | 'getTicket' | 'comment';
 export type RuntimeGitHubMcpAction = 'createBranch' | 'openPullRequest' | 'readPullRequest' | 'getChecks' | 'mergePullRequest' | 'commentOnPullRequest';
-export type RuntimeRailwayMcpAction = 'waitForDeployment' | 'readDeployment' | 'getServiceUrl';
+export type RuntimeRailwayMcpAction = 'waitForDeployment' | 'readDeployment' | 'getServiceUrl' | 'listProjects' | 'listServices' | 'getServiceConfig';
 
 export interface RuntimeProviderFactoryOptions {
   readonly config: WorkspaceConfig;

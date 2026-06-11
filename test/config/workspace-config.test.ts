@@ -49,7 +49,195 @@ test('loads and validates config/workspace.example.yml', async () => {
     productionBranch: 'main',
     qualityProfile: 'node',
     hints: ['frontend', 'ui', 'web', 'next'],
-    stagingSmokeUrls: ['/', '/health']
+    stagingSmokeUrls: ['/', '/health'],
+    deployments: {
+      staging: {
+        provider: 'railway',
+        projectId: 'prj_frontend',
+        environmentId: 'env_staging',
+        serviceId: 'svc_frontend',
+        branch: 'develop',
+        verification: {
+          mode: 'railway_mcp',
+          smokeUrls: ['/', '/health']
+        }
+      }
+    }
+  });
+});
+
+test('workspace repository config parses explicit Railway deployment mappings', () => {
+  const config = parseWorkspaceConfig(`
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mcp
+  staging_branch: develop
+  production_branch: main
+  mcp_server: railway
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  railway:
+    display_name: Railway MCP
+    command: railway
+    args:
+      - mcp
+repos:
+  - name: api
+    url: git@github.com:agentic/api.git
+    local_path: ../api
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - api
+    staging_smoke_urls:
+      - /health
+    deployments:
+      staging:
+        provider: railway
+        project_id: project-api
+        environment_id: env-staging
+        service_id: service-api
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /ready
+`);
+
+  assert.deepEqual(config.repos[0]?.deployments?.staging, {
+    provider: 'railway',
+    projectId: 'project-api',
+    environmentId: 'env-staging',
+    serviceId: 'service-api',
+    branch: 'develop',
+    verification: {
+      mode: 'railway_mcp',
+      smokeUrls: ['/ready']
+    }
+  });
+});
+
+test('workspace repository deployment mapping accepts missing Railway IDs for doctor guidance', () => {
+  const config = parseWorkspaceConfig(`
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mcp
+  staging_branch: develop
+  production_branch: main
+  mcp_server: railway
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+mcp_servers:
+  railway:
+    display_name: Railway MCP
+    command: railway
+    args:
+      - mcp
+repos:
+  - name: worker
+    url: git@github.com:agentic/worker.git
+    local_path: ../worker
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - worker
+    staging_smoke_urls: []
+    deployments:
+      staging:
+        provider: railway
+        branch: develop
+        verification:
+          mode: railway_mcp
+`);
+
+  assert.equal(config.repos[0]?.deployments?.staging?.projectId, undefined);
+  assert.equal(config.repos[0]?.deployments?.staging?.verification.mode, 'railway_mcp');
+});
+
+test('workspace repository deployment mapping defaults verification smoke URLs from repository smoke URLs', () => {
+  const config = parseWorkspaceConfig(`
+workspace:
+  name: test
+  autonomy: full_until_production_pr
+  staging_branch: develop
+  production_branch: main
+  max_concurrent_tickets: 1
+jira:
+  mode: mock
+  base_url: https://jira.example.test
+  project_keys:
+    - AD
+github:
+  mode: mock
+  organization: agentic
+railway:
+  mode: mock
+  staging_branch: develop
+  production_branch: main
+dev_runner:
+  provider: opencode
+  command: opencode
+  max_attempts: 2
+quality:
+  default_profile: node
+repos:
+  - name: frontend
+    url: git@github.com:agentic/frontend.git
+    local_path: ../frontend
+    default_branch: develop
+    production_branch: main
+    quality_profile: node
+    hints:
+      - frontend
+    staging_smoke_urls:
+      - /health
+    deployments:
+      staging:
+        provider: railway
+        verification:
+          mode: http_smoke
+`);
+
+  assert.deepEqual(config.repos[0]?.deployments?.staging?.verification, {
+    mode: 'http_smoke',
+    smokeUrls: ['/health']
   });
 });
 
@@ -110,6 +298,38 @@ test('workspace config discovery mode normalizes sibling Git repositories', () =
     assert.deepEqual(config.repositoryDiscovery?.exclude, []);
     assert.deepEqual(config.repos.map((repo) => repo.name), ['service-a', 'service-b']);
     assert.equal(config.repos[0]?.localPath, './service-a');
+  } finally {
+    rmSync(rootPath, { recursive: true, force: true });
+  }
+});
+
+test('workspace config discovery mode applies per-repository deployment overrides without losing other repos', () => {
+  const rootPath = mkdtempSync(join(tmpdir(), 'ewokbot-config-discovery-deployments-'));
+
+  try {
+    mkdirSync(join(rootPath, 'frontend', '.git'), { recursive: true });
+    mkdirSync(join(rootPath, 'api', '.git'), { recursive: true });
+
+    const config = parseWorkspaceConfig(minimalWorkspaceConfig(`repos:
+  discovery: sibling-git-directories
+  exclude: []
+  deployments:
+    frontend:
+      staging:
+        provider: railway
+        project_id: project-frontend
+        environment_id: env-staging
+        service_id: service-frontend
+        branch: develop
+        verification:
+          mode: railway_mcp
+          smoke_urls:
+            - /health
+`), { workspaceRoot: rootPath });
+
+    assert.deepEqual(config.repos.map((repo) => repo.name), ['api', 'frontend']);
+    assert.equal(config.repos.find((repo) => repo.name === 'api')?.deployments?.staging, undefined);
+    assert.equal(config.repos.find((repo) => repo.name === 'frontend')?.deployments?.staging?.projectId, 'project-frontend');
   } finally {
     rmSync(rootPath, { recursive: true, force: true });
   }

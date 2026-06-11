@@ -45,7 +45,8 @@ export function createDiscoveredRepositoryConfig(name: string): WorkspaceReposit
     productionBranch: 'main',
     qualityProfile: 'node',
     hints: createHints(name),
-    stagingSmokeUrls: []
+    stagingSmokeUrls: [],
+    deployments: undefined
   };
 }
 

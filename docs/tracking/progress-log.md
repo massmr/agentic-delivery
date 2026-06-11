@@ -1,5 +1,50 @@
 # Progress Log
 
+## 2026-06-11
+
+Implemented Milestone BE Railway MCP Discovery And Repository Mapping:
+
+- Added a setup-only Railway MCP discovery boundary that allowlists read-only `list_projects`, `list_services`, and `get_service_config` tool mappings separately from the runtime Railway deployment adapter.
+- Extended interactive `ewokbot init` so injected Railway discovery can present discovered sibling Git repositories and Railway services, persist per-repo staging mappings under `repos.deployments`, and preserve unmapped sibling repositories through `repos.discovery: sibling-git-directories`.
+- Preserved manual project/environment/service id entry and explicit `none`/`github_only` skip choices for unavailable discovery, incomplete discovery results, non-interactive setup, or operator preference.
+- Kept runtime smoke/staging verification on persisted repository mappings only; no `railway link` dependency, Railway mutation tools, variable-value reads, production deployment, or live provider calls were added.
+- Added fake-only coverage for the discovery adapter and init mapping flow, including `api` and `frontend` Railway MCP mappings plus a `worker` explicit `none` skip without printing Railway tokens or variable values.
+
+Verification commands run for BE:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm run typecheck`
+- `pnpm run build`
+- `node --test dist/test/railway-mcp-deployment-port.test.js dist/test/cli-init.test.js` (`39/39`)
+- `pnpm test` (`426/426`)
+- `git diff --check`
+- `gitnexus_detect_changes({ scope: "all", repo: "ewokbot" })` reported critical overall impact across the existing staged BD/BE workspace diff; focused BE discovery/init behavior is covered by the passing fake-only tests above.
+
+Prepared Milestone BE Railway MCP Discovery And Repository Mapping:
+
+- Reframed the next approved Railway work as a guided setup/discovery milestone rather than the operator-agent milestone.
+- Defined the BE target flow: discover local repositories, discover Railway projects/services through read-only Railway MCP tools, map each repo to its staging Railway target, and persist mappings under `repos.deployments` while preserving sibling Git discovery.
+- Shifted the later milestones to BF Operator Agent Action Sandbox, BG Ewokbot Control UI v1, and BH Cubic Review Provider.
+- Updated README and tracking docs so missing Railway mappings are treated as actionable failures unless the repository explicitly chooses `none` or `github_only`.
+
+Implemented Milestone BD Railway Deployment Mapping Per Repository:
+
+- Added explicit per-repository staging deployment mappings to workspace config, including Railway project, environment, service, branch, and verification mode fields.
+- Supported repository verification modes `railway_mcp`, `http_smoke`, `github_only`, and `none`; worker-style repos should use an explicit `none` or `github_only` mode when Railway staging should be skipped.
+- Updated Railway MCP staging verification to pass the selected repository mapping's `project_id`, `environment_id`, and `service_id` into read-only Railway MCP calls instead of relying on `railway link` or the current working directory.
+- Kept Railway MCP access read-only by allowlisting discovery/setup evidence tools (`list_projects`, `list_services`, `get_service_config`) and deployment evidence tools (`environment_status`, `list_deployments`) without adding deploy, scale, variable, domain, source/link, production deploy, or other mutation paths.
+- Extended interactive `ewokbot init` so operators can enter explicit per-repository Railway staging mappings and manual IDs when Railway discovery is unavailable; non-interactive init remains discovery-based and mock-safe by default.
+- Extended `ewokbot doctor` with local-only per-repository deployment mapping diagnostics for missing Railway IDs, no-deployment repos, `http_smoke` URL requirements, and mapping IDs used for `railway_mcp`, without calling live Railway MCP, Railway CLI sessions, Docker, package managers, or network APIs.
+- Surfaced the selected deployment mapping in staging reports, final reports, and status output so operators can see which repository/project/environment/service/mode was used.
+- Added fake-only coverage for config parsing, incomplete mapping diagnostics, init rendering, doctor checks, staging skip/http-smoke/railway-mcp behavior, Railway MCP argument mapping, status output, and smoke command staging calls.
+- Preserved BD scope only: no Cubic review provider, operator-agent sandbox, web UI, Telegram, WhatsApp, production merge automation, production deploy, Railway mutating tools, live provider/MCP/Docker/OAuth/network calls in tests, or raw MCP tool exposure was added.
+
+Verification commands run for BD so far:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm run build`
+- `node --test dist/test/setup/doctor.test.js dist/test/smoke-command.test.js dist/test/staging.test.js` (`33/33`)
+
 ## 2026-06-09
 
 Implemented Milestone BC Develop PR Follow-Up Policy:

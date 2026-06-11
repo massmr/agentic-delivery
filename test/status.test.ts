@@ -85,9 +85,21 @@ const stagingDeployment = {
   ref: {
     provider: 'railway',
     projectId: 'mock-project-agentic',
+    environmentId: 'mock-environment-staging',
     serviceId: 'mock-service-frontend',
     deploymentId: 'mock-agentic-frontend-staging-develop-abc123',
     environment: 'staging'
+  },
+  mapping: {
+    provider: 'railway',
+    projectId: 'mock-project-agentic',
+    environmentId: 'mock-environment-staging',
+    serviceId: 'mock-service-frontend',
+    branch: 'develop',
+    verification: {
+      mode: 'railway_mcp',
+      smokeUrls: ['/health']
+    }
   },
   status: 'success',
   branch: 'develop',
@@ -199,6 +211,7 @@ test('renderRunStatus summarizes state, repositories, branches, PRs, quality, st
   assert.match(rendered, /Agent Product Changed Files: none/u);
   assert.match(rendered, /Agent Ignored Files: \.omo\/session\.json/u);
   assert.match(rendered, /Deployment: mock-agentic-frontend-staging-develop-abc123/u);
+  assert.match(rendered, /Mapping: project mock-project-agentic, environment mock-environment-staging, service mock-service-frontend, mode railway_mcp/u);
   assert.match(rendered, /Smoke check failed/u);
   assert.match(rendered, /Review failed smoke check/u);
 });

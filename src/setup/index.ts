@@ -15,6 +15,7 @@ export type {
   SetupDetectionResult,
   SetupGeneratedConfigMetadata,
   SetupProviderCapability,
+  SetupRepositoryDeploymentSelection,
   SetupSelections,
   SetupValidationResult,
   TicketProviderSelection

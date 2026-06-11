@@ -1,18 +1,21 @@
-import type { DeploymentEnvironment, DeploymentRef, DeploymentResult, RepositoryRef } from '../domain/index.js';
+import type { DeploymentEnvironment, DeploymentRef, DeploymentResult, RailwayDeploymentMapping, RepositoryRef } from '../domain/index.js';
 
 export interface WaitForDeploymentInput {
   readonly repository: RepositoryRef;
   readonly branch: string;
   readonly commitSha: string;
   readonly environment: DeploymentEnvironment;
+  readonly mapping?: RailwayDeploymentMapping | undefined;
 }
 
 export interface ReadDeploymentInput {
   readonly ref: DeploymentRef;
+  readonly mapping?: RailwayDeploymentMapping | undefined;
 }
 
 export interface ServiceUrlInput {
   readonly ref: DeploymentRef;
+  readonly mapping?: RailwayDeploymentMapping | undefined;
 }
 
 export interface DeploymentPort {

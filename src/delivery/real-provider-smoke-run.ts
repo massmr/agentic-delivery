@@ -363,11 +363,12 @@ export async function runRealProviderSmokeRun(input: RunRealProviderSmokeRunInpu
     return buildResult(developState, runId, planReportPath, { implementationLogPath, qualityReportPath, finalReportPath });
   }
 
+  const stagingCommitSha = developState.developPullRequestFollowUp?.mergeResult?.commitSha ?? pushedBranch.headSha ?? branch.headSha ?? 'unknown-head';
   const stagingState = await runStagingVerification({
     state: developState,
     repository,
     branch: repository.branchPolicy.stagingTarget,
-    commitSha: pushedBranch.headSha ?? branch.headSha ?? 'unknown-head',
+    commitSha: stagingCommitSha,
     railway: input.adapters.railway,
     smokeVerifier: input.smokeVerifier ?? new HttpSmokeUrlVerifier(),
     stateStore,
@@ -438,7 +439,8 @@ function toRepositoryConfig(repository: WorkspaceRepositoryConfig, owner: string
       productionTarget: 'main'
     },
     qualityGates: [],
-    stagingSmokeUrls: repository.stagingSmokeUrls
+    stagingSmokeUrls: repository.stagingSmokeUrls,
+    stagingDeployment: repository.deployments?.staging
   };
 }
 

@@ -155,6 +155,10 @@ export function renderStagingReportMarkdown(ticketKey: string, runId: string, de
     `Status: ${deployment.status.toUpperCase()}`,
     `Provider: ${deployment.ref.provider}`,
     `Environment: ${deployment.ref.environment}`,
+    `Mapping Project ID: ${deployment.mapping?.projectId ?? deployment.ref.projectId}`,
+    `Mapping Environment ID: ${deployment.mapping?.environmentId ?? deployment.ref.environmentId ?? 'not configured'}`,
+    `Mapping Service ID: ${deployment.mapping?.serviceId ?? deployment.ref.serviceId}`,
+    `Mapping Verification Mode: ${deployment.mapping?.verification.mode ?? 'not configured'}`,
     `Deployment ID: ${deployment.ref.deploymentId}`,
     `Branch: ${deployment.branch}`,
     `Commit SHA: ${deployment.commitSha}`,
@@ -476,6 +480,7 @@ function renderStagingSummary(deployment: DeploymentResult | undefined, reportPa
   return [
     `- Status: ${deployment.status.toUpperCase()}`,
     `- Staging Report: ${reportPath ?? 'not recorded'}`,
+    `- Mapping: project ${deployment.mapping?.projectId ?? deployment.ref.projectId}, environment ${deployment.mapping?.environmentId ?? deployment.ref.environmentId ?? 'not configured'}, service ${deployment.mapping?.serviceId ?? deployment.ref.serviceId}, mode ${deployment.mapping?.verification.mode ?? 'not configured'}`,
     `- Deployment: ${deployment.ref.deploymentId}`,
     `- Branch: ${deployment.branch}`,
     `- Service URL: ${deployment.serviceUrl}`,

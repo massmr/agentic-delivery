@@ -6,6 +6,7 @@ import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 
 import { createCliProgram, parseWorkspaceConfig } from '../src/index.js';
+import type { RailwayDiscoveryPort } from '../src/index.js';
 import { promptForSelectionsWithPromptAdapter, type InitPromptAdapter, type InitPromptChoice } from '../src/cli/commands/init.js';
 
 function createTestUserLayoutOptions(workspaceDir: string) {
@@ -394,6 +395,7 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
     secrets.github,
     ['railway', 'vercel'],
     'railway-mcp',
+    false,
     secrets.vercel
   ]);
 
@@ -474,6 +476,231 @@ test('ewokbot init interactive-style wizard asks credentials and MCP settings wi
   assert.match(envExample, /^GITHUB_PERSONAL_ACCESS_TOKEN=$/mu);
   assert.doesNotMatch(envExample, /^RAILWAY_TOKEN=/mu);
   assert.match(envExample, /^VERCEL_TOKEN=$/mu);
+});
+
+test('ewokbot init wizard renders explicit per-repository Railway deployment mappings', async () => {
+  const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-bd-repo-mapping-'));
+  mkdirSync(join(workspaceDir, 'frontend', '.git'), { recursive: true });
+  mkdirSync(join(workspaceDir, 'api', '.git'), { recursive: true });
+  mkdirSync(join(workspaceDir, 'worker', '.git'), { recursive: true });
+  const captured = createCapturedIO();
+  const prompts = createFakePromptAdapter([
+    'mock',
+    false,
+    'mock',
+    'mock',
+    ['railway'],
+    'railway-mcp',
+    true,
+    'frontend,api,worker',
+    'http_smoke',
+    'https://frontend.example.test/health',
+    'git@github.com:agentic/frontend.git',
+    '../frontend',
+    'develop',
+    'main',
+    'node',
+    'frontend,ui',
+    '',
+    '',
+    '',
+    'develop',
+    'railway_mcp',
+    '/health',
+    'git@github.com:agentic/api.git',
+    '../api',
+    'develop',
+    'main',
+    'node',
+    'api',
+    'project-api',
+    'env-staging',
+    'service-api',
+    'develop',
+    'none',
+    '',
+    'git@github.com:agentic/worker.git',
+    '../worker',
+    'develop',
+    'main',
+    'node',
+    'worker',
+    '',
+    '',
+    '',
+    'develop'
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: workspaceDir,
+    io: captured.io,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
+    initPrompter: async (defaults, context) => promptForSelectionsWithPromptAdapter({ ...defaults, deploymentMonitor: 'none' }, prompts, context)
+  }).run(['node', 'ewokbot', 'init']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(captured.stderr, '');
+  assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message === 'Configure explicit per-repository Railway staging mappings now?'), true);
+
+  const configYaml = readFileSync(join(workspaceDir, '.ewokbot', 'workspace.yml'), 'utf8');
+  const config = parseWorkspaceConfig(configYaml, { workspaceRoot: workspaceDir });
+  assert.equal(config.repos.length, 3);
+  assert.equal(config.repositoryDiscovery?.discovery, 'sibling-git-directories');
+  const frontend = config.repos.find((repo) => repo.name === 'frontend');
+  const api = config.repos.find((repo) => repo.name === 'api');
+  const worker = config.repos.find((repo) => repo.name === 'worker');
+  assert.deepEqual(frontend?.deployments?.staging?.verification, {
+    mode: 'http_smoke',
+    smokeUrls: ['https://frontend.example.test/health']
+  });
+  assert.deepEqual(api?.deployments?.staging, {
+    provider: 'railway',
+    projectId: 'project-api',
+    environmentId: 'env-staging',
+    serviceId: 'service-api',
+    branch: 'develop',
+    verification: {
+      mode: 'railway_mcp',
+      smokeUrls: ['/health']
+    }
+  });
+  assert.equal(worker?.deployments?.staging?.verification.mode, 'none');
+  assert.doesNotMatch(configYaml, /project_id: $/mu);
+  assert.match(configYaml, /repos:\n  discovery: sibling-git-directories\n  exclude: \[\]\n  deployments:/u);
+  assert.match(configYaml, /frontend:\n      staging:\n        provider: railway/u);
+});
+
+test('ewokbot init maps discovered sibling repos to discovered Railway services with explicit skips', async () => {
+  const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-be-discovery-'));
+  mkdirSync(join(workspaceDir, 'frontend', '.git'), { recursive: true });
+  mkdirSync(join(workspaceDir, 'api', '.git'), { recursive: true });
+  mkdirSync(join(workspaceDir, 'worker', '.git'), { recursive: true });
+  const captured = createCapturedIO();
+  const railwayDiscovery: RailwayDiscoveryPort = {
+    async discover() {
+      return {
+        projects: [
+          { id: 'project-web', name: 'Web Platform' },
+          { id: 'project-api', name: 'API Platform' }
+        ],
+        services: [
+          { id: 'service-api', name: 'api', projectId: 'project-api', projectName: 'API Platform', environmentId: 'env-api-staging', environmentName: 'staging', branch: 'develop' },
+          { id: 'service-frontend', name: 'frontend', projectId: 'project-web', projectName: 'Web Platform', environmentId: 'env-web-staging', environmentName: 'staging', branch: 'develop' }
+        ]
+      };
+    }
+  };
+  const prompts = createFakePromptAdapter([
+    'mock',
+    false,
+    'mock',
+    'mock',
+    ['railway'],
+    'railway-mcp',
+    true,
+    'discovered_railway_mcp',
+    'service-api',
+    'discovered_railway_mcp',
+    'service-frontend',
+    'none'
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: workspaceDir,
+    io: captured.io,
+    initRailwayDiscovery: railwayDiscovery,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
+    initPrompter: async (defaults, context) => promptForSelectionsWithPromptAdapter({ ...defaults, deploymentMonitor: 'none' }, prompts, context)
+  }).run(['node', 'ewokbot', 'init']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(captured.stderr, '');
+  assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message === 'Use Railway MCP discovery to map sibling Git repositories?'), true);
+  assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message === 'Configure explicit per-repository Railway staging mappings now?'), false);
+
+  const configYaml = readFileSync(join(workspaceDir, '.ewokbot', 'workspace.yml'), 'utf8');
+  const config = parseWorkspaceConfig(configYaml, { workspaceRoot: workspaceDir });
+  const frontend = config.repos.find((repo) => repo.name === 'frontend');
+  const api = config.repos.find((repo) => repo.name === 'api');
+  const worker = config.repos.find((repo) => repo.name === 'worker');
+
+  assert.equal(config.repos.length, 3);
+  assert.equal(config.repositoryDiscovery?.discovery, 'sibling-git-directories');
+  assert.deepEqual(api?.deployments?.staging, {
+    provider: 'railway',
+    projectId: 'project-api',
+    environmentId: 'env-api-staging',
+    serviceId: 'service-api',
+    branch: 'develop',
+    verification: { mode: 'railway_mcp', smokeUrls: [] }
+  });
+  assert.deepEqual(frontend?.deployments?.staging, {
+    provider: 'railway',
+    projectId: 'project-web',
+    environmentId: 'env-web-staging',
+    serviceId: 'service-frontend',
+    branch: 'develop',
+    verification: { mode: 'railway_mcp', smokeUrls: [] }
+  });
+  assert.equal(worker?.deployments?.staging?.verification.mode, 'none');
+  assert.match(configYaml, /repos:\n  discovery: sibling-git-directories\n  exclude: \[\]\n  deployments:/u);
+  assert.doesNotMatch(configYaml, /RAILWAY_TOKEN|variableValue|variables:/u);
+});
+
+test('ewokbot init falls back to manual Railway mapping when MCP discovery fails', async () => {
+  const workspaceDir = mkdtempSync(join(tmpdir(), 'ewokbot-init-be-discovery-fallback-'));
+  mkdirSync(join(workspaceDir, 'frontend', '.git'), { recursive: true });
+  const captured = createCapturedIO();
+  const railwayDiscovery: RailwayDiscoveryPort = {
+    async discover() {
+      throw new Error('Railway MCP session is not authenticated');
+    }
+  };
+  const prompts = createFakePromptAdapter([
+    'mock',
+    false,
+    'mock',
+    'mock',
+    ['railway'],
+    'railway-mcp',
+    true,
+    'frontend',
+    'railway_mcp',
+    '/health',
+    'git@github.com:agentic/frontend.git',
+    './frontend',
+    'develop',
+    'main',
+    'node',
+    'frontend',
+    'project-frontend',
+    'env-staging',
+    'service-frontend',
+    'develop'
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: workspaceDir,
+    io: captured.io,
+    initRailwayDiscovery: railwayDiscovery,
+    initUserLayoutOptions: createTestUserLayoutOptions(workspaceDir),
+    initPrompter: async (defaults, context) => promptForSelectionsWithPromptAdapter({ ...defaults, deploymentMonitor: 'none' }, prompts, context)
+  }).run(['node', 'ewokbot', 'init', '--debug']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(captured.stderr, '');
+  assert.match(captured.stdout, /Railway MCP discovery unavailable; falling back to manual Railway mapping/u);
+  assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message === 'Use Railway MCP discovery to map sibling Git repositories?'), false);
+  assert.equal(prompts.calls.some((call) => call.kind === 'confirm' && call.message === 'Configure explicit per-repository Railway staging mappings now?'), true);
+
+  const configYaml = readFileSync(join(workspaceDir, '.ewokbot', 'workspace.yml'), 'utf8');
+  const config = parseWorkspaceConfig(configYaml, { workspaceRoot: workspaceDir });
+  const frontend = config.repos.find((repo) => repo.name === 'frontend');
+
+  assert.equal(config.repositoryDiscovery?.discovery, 'sibling-git-directories');
+  assert.equal(frontend?.deployments?.staging?.projectId, 'project-frontend');
+  assert.equal(frontend?.deployments?.staging?.environmentId, 'env-staging');
+  assert.equal(frontend?.deployments?.staging?.serviceId, 'service-frontend');
 });
 
 test('ewokbot init allows an empty Jira project-key constraint for all visible projects', async () => {

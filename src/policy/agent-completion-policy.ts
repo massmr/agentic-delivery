@@ -109,7 +109,8 @@ function parseBlockers(value: string | undefined): readonly string[] {
 function extractSummaryText(text: string): string {
   const matches = [...text.matchAll(/(?:##\s*)?Required Final Completion Summary/giu)];
   const marker = matches.at(-1);
-  const summary = marker === undefined ? findLastCompletionFieldBlock(text) ?? '' : text.slice(marker.index);
+  const searchText = marker === undefined ? text : text.slice(marker.index);
+  const summary = findLastCompletionFieldBlock(searchText) ?? (marker === undefined ? '' : searchText);
   return trimTrailingSummaryNoise(summary.trim()).slice(0, 4000);
 }
 
@@ -144,6 +145,7 @@ function findSummaryEndIndex(text: string): number {
 function findLastCompletionFieldBlock(text: string): string | undefined {
   const lines = text.split(/\r?\n/u);
   let candidate: string | undefined;
+  let partialCandidate: string | undefined;
 
   for (let index = 0; index < lines.length; index += 1) {
     const statusValue = findLineField(lines[index] ?? '', 'Status');
@@ -156,38 +158,73 @@ function findLastCompletionFieldBlock(text: string): string | undefined {
 
     if (block !== undefined) {
       candidate = block;
+    } else {
+      partialCandidate = collectCompletionFieldCluster(lines, index).join('\n');
     }
   }
 
-  return candidate;
+  return candidate ?? partialCandidate;
 }
 
 function buildCompletionFieldBlock(lines: readonly string[], statusIndex: number): string | undefined {
-  const searchEnd = findCompletionBlockSearchEnd(lines, statusIndex);
-  const fieldIndexes = completionFieldLabels.map((label) => findFieldLineIndex(lines, label, statusIndex, searchEnd));
+  const cluster = collectCompletionFieldCluster(lines, statusIndex);
+  const fieldIndexes = completionFieldLabels.map((label) => findFieldLineIndex(cluster, label));
 
   if (fieldIndexes.some((index) => index === -1)) {
     return undefined;
   }
 
+  const firstFieldIndex = Math.min(...fieldIndexes);
   const lastFieldIndex = Math.max(...fieldIndexes);
-  return lines.slice(statusIndex, lastFieldIndex + 1).join('\n');
+  const blockStart = findCompletionBlockStart(cluster, firstFieldIndex);
+  return cluster.slice(blockStart, lastFieldIndex + 1).join('\n');
 }
 
-function findCompletionBlockSearchEnd(lines: readonly string[], statusIndex: number): number {
-  const maxSearchEnd = Math.min(lines.length, statusIndex + 24);
+function collectCompletionFieldCluster(lines: readonly string[], statusIndex: number): readonly string[] {
+  let start = statusIndex;
+  let end = statusIndex + 1;
+  const searchStart = Math.max(0, statusIndex - 24);
+  const searchEnd = Math.min(lines.length, statusIndex + 25);
 
-  for (let index = statusIndex + 1; index < maxSearchEnd; index += 1) {
-    if (/^\s*##\s+Attempt\s+\d+/iu.test(lines[index] ?? '') || /^\s*###\s+Stderr\b/iu.test(lines[index] ?? '')) {
-      return index;
+  for (let index = statusIndex - 1; index >= searchStart; index -= 1) {
+    if (isCompletionBlockBoundary(lines[index] ?? '') || (lines[index] ?? '').trim().length === 0) {
+      break;
     }
+
+    start = index;
   }
 
-  return maxSearchEnd;
+  for (let index = statusIndex + 1; index < searchEnd; index += 1) {
+    if (isCompletionBlockBoundary(lines[index] ?? '') || (lines[index] ?? '').trim().length === 0) {
+      break;
+    }
+
+    end = index + 1;
+  }
+
+  return lines.slice(start, end);
 }
 
-function findFieldLineIndex(lines: readonly string[], label: string, start: number, end: number): number {
-  for (let index = start; index < end; index += 1) {
+function findCompletionBlockStart(lines: readonly string[], firstFieldIndex: number): number {
+  let index = firstFieldIndex - 1;
+
+  while (index >= 0 && findAnyCompletionField(lines[index] ?? '') === undefined) {
+    index -= 1;
+  }
+
+  return Math.max(index + 1, firstFieldIndex - 1);
+}
+
+function findAnyCompletionField(line: string): string | undefined {
+  return completionFieldLabels.find((label) => findLineField(line, label) !== undefined);
+}
+
+function isCompletionBlockBoundary(line: string): boolean {
+  return /^\s*##\s+Attempt\s+\d+/iu.test(line) || /^\s*###\s+(?:Stdout|Stderr)\b/iu.test(line) || /^\s*````?\s*$/u.test(line);
+}
+
+function findFieldLineIndex(lines: readonly string[], label: string): number {
+  for (let index = 0; index < lines.length; index += 1) {
     if (findLineField(lines[index] ?? '', label) !== undefined) {
       return index;
     }

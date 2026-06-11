@@ -8,7 +8,10 @@ const publicRuntimeMcp = createPublicCliRuntimeMcp({ environmentProvider: () => 
 
 async function main(): Promise<void> {
   try {
-    process.exitCode = await createCliProgram({ runtimeMcp: publicRuntimeMcp.runtimeMcp }).run(process.argv);
+    process.exitCode = await createCliProgram({
+      runtimeMcp: publicRuntimeMcp.runtimeMcp,
+      initRailwayDiscovery: publicRuntimeMcp.createRailwayDiscovery()
+    }).run(process.argv);
   } catch (error: unknown) {
     process.stderr.write(error instanceof Error ? `${error.message}\n` : `${String(error)}\n`);
     process.exitCode = 1;
