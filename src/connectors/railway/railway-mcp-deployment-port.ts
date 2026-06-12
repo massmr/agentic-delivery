@@ -5,7 +5,15 @@ import type { DeploymentPort, ReadDeploymentInput, ServiceUrlInput, WaitForDeplo
 import type { RailwayConnector } from './railway-connector.js';
 
 const portName = 'DeploymentPort';
+const defaultWaitMaxAttempts = 120;
+const defaultWaitPollIntervalMs = 5000;
+const missingRequestedDeploymentMessage = 'content.deployments must include the requested Railway deployment.';
+
 type RailwayMcpAction = 'waitForDeployment' | 'readDeployment' | 'getServiceUrl' | 'listProjects' | 'listServices' | 'getServiceConfig';
+
+const defaultRailwayWaitSleep = (ms: number): Promise<void> => new Promise((resolve) => {
+  setTimeout(resolve, ms);
+});
 
 export interface RailwayMcpToolNames {
   readonly waitForDeployment: string;
@@ -39,6 +47,9 @@ export interface RailwayMcpDeploymentPortOptions {
   readonly client: McpClient;
   readonly serverId: string;
   readonly timeoutMs?: number | undefined;
+  readonly waitMaxAttempts?: number | undefined;
+  readonly waitPollIntervalMs?: number | undefined;
+  readonly sleep?: ((ms: number) => Promise<void>) | undefined;
   readonly toolNames?: Partial<RailwayMcpToolNames> | undefined;
   readonly auditSink?: RailwayMcpAuditSink | undefined;
 }
@@ -48,36 +59,54 @@ export class RailwayMcpDeploymentPort implements RailwayConnector, DeploymentPor
   private readonly auditSink: RailwayMcpAuditSink | undefined;
   private readonly client: McpClient;
   private readonly serverId: string;
+  private readonly sleep: (ms: number) => Promise<void>;
   private readonly timeoutMs: number | undefined;
   private readonly toolNames: RailwayMcpToolNames;
+  private readonly waitMaxAttempts: number;
+  private readonly waitPollIntervalMs: number;
 
   constructor(options: RailwayMcpDeploymentPortOptions) {
     this.client = options.client;
     this.serverId = options.serverId;
+    this.sleep = options.sleep ?? defaultRailwayWaitSleep;
     this.timeoutMs = options.timeoutMs;
+    this.waitMaxAttempts = readPositiveIntegerOption(options.waitMaxAttempts, defaultWaitMaxAttempts, 'waitMaxAttempts');
+    this.waitPollIntervalMs = readNonNegativeIntegerOption(options.waitPollIntervalMs, defaultWaitPollIntervalMs, 'waitPollIntervalMs');
     this.toolNames = { ...defaultRailwayMcpToolNames, ...options.toolNames };
     this.auditSink = options.auditSink;
     this.allowlist = createRailwayMcpToolRequirements(options.serverId, this.toolNames);
   }
 
   async waitForDeployment(input: WaitForDeploymentInput): Promise<DeploymentResult> {
-    await this.callRailwayTool(this.toolNames.environmentStatus, 'waitForDeployment', buildRailwayMcpArguments(input.mapping, { includeService: false }));
+    const selector = buildDeploymentResultSelector(input);
+    let lastObservation = 'No matching Railway deployment was found.';
 
-    const execution = await this.callRailwayTool(this.toolNames.waitForDeployment, 'waitForDeployment', {
-      ...buildRailwayMcpArguments(input.mapping, { includeService: true }),
-      limit: 25
-    });
+    for (let attempt = 1; attempt <= this.waitMaxAttempts; attempt += 1) {
+      await this.callRailwayTool(this.toolNames.environmentStatus, 'waitForDeployment', buildRailwayMcpArguments(input.mapping, { includeService: false }));
 
-    const deployment = readDeploymentResult(execution.result.content, {
-      branch: input.branch,
-      commitSha: input.commitSha,
-      environment: input.environment,
-      projectId: input.mapping?.projectId,
-      environmentId: input.mapping?.environmentId,
-      serviceId: input.mapping?.serviceId
-    });
-    assertMatchingDeploymentWaitResult(deployment, input);
-    return withDeploymentMapping(deployment, input.mapping);
+      const execution = await this.callRailwayTool(this.toolNames.waitForDeployment, 'waitForDeployment', {
+        ...buildRailwayMcpArguments(input.mapping, { includeService: true }),
+        limit: 25
+      });
+
+      const deployment = readDeploymentResultForWait(execution.result.content, selector);
+      if (deployment !== undefined) {
+        assertMatchingDeploymentWaitResult(deployment, input);
+        const mappedDeployment = withDeploymentMapping(deployment, input.mapping);
+
+        if (isTerminalDeploymentStatus(mappedDeployment.status)) {
+          return mappedDeployment;
+        }
+
+        lastObservation = `Last status: ${mappedDeployment.status}.`;
+      }
+
+      if (attempt < this.waitMaxAttempts) {
+        await this.sleep(this.waitPollIntervalMs);
+      }
+    }
+
+    throw new Error(buildDeploymentPollingTimeoutMessage(input, this.waitMaxAttempts, lastObservation));
   }
 
   async readDeployment(input: ReadDeploymentInput): Promise<DeploymentResult> {
@@ -189,6 +218,58 @@ function withDeploymentMapping(deployment: DeploymentResult, mapping: RailwayDep
   };
 }
 
+function buildDeploymentResultSelector(input: WaitForDeploymentInput): DeploymentResultSelector {
+  return {
+    branch: input.branch,
+    commitSha: input.commitSha,
+    environment: input.environment,
+    projectId: input.mapping?.projectId,
+    environmentId: input.mapping?.environmentId,
+    serviceId: input.mapping?.serviceId
+  };
+}
+
+function readDeploymentResultForWait(content: JsonValue | undefined, selector: DeploymentResultSelector): DeploymentResult | undefined {
+  try {
+    return readDeploymentResult(content, selector);
+  } catch (error) {
+    if (isMissingRequestedDeploymentError(error)) {
+      return undefined;
+    }
+
+    throw error;
+  }
+}
+
+function isMissingRequestedDeploymentError(error: unknown): boolean {
+  return error instanceof Error && error.message === missingRequestedDeploymentMessage;
+}
+
+function isTerminalDeploymentStatus(status: DeploymentStatus): boolean {
+  return status === 'success' || status === 'failed' || status === 'cancelled';
+}
+
+function buildDeploymentPollingTimeoutMessage(input: WaitForDeploymentInput, attempts: number, lastObservation: string): string {
+  return [
+    `Railway deployment polling timed out after ${attempts} attempt(s) for ${input.repository.owner}/${input.repository.name} branch ${input.branch} commit ${input.commitSha}.`,
+    `Environment: ${input.environment}.`,
+    `Railway mapping: ${formatRailwayMapping(input.mapping)}.`,
+    lastObservation
+  ].join(' ');
+}
+
+function formatRailwayMapping(mapping: RailwayDeploymentMapping | undefined): string {
+  if (mapping === undefined) {
+    return 'not configured';
+  }
+
+  return [
+    `project_id=${mapping.projectId ?? 'missing'}`,
+    `environment_id=${mapping.environmentId ?? 'missing'}`,
+    `service_id=${mapping.serviceId ?? 'missing'}`
+  ].join(', ');
+}
+
 type DeploymentResultSelector = DeploymentRef | {
   readonly branch: string;
   readonly commitSha: string;
@@ -230,7 +311,7 @@ function readDeploymentObject(content: JsonValue | undefined, selector: Deployme
       return selected;
     }
 
-    throw new Error('content.deployments must include the requested Railway deployment.');
+    throw new Error(missingRequestedDeploymentMessage);
   }
 
   throw new Error('content.deployment must be an object, or content.deployments must be an array.');
@@ -604,4 +685,28 @@ function readPositiveInteger(value: JsonValue | undefined, path: string): number
   }
 
   throw new Error(`${path} must be a non-negative integer.`);
+}
+
+function readPositiveIntegerOption(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  throw new Error(`Railway MCP ${name} must be a positive integer.`);
+}
+
+function readNonNegativeIntegerOption(value: number | undefined, fallback: number, name: string): number {
+  if (value === undefined) {
+    return fallback;
+  }
+
+  if (Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+
+  throw new Error(`Railway MCP ${name} must be a non-negative integer.`);
 }

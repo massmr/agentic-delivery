@@ -272,6 +272,187 @@ test('Railway MCP DeploymentPort missing tools fail with actionable MCP tool err
   });
 });
 
+test('Railway MCP DeploymentPort polls pending and deploying deployments until Railway reports success', async () => {
+  const sleeps: number[] = [];
+  let listCalls = 0;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => {
+      listCalls += 1;
+      const status = listCalls === 1 ? 'pending' : listCalls === 2 ? 'deploying' : 'success';
+      return {
+        content: { deployment: railwayDeploymentWithStatus(status) },
+        isError: false
+      };
+    })
+  ]);
+  const adapter = new RailwayMcpDeploymentPort({
+    client,
+    serverId,
+    waitMaxAttempts: 4,
+    waitPollIntervalMs: 10,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    }
+  });
+
+  const deployment = await adapter.waitForDeployment({ repository: railwayRepository(), branch: 'develop', commitSha: 'abc123', environment: 'staging' });
+
+  assert.equal(deployment.status, 'success');
+  assert.equal(deployment.ref.deploymentId, 'mock-agentic-delivery-cli-staging-develop-abc123');
+  assert.deepEqual(sleeps, [10, 10]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment,
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment,
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment
+  ]);
+});
+
+test('Railway MCP DeploymentPort returns terminal failed and cancelled deployments without polling again', async () => {
+  for (const status of ['failed', 'cancelled'] as const) {
+    const sleeps: number[] = [];
+    const client = new MockMcpClient([
+      createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+        content: { environment: { status: 'ready' } },
+        isError: false
+      })),
+      createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
+        content: { deployment: railwayDeploymentWithStatus(status) },
+        isError: false
+      }))
+    ]);
+    const adapter = new RailwayMcpDeploymentPort({
+      client,
+      serverId,
+      waitMaxAttempts: 3,
+      waitPollIntervalMs: 10,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      }
+    });
+
+    const deployment = await adapter.waitForDeployment({ repository: railwayRepository(), branch: 'develop', commitSha: 'abc123', environment: 'staging' });
+
+    assert.equal(deployment.status, status);
+    assert.deepEqual(sleeps, []);
+    assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [
+      defaultRailwayMcpToolNames.environmentStatus,
+      defaultRailwayMcpToolNames.waitForDeployment
+    ]);
+  }
+});
+
+test('Railway MCP DeploymentPort times out persistent pending deployments with actionable context', async () => {
+  const mapping = {
+    provider: 'railway' as const,
+    projectId: 'project-api',
+    environmentId: 'env-staging',
+    serviceId: 'service-api',
+    branch: 'develop',
+    verification: {
+      mode: 'railway_mcp' as const,
+      smokeUrls: []
+    }
+  };
+  const sleeps: number[] = [];
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => ({
+      content: {
+        deployment: {
+          ...railwayDeploymentWithStatus('pending'),
+          ref: {
+            ...railwayDeploymentRef(),
+            projectId: 'project-api',
+            environmentId: 'env-staging',
+            serviceId: 'service-api'
+          }
+        }
+      },
+      isError: false
+    }))
+  ]);
+  const adapter = new RailwayMcpDeploymentPort({
+    client,
+    serverId,
+    waitMaxAttempts: 2,
+    waitPollIntervalMs: 7,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    }
+  });
+
+  await assert.rejects(
+    () => adapter.waitForDeployment({ repository: railwayRepository(), branch: 'develop', commitSha: 'abc123', environment: 'staging', mapping }),
+    (error: unknown) => {
+      assert.ok(error instanceof Error);
+      assert.match(error.message, /timed out after 2 attempt\(s\)/u);
+      assert.match(error.message, /agentic\/delivery-cli/u);
+      assert.match(error.message, /branch develop/u);
+      assert.match(error.message, /commit abc123/u);
+      assert.match(error.message, /project_id=project-api/u);
+      assert.match(error.message, /environment_id=env-staging/u);
+      assert.match(error.message, /service_id=service-api/u);
+      assert.match(error.message, /Last status: pending/u);
+      return true;
+    }
+  );
+  assert.deepEqual(sleeps, [7]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment,
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment
+  ]);
+});
+
+test('Railway MCP DeploymentPort keeps polling when the matching deployment is initially absent', async () => {
+  const sleeps: number[] = [];
+  let listCalls = 0;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
+      content: { environment: { status: 'ready' } },
+      isError: false
+    })),
+    createMockMcpTool(serverId, defaultRailwayMcpToolNames.waitForDeployment, () => {
+      listCalls += 1;
+      return {
+        content: listCalls === 1 ? { deployments: [] } : { deployment: railwayDeployment('wait-for-deployment') },
+        isError: false
+      };
+    })
+  ]);
+  const adapter = new RailwayMcpDeploymentPort({
+    client,
+    serverId,
+    waitMaxAttempts: 3,
+    waitPollIntervalMs: 5,
+    sleep: async (ms) => {
+      sleeps.push(ms);
+    }
+  });
+
+  const deployment = await adapter.waitForDeployment({ repository: railwayRepository(), branch: 'develop', commitSha: 'abc123', environment: 'staging' });
+
+  assert.equal(deployment.status, 'success');
+  assert.deepEqual(sleeps, [5]);
+  assert.deepEqual(client.toolCallRequests.map((call) => call.toolName), [
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment,
+    defaultRailwayMcpToolNames.environmentStatus,
+    defaultRailwayMcpToolNames.waitForDeployment
+  ]);
+});
+
 test('Railway MCP DeploymentPort accepts wait results without service URL', async () => {
   const client = new MockMcpClient([
     createMockMcpTool(serverId, defaultRailwayMcpToolNames.environmentStatus, () => ({
@@ -519,6 +700,14 @@ function railwayDeploymentWithoutServiceUrl(label: string): JsonObject {
   const deployment = { ...railwayDeployment(label) };
   delete deployment.serviceUrl;
   return deployment;
+}
+
+function railwayDeploymentWithStatus(status: 'pending' | 'deploying' | 'success' | 'failed' | 'cancelled'): JsonObject {
+  return {
+    ...railwayDeployment(status),
+    status,
+    summary: `Mock Railway deployment status ${status}.`
+  };
 }
 
 function railwayDeploymentRef(): JsonObject {
