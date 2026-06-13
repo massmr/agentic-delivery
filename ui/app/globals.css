@@ -1,0 +1,138 @@
+:root {
+  color: #172033;
+  background: #f5f2ea;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body {
+  margin: 0;
+}
+
+main {
+  margin: 0 auto;
+  max-width: 1180px;
+  padding: 48px 24px;
+}
+
+.hero {
+  background: linear-gradient(135deg, #1d3557, #335c67);
+  border-radius: 28px;
+  color: #fff8e8;
+  padding: 40px;
+}
+
+.eyebrow {
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+
+h1, h2, h3 {
+  margin: 0 0 12px;
+}
+
+section {
+  margin-top: 28px;
+}
+
+.grid, .cards, .list {
+  display: grid;
+  gap: 16px;
+}
+
+.grid, .cards {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+article {
+  background: #fffaf0;
+  border: 1px solid #e2d7c0;
+  border-radius: 18px;
+  padding: 20px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+th, td {
+  border-top: 1px solid #eadfc8;
+  padding: 8px 0;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  color: #58606f;
+  font-weight: 600;
+  width: 42%;
+}
+
+dt {
+  color: #58606f;
+  font-size: .85rem;
+  margin-top: 10px;
+}
+
+dd {
+  margin: 0;
+}
+
+.ok {
+  color: #176f43;
+  font-weight: 700;
+}
+
+.warning {
+  color: #9a3412;
+  font-weight: 700;
+}
+
+.config-editor {
+  border-top: 1px solid #eadfc8;
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+label {
+  color: #58606f;
+  font-size: .85rem;
+  font-weight: 700;
+}
+
+input, select, button {
+  border: 1px solid #d8c9ad;
+  border-radius: 10px;
+  font: inherit;
+  padding: 10px 12px;
+}
+
+input, select {
+  background: #fffdf8;
+  color: #172033;
+}
+
+button {
+  background: #1d3557;
+  color: #fff8e8;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: .6;
+}
+
+.help-text {
+  color: #58606f;
+  font-size: .9rem;
+  margin: 0;
+}

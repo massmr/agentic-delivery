@@ -44,6 +44,7 @@ test('ewokbot --help prints the mock planning help output', async () => {
   assert.match(captured.stdout, /ewokbot auth list/u);
   assert.match(captured.stdout, /ewokbot doctor/u);
   assert.match(captured.stdout, /ewokbot scan/u);
+  assert.match(captured.stdout, /ewokbot ui \[--port <port>\] \[--hostname <host>\]/u);
   assert.match(captured.stdout, /ewokbot plan <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot run <ticket-key>/u);
   assert.match(captured.stdout, /ewokbot run-dev <ticket-key> --confirm-dev-execution/u);
@@ -119,6 +120,7 @@ test('built ewokbot bin prints help when invoked through a package-manager symli
   assert.match(result.stdout, /Usage:\n  ewokbot \[--help\]/u);
   assert.match(result.stdout, /ewokbot init/u);
   assert.match(result.stdout, /ewokbot auth status/u);
+  assert.match(result.stdout, /ewokbot ui \[--port <port>\] \[--hostname <host>\]/u);
   assert.match(result.stdout, /ewokbot run <ticket-key>/u);
   assert.match(result.stdout, /ewokbot run-dev <ticket-key> --confirm-dev-execution/u);
   assert.match(result.stdout, /ewokbot smoke <ticket-key> --confirm-real-provider-smoke/u);

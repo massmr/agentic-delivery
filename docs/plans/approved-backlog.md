@@ -1532,11 +1532,84 @@ Explicit safety constraints:
 - Do not implement Cubic, the operator-agent sandbox, the web UI, Telegram, WhatsApp, production merge automation, or production deploy in BE.
 - Production merge and production deployment remain human-only.
 
-### Milestone BF: Operator Agent Action Sandbox
+### Milestone BF: Invocation Control UI v0
 
 Goal:
 
-Add an Ewokbot operator agent that can converse with the user and drive the existing delivery flow only through an explicit registry of approved Ewokbot actions.
+Add the first local Next.js control surface for one Ewokbot invocation. An operator should be able to run Ewokbot in a workspace, start a local UI bound to that workspace, and inspect the exact configuration, repositories, providers, runs, and reports that the current invocation can see.
+
+Build:
+
+- Add a local `ewokbot ui` command that starts a minimal Next.js UI for the current workspace only.
+- Keep the UI lifecycle invocation-scoped: one workspace invocation maps to one local UI session, not a SaaS or multi-tenant dashboard.
+- Add a safe backend/API layer that reads `.ewokbot/workspace.yml`, `.ewokbot/.env.example`, run state, report paths, provider modes, repository discovery, and doctor/scan output without exposing raw secrets.
+- Show workspace summary, discovered repositories, configured providers, MCP server ids, development runner readiness, delivery policy, and current Railway deployment mappings.
+- Show recent runs grouped by state, with links/contents for plan, implementation, quality, staging, final report, agent-completion, test-relevance, and core-safety evidence.
+- Provide read-only actions for `doctor`, `scan`, `runs`, `inspect`, and report viewing through typed Ewokbot handlers or command wrappers.
+- Add minimal config editing for non-secret workspace fields needed during setup, especially repository branch settings, provider modes, deployment verification mode, and Railway mapping placeholders.
+- Treat secret values as write-only/redacted: the UI may show that a required env key is present or missing, but must not display stored values.
+- Keep styling restrained and operational: this is a local control console, not a marketing dashboard.
+
+Acceptance:
+
+- `ewokbot ui` starts a local Next.js UI bound to the current workspace root.
+- The UI can render workspace config, repositories, provider setup state, Railway mapping state, and existing runs from fake/local fixtures.
+- The UI can run or display safe read-only actions such as doctor, scan, runs, inspect, and report reads without starting OpenCode, creating branches, opening PRs, merging, or deploying.
+- The UI can update allowed non-secret workspace config fields through a tested API boundary.
+- Secret fields remain redacted or write-only and are never returned by API responses, logs, tests, screenshots, or generated docs.
+- CLI commands remain fully usable without the UI.
+- Tests remain local/fake-only and do not call live Atlassian, GitHub, Railway, Vercel, MCP servers, Docker, OAuth, OpenCode, provider APIs, or networks.
+
+Explicit safety constraints:
+
+- Do not expose a raw shell in the UI.
+- Do not expose raw MCP tool calling in the UI.
+- Do not expose provider credentials, OpenCode credentials, Railway variable values, or `.ewokbot/.env` values.
+- Do not start development runs, push branches, open PRs, merge PRs, verify staging, deploy, rollback, scale, mutate variables, create domains, or delete resources from BF.
+- Do not implement the operator-agent conversational layer in BF.
+- Do not implement Telegram or WhatsApp in BF.
+- Production merge and production deployment remain human-only.
+
+### Milestone BG: Railway Mapping UI
+
+Goal:
+
+Extend the invocation UI so Railway setup can be completed without a giant CLI wizard. Operators should be able to map each controlled repository to the correct Railway project, environment, and service from the browser, using only read-only Railway discovery data and explicit human choices.
+
+Build:
+
+- Add a dedicated Railway mapping screen to the local UI.
+- Read discovered local repositories from the current workspace.
+- Read Railway projects/services/status through the existing `RailwayDiscoveryPort` and MCP policy-approved read-only tools.
+- Present per-repository choices for `railway_mcp`, `github_only`, and `none`.
+- Let operators choose or manually enter project/environment/service ids for each repository.
+- Persist mappings in the same `repos.deployments.<repo>.staging` shape produced by `ewokbot init`.
+- Re-run local validation after saving and show actionable mapping errors.
+- Keep discovery separate from runtime staging verification: the UI maps config; smoke/runtime still use persisted mappings.
+
+Acceptance:
+
+- The UI can map multiple repositories to different Railway staging targets using fake Railway discovery data in tests.
+- The UI supports manual id entry when discovery is unavailable or incomplete.
+- The UI can explicitly set repositories to `github_only` or `none`.
+- Saving config preserves sibling repository discovery and does not drop unmapped repositories.
+- Doctor/config validation feedback is visible after edits.
+- Tests remain fake-only and do not call live Railway CLI, live MCP servers, Docker, OAuth, provider APIs, deployed URLs, or networks.
+
+Explicit safety constraints:
+
+- Do not call Railway mutating tools from the UI.
+- Do not read or print Railway variable values.
+- Do not store Railway tokens or secret values in tracked files.
+- Do not make live Railway calls in tests.
+- Do not implement operator-agent chat, Cubic, Telegram, WhatsApp, production merge automation, or production deploy in BG.
+- Production merge and production deployment remain human-only.
+
+### Milestone BH: Operator Agent Action Sandbox
+
+Goal:
+
+Add an Ewokbot operator agent that can converse with the user and drive the existing delivery flow only through an explicit registry of approved Ewokbot actions. The agent should reuse the same safe action surfaces created for the CLI and UI, not receive raw shell or raw MCP access.
 
 Build:
 
@@ -1553,7 +1626,7 @@ Acceptance:
 - The operator agent can propose and execute only registered Ewokbot actions.
 - Attempts to call unregistered actions, raw shell commands, raw MCP tools, or provider credentials are refused and audited.
 - Human confirmation is required for side-effectful actions.
-- Existing CLI commands remain usable without the operator agent.
+- Existing CLI and UI commands remain usable without the operator agent.
 - Tests use fake LLM/action proposals only and do not call live providers, MCP servers, OpenCode, shells, or networks.
 
 Explicit safety constraints:
@@ -1561,5 +1634,35 @@ Explicit safety constraints:
 - Do not expose a raw shell to the operator agent.
 - Do not expose raw MCP tool calling to the operator agent.
 - Do not expose provider credentials or OpenCode credentials to the operator agent.
-- Do not implement Telegram, WhatsApp, or dashboard surfaces in BF.
+- Do not implement Telegram or WhatsApp in BH.
+- Production merge and production deployment remain human-only.
+
+### Milestone BI: Cubic Review Provider
+
+Goal:
+
+Add Cubic as an interchangeable review provider in the delivery flow. Operators should be able to choose Cubic during setup, have Ewokbot run Cubic review on scoped diffs before commit, and verify the Cubic PR review result after the develop PR is opened.
+
+Build:
+
+- Add a review-provider port with Cubic as the first implementation.
+- Update `ewokbot init` and `doctor` so Cubic can be selected, detected, and validated without taking ownership of Cubic credentials.
+- Run Cubic review after meaningful diff, agent completion, core safety, and test relevance pass, but before the scoped local commit.
+- Block or require human review according to Cubic result and workspace policy.
+- After the develop PR is opened, verify that the expected Cubic review signal is present on the PR when configured.
+- Persist Cubic evidence in run state, reports, and status output.
+
+Acceptance:
+
+- Cubic can be configured as an optional review provider.
+- A failed or missing required Cubic pre-commit review blocks before local commit, push, PR creation, or staging.
+- A required PR review signal can be verified after PR creation.
+- Review provider behavior is typed and interchangeable for future providers.
+- Tests remain fake-only and do not call live Cubic, GitHub, MCP servers, OpenCode, Docker, OAuth, provider APIs, or networks.
+
+Explicit safety constraints:
+
+- Do not expose raw Cubic commands to the operator agent or UI.
+- Do not bypass Ewokbot's existing meaningful diff, core safety, quality, and GitHub handoff gates.
+- Do not implement production merge automation or production deploy in BI.
 - Production merge and production deployment remain human-only.

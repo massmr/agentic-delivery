@@ -142,13 +142,15 @@ Status legend:
 - `[x]` Develop PR follow-up policy: branch-scoped auto-merge, no-CI behavior, PR polling, and staging handoff
 - `[x]` Railway deployment mapping per repository
 - `[x]` Railway MCP discovery and repository mapping in `ewokbot init`
+- `[x]` Invocation control UI v0: local Next.js UI bound to one workspace invocation
+- `[ ]` Railway mapping UI for per-repository project/environment/service setup
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
-- `[ ]` Ewokbot control UI v1 for workspace setup, Railway mapping, tickets, flows, and approvals
 - `[ ]` Cubic review provider: init, doctor, pre-commit diff review, and PR review verification
 
 ## Future Control Surfaces
 
 - `[ ]` First local/self-hosted web UI for Ewokbot workspace control
+- `[ ]` Railway mapping screen for multi-repository setup
 - `[ ]` Telegram control plane
 - `[ ]` WhatsApp control plane
 - `[ ]` Mobile-friendly dashboard

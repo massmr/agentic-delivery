@@ -85,6 +85,16 @@ export type {
 export { createCliProgram } from './cli/program.js';
 export { createPublicCliRuntimeMcp } from './cli/runtime-mcp.js';
 export {
+  applyInvocationControlConfigPatch,
+  buildInvocationControlSummary,
+  inspectInvocationControlRun,
+  listInvocationControlTickets,
+  readInvocationControlReport,
+  runInvocationControlDoctor
+} from './ui/backend.js';
+export { startInvocationControlApiServer } from './ui/api-server.js';
+export { startInvocationControlUi } from './ui/local-ui.js';
+export {
   ewokbotCacheDirectory,
   ewokbotDirectory,
   ewokbotEnvExamplePath,
@@ -105,6 +115,23 @@ export {
 } from './user-layout.js';
 export type { CliProgram, CliProgramIO, CliProgramOptions, CliRuntimeMcpOptions } from './cli/program.js';
 export type { CreatePublicCliRuntimeMcpOptions, PublicCliRuntimeMcp } from './cli/runtime-mcp.js';
+export type {
+  InvocationControlBackendOptions,
+  InvocationControlSummary,
+  UiConfigPatch,
+  UiDeliveryPolicySummary,
+  UiMcpServerSummary,
+  UiProviderSummary,
+  UiRailwayMappingSummary,
+  UiRepositorySummary,
+  UiReportReadResult,
+  UiReportSummary,
+  UiRunInspection,
+  UiRunSummary,
+  UiWorkspaceConfigStatus
+} from './ui/backend.js';
+export type { InvocationControlApiServer, StartInvocationControlApiServerOptions } from './ui/api-server.js';
+export type { InvocationControlUiHandle, StartInvocationControlUiOptions } from './ui/local-ui.js';
 export {
   createOnboardingFiles,
   defaultSetupSelections,

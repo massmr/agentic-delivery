@@ -42,6 +42,7 @@ Current capabilities:
 - Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, meaningful diff, agent completion, core safety, test relevance, and local quality evidence only.
 - Local fixture harness with `ewokbot harness run <fixture-id>` and `ewokbot harness run --all` for deterministic scoring of meaningful diff, repository selection, policy decisions, quality results, and report presence.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
+- Local `ewokbot ui` invocation control surface for one workspace-bound session, backed by safe read-only APIs for workspace readiness, provider configuration, runs, and reports.
 - Atlassian MCP ticket intake boundary with Jira as the first supported work-item surface.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
 - Railway staging verification boundary for per-repository deployment state, service URLs, and explicit Railway project/environment/service mappings.
@@ -156,6 +157,14 @@ Inspect available commands:
 ```bash
 node dist/src/cli/index.js --help
 ```
+
+Start the local invocation control UI for the current workspace:
+
+```bash
+node dist/src/cli/index.js ui
+```
+
+The UI is local-only and bound to the current workspace root. It shows workspace readiness, configured provider modes, repository discovery, Railway mapping placeholders, run state, and known reports without exposing `.ewokbot/.env` values or starting delivery side effects such as OpenCode execution, branch creation, pull requests, staging verification, deployment, or production merge.
 
 Inspect Ewokbot-owned provider auth metadata without touching OpenCode auth:
 

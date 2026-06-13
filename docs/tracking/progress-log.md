@@ -1,5 +1,38 @@
 # Progress Log
 
+## 2026-06-12
+
+Implemented Milestone BF Invocation Control UI v0:
+
+- Added `ewokbot ui` as a local-only invocation control surface for the current workspace root, with the Next.js UI served through a safe workspace API sidecar.
+- Surfaced workspace config parse status, provider modes, delivery policy, discovered repositories, MCP server ids/configured providers, Railway staging mappings, run states, and known run reports without exposing `.ewokbot/.env` values or provider secrets.
+- Kept BF actions inside the approved boundary: doctor/readiness, typed-port ticket scan, runs/inspect/report reads, and minimal non-secret workspace config edits. No OpenCode execution, branch/PR creation, merge, staging verification, deployment, rollback, scaling, raw shell, or raw MCP tool surfaces were added.
+- Added fake-only coverage for the UI CLI launcher, backend summaries, local doctor/scan boundaries, safe report reads, safe config patching, and the workspace API/UI port separation found during manual UI verification.
+- Remediated the BF review findings by waiting for the Next UI to become reachable before printing the local URL, failing clearly and closing the API server when the UI process exits before readiness, using the same default local-only doctor probes as `ewokbot doctor`, deriving the API CORS origin from the selected local UI port, and exposing only workspace name, autonomy, and max concurrent ticket config controls.
+- Fixed the remaining live UI lifecycle bug by launching the concrete Next CLI binary when available, keeping the workspace API lifetime owned by the Ewokbot UI handle instead of a package-manager wrapper exit, requiring `/api/summary`, `/api/doctor`, and the real app route to be healthy before printing the URL, and closing the UI/API explicitly on parent shutdown.
+- Left BG Railway Mapping UI, BH Operator Agent Action Sandbox, and BI Cubic Review Provider as future milestones.
+
+Verification commands run for BF:
+
+- `lsp_diagnostics` on changed TypeScript and test files was attempted earlier, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm build`
+- `node --test dist/test/cli-ui.test.js dist/test/ui-backend.test.js` (`11/11`)
+- `pnpm test` (`448/448`)
+- `pnpm exec next build ui`
+- `node dist/src/cli/index.js ui --port 3002` with repeated `curl http://127.0.0.1:3002/`; launcher log showed a successful app `GET / 200` before the Ewokbot URL was printed, the live `/api/summary` and `/api/doctor` payloads did not include `.ewokbot/.env` or credential-looking values, and shutdown released port 3002.
+- `git diff --check`
+- `gitnexus_detect_changes({ scope: "all", repo: "ewokbot" })` reported HIGH risk because the shared CLI dispatch surface changed; the affected CLI paths are covered by the passing help, UI, and full command test suite above.
+
+Reprioritized the post-BE roadmap around a local invocation UI:
+
+- Moved the first UI ahead of the operator-agent milestone because Railway/MCP multi-repo setup is now too heavy for CLI-only configuration.
+- Defined BF as Invocation Control UI v0: `ewokbot ui`, local Next.js, one invocation equals one workspace-bound UI session, read-only doctor/scan/runs/inspect/report views, and minimal non-secret workspace config editing.
+- Defined BG as Railway Mapping UI: per-repository Railway project/environment/service mapping through read-only discovery or manual entry.
+- Moved Operator Agent Action Sandbox to BH so the future conversational agent can reuse the same safe action surfaces exposed by the CLI/UI.
+- Moved Cubic Review Provider to BI.
+- Kept production merge, production deployment, raw shell, raw MCP tools, Telegram, WhatsApp, and hosted SaaS dashboard work out of BF/BG.
+
 ## 2026-06-11
 
 Implemented Milestone BE Railway MCP Discovery And Repository Mapping:
@@ -24,7 +57,7 @@ Prepared Milestone BE Railway MCP Discovery And Repository Mapping:
 
 - Reframed the next approved Railway work as a guided setup/discovery milestone rather than the operator-agent milestone.
 - Defined the BE target flow: discover local repositories, discover Railway projects/services through read-only Railway MCP tools, map each repo to its staging Railway target, and persist mappings under `repos.deployments` while preserving sibling Git discovery.
-- Shifted the later milestones to BF Operator Agent Action Sandbox, BG Ewokbot Control UI v1, and BH Cubic Review Provider.
+- Shifted the later milestones to BF Operator Agent Action Sandbox, BG Ewokbot Control UI v1, and BH Cubic Review Provider. This was later reprioritized on 2026-06-12 so BF is now Invocation Control UI v0, BG is Railway Mapping UI, BH is Operator Agent Action Sandbox, and BI is Cubic Review Provider.
 - Updated README and tracking docs so missing Railway mappings are treated as actionable failures unless the repository explicitly chooses `none` or `github_only`.
 
 Implemented Milestone BD Railway Deployment Mapping Per Repository:

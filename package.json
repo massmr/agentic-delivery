@@ -13,7 +13,8 @@
   },
   "files": [
     "dist",
-    "assets"
+    "assets",
+    "ui"
   ],
   "engines": {
     "node": ">=20"
@@ -23,9 +24,17 @@
     "test": "pnpm run build && node --test dist/test/*.js",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "sharp"
+    ]
+  },
   "dependencies": {
     "@inquirer/prompts": "^8.5.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "yaml": "^2.8.0",
     "zod": "^4.4.3"
   },

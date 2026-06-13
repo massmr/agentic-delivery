@@ -24,6 +24,7 @@ import { runScanCommand } from './commands/scan.js';
 import { parseSmokeCommandOptions, runSmokeCommand } from './commands/smoke.js';
 import type { SmokeCommandDeliveryOptions } from './commands/smoke.js';
 import { parseStatusCommandOptions, runStatusCommand } from './commands/status.js';
+import { runUiCommand, type InvocationControlUiLauncher } from './commands/ui.js';
 import { parseWorkerCommandOptions, runWorkerCommand } from './commands/worker.js';
 import type { RuntimeProviderFactoryOptions } from '../providers/index.js';
 import type { RailwayDiscoveryPort } from '../connectors/railway/index.js';
@@ -46,6 +47,7 @@ const HELP_TEXT = [
   '  ewokbot auth list',
   '  ewokbot doctor',
   '  ewokbot scan',
+  '  ewokbot ui [--port <port>] [--hostname <host>]',
   '  ewokbot plan <ticket-key>',
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
   '  ewokbot run-dev <ticket-key> --confirm-dev-execution [--run-id <run-id>]',
@@ -70,6 +72,7 @@ const HELP_TEXT = [
   '  auth        Manage Ewokbot-owned provider auth metadata; OpenCode auth stays external.',
   '  doctor      Validate local setup files without live provider calls.',
   '  scan        List Jira backlog tickets through the configured typed TicketPort.',
+  '  ui          Start the local invocation control UI for this workspace; no delivery side effects.',
   '  plan        Create a local dry-run plan through the configured typed TicketPort; no delivery side effects.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
   '  run-dev     Execute one explicitly confirmed Jira ticket through local branch, OpenCode, and quality only.',
@@ -114,6 +117,7 @@ export interface CliProgramOptions {
   readonly authUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
+  readonly uiLauncher?: InvocationControlUiLauncher | undefined;
   readonly smokeDelivery?: SmokeCommandDeliveryOptions | undefined;
   readonly runDevDelivery?: RunDevCommandDeliveryOptions | undefined;
   readonly harnessFixturesRoot?: string | undefined;
@@ -190,6 +194,10 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
 
       if (args[0] === 'scan') {
         return runScanCommand({ cwd: options.cwd, configPath: options.configPath, io, runtimeMcp: options.runtimeMcp });
+      }
+
+      if (args[0] === 'ui') {
+        return runUiCommand(args.slice(1), { cwd: options.cwd, io, launcher: options.uiLauncher });
       }
 
       if (args[0] === 'plan') {
