@@ -42,7 +42,7 @@ Current capabilities:
 - Explicit `ewokbot run-dev <ticket-key> --confirm-dev-execution` flow for one controlled local development execution through branch creation, OpenCode, meaningful diff, agent completion, core safety, test relevance, and local quality evidence only.
 - Local fixture harness with `ewokbot harness run <fixture-id>` and `ewokbot harness run --all` for deterministic scoring of meaningful diff, repository selection, policy decisions, quality results, and report presence.
 - Local CLI control plane for run listing, inspection, pause/resume intent, approval/rejection records, and persisted logs.
-- Local `ewokbot ui` invocation control surface for one workspace-bound session, backed by safe read-only APIs for workspace readiness, provider configuration, runs, and reports.
+- Local `ewokbot ui` invocation control surface for one workspace-bound session, backed by safe APIs for workspace readiness, provider configuration, Railway staging mappings, runs, and reports.
 - Atlassian MCP ticket intake boundary with Jira as the first supported work-item surface.
 - GitHub code-host boundary for branches, pull requests, comments, and checks.
 - Railway staging verification boundary for per-repository deployment state, service URLs, and explicit Railway project/environment/service mappings.
@@ -164,7 +164,7 @@ Start the local invocation control UI for the current workspace:
 node dist/src/cli/index.js ui
 ```
 
-The UI is local-only and bound to the current workspace root. It shows workspace readiness, configured provider modes, repository discovery, Railway mapping placeholders, run state, and known reports without exposing `.ewokbot/.env` values or starting delivery side effects such as OpenCode execution, branch creation, pull requests, staging verification, deployment, or production merge.
+The UI is local-only and bound to the current workspace root. It shows workspace readiness, configured provider modes, repository discovery, Railway staging mappings, run state, and known reports without exposing `.ewokbot/.env` values or starting delivery side effects such as OpenCode execution, branch creation, pull requests, staging verification, deployment, or production merge. Its Railway mapping screen lets operators choose `railway_mcp`, `github_only`, or `none` per controlled repository, enter Railway project/environment/service ids manually when needed, persist mappings under `repos.deployments.<repo>.staging`, and view local validation feedback after each save.
 
 Inspect Ewokbot-owned provider auth metadata without touching OpenCode auth:
 

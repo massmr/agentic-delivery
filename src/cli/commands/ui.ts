@@ -1,4 +1,5 @@
 import { startInvocationControlUi, type InvocationControlUiHandle, type StartInvocationControlUiOptions } from '../../ui/local-ui.js';
+import type { RailwayDiscoveryPort } from '../../connectors/railway/index.js';
 import type { CliProgramIO } from '../program.js';
 
 export type InvocationControlUiLauncher = (options: StartInvocationControlUiOptions) => Promise<InvocationControlUiHandle>;
@@ -7,6 +8,7 @@ export interface UiCommandOptions {
   readonly cwd?: string | undefined;
   readonly io: CliProgramIO;
   readonly launcher?: InvocationControlUiLauncher | undefined;
+  readonly railwayDiscoveryPort?: RailwayDiscoveryPort | undefined;
 }
 
 export interface ParsedUiCommandOptions {
@@ -20,7 +22,8 @@ export async function runUiCommand(args: readonly string[], options: UiCommandOp
   const handle = await launcher({
     workspaceRoot: options.cwd ?? process.cwd(),
     hostname: parsed.hostname,
-    port: parsed.port
+    port: parsed.port,
+    ...(options.railwayDiscoveryPort === undefined ? {} : { railwayDiscoveryPort: options.railwayDiscoveryPort })
   });
 
   options.io.stdout(`Ewokbot UI: ${handle.url}\n`);

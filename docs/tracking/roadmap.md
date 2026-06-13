@@ -143,7 +143,7 @@ Status legend:
 - `[x]` Railway deployment mapping per repository
 - `[x]` Railway MCP discovery and repository mapping in `ewokbot init`
 - `[x]` Invocation control UI v0: local Next.js UI bound to one workspace invocation
-- `[ ]` Railway mapping UI for per-repository project/environment/service setup
+- `[x]` Railway mapping UI for per-repository project/environment/service setup
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 - `[ ]` Cubic review provider: init, doctor, pre-commit diff review, and PR review verification
 

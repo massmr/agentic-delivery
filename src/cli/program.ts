@@ -114,6 +114,7 @@ export interface CliProgramOptions {
   readonly initOpenCodeHomeDirectory?: string | undefined;
   readonly initUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
   readonly initRailwayDiscovery?: RailwayDiscoveryPort | undefined;
+  readonly uiRailwayDiscovery?: RailwayDiscoveryPort | undefined;
   readonly authUserLayoutOptions?: ResolveEwokbotUserLayoutOptions | undefined;
   readonly doctorOptions?: DoctorProbeOptions | undefined;
   readonly runtimeMcp?: CliRuntimeMcpOptions | undefined;
@@ -197,7 +198,12 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
       }
 
       if (args[0] === 'ui') {
-        return runUiCommand(args.slice(1), { cwd: options.cwd, io, launcher: options.uiLauncher });
+        return runUiCommand(args.slice(1), {
+          cwd: options.cwd,
+          io,
+          launcher: options.uiLauncher,
+          railwayDiscoveryPort: options.uiRailwayDiscovery
+        });
       }
 
       if (args[0] === 'plan') {

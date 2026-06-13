@@ -39,6 +39,35 @@ test('ewokbot ui starts a local invocation UI through the injected launcher', as
   assert.equal(captured.stderr, '');
 });
 
+test('ewokbot ui wires injected Railway discovery into the local UI launcher without live provider calls', async () => {
+  const rootPath = mkdtempSync(join(tmpdir(), 'agentic-ui-cli-discovery-'));
+  const captured = createCapturedIO();
+  const railwayDiscoveryPort = {
+    discover: async () => ({ projects: [], services: [] })
+  };
+  let launched: StartInvocationControlUiOptions | undefined;
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    io: captured.io,
+    uiRailwayDiscovery: railwayDiscoveryPort,
+    uiLauncher: async (options) => {
+      launched = options;
+      return {
+        url: 'http://127.0.0.1:4199',
+        apiUrl: 'http://127.0.0.1:51234',
+        process: new EventEmitter() as never,
+        close: async () => {}
+      };
+    }
+  }).run(['node', 'ewokbot', 'ui']);
+
+  assert.equal(exitCode, 0);
+  assert.equal(launched?.workspaceRoot, rootPath);
+  assert.equal(launched?.railwayDiscoveryPort, railwayDiscoveryPort);
+  assert.equal(captured.stderr, '');
+});
+
 test('ewokbot ui rejects unsafe launcher options before starting', async () => {
   const captured = createCapturedIO();
   let launched = false;

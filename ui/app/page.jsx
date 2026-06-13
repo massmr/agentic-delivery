@@ -1,4 +1,5 @@
 import ConfigEditor from './config-editor';
+import RailwayMappingEditor from './railway-mapping-editor';
 
 async function fetchJson(path) {
   const base = process.env.EWOKBOT_UI_API_BASE;
@@ -112,6 +113,12 @@ export default async function Page() {
             </article>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2>Railway staging mapping</h2>
+        <p className="help-text">Map each controlled repository to staging. Use manual Railway IDs for Railway verification, or choose github_only/none when staging should not require Railway IDs.</p>
+        <RailwayMappingEditor apiBase={process.env.EWOKBOT_UI_API_BASE ?? ''} repositories={summary.repositories ?? []} />
       </section>
 
       <section>

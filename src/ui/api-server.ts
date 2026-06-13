@@ -3,13 +3,17 @@ import { URL } from 'node:url';
 
 import {
   applyInvocationControlConfigPatch,
+  applyInvocationControlStagingMappingPatch,
   buildInvocationControlSummary,
   inspectInvocationControlRun,
+  InvocationControlUpdateError,
   listInvocationControlTickets,
+  readInvocationControlRailwayDiscovery,
   readInvocationControlReport,
   runInvocationControlDoctor,
   type InvocationControlBackendOptions,
-  type UiConfigPatch
+  type UiConfigPatch,
+  type UiRailwayMappingUpdatePatch
 } from './backend.js';
 
 export interface InvocationControlApiServer {
@@ -69,6 +73,11 @@ async function handleApiRequest(options: StartInvocationControlApiServerOptions,
       return;
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/railway/discovery') {
+      writeJson(response, 200, await readInvocationControlRailwayDiscovery(options), options.allowedOrigin);
+      return;
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/runs') {
       writeJson(response, 200, (await buildInvocationControlSummary(options)).runs, options.allowedOrigin);
       return;
@@ -100,8 +109,23 @@ async function handleApiRequest(options: StartInvocationControlApiServerOptions,
       return;
     }
 
+    const stagingMappingMatch = /^\/api\/repositories\/([^/]+)\/deployments\/staging$/u.exec(url.pathname);
+    if (request.method === 'PUT' && stagingMappingMatch !== null) {
+      writeJson(response, 200, applyInvocationControlStagingMappingPatch(
+        options.workspaceRoot,
+        decodeURIComponent(stagingMappingMatch[1] ?? ''),
+        await readJsonBody<UiRailwayMappingUpdatePatch>(request)
+      ), options.allowedOrigin);
+      return;
+    }
+
     writeJson(response, 404, { error: 'Not found' }, options.allowedOrigin);
   } catch (error) {
+    if (error instanceof InvocationControlUpdateError) {
+      writeJson(response, error.statusCode, error.payload, options.allowedOrigin);
+      return;
+    }
+
     writeJson(response, 500, { error: error instanceof Error ? error.message : String(error) }, options.allowedOrigin);
   }
 }
@@ -120,7 +144,7 @@ async function readJsonBody<T>(request: IncomingMessage): Promise<T> {
 function writeJson(response: ServerResponse, statusCode: number, value: unknown, allowedOrigin = 'http://127.0.0.1:3000'): void {
   response.statusCode = statusCode;
   response.setHeader('Access-Control-Allow-Origin', allowedOrigin);
-  response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+  response.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,PUT,OPTIONS');
   response.setHeader('Access-Control-Allow-Headers', 'content-type');
 
   if (statusCode === 204) {

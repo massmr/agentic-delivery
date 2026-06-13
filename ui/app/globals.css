@@ -136,3 +136,52 @@ button:disabled {
   font-size: .9rem;
   margin: 0;
 }
+
+.repo-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.repo-heading p {
+  margin: 0;
+}
+
+.repo-heading span {
+  background: #eadfc8;
+  border-radius: 999px;
+  color: #1d3557;
+  font-size: .8rem;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.repo-meta {
+  border-top: 1px solid #eadfc8;
+  margin: 16px 0 0;
+  padding-top: 6px;
+}
+
+.discovery-panel, .manual-railway-ids, .validation-feedback {
+  background: #fffdf8;
+  border: 1px solid #eadfc8;
+  border-radius: 14px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.discovery-panel {
+  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.discovery-panel p {
+  margin: 0;
+}
+
+.validation-feedback ul {
+  margin: 0;
+  padding-left: 20px;
+}

@@ -86,9 +86,12 @@ export { createCliProgram } from './cli/program.js';
 export { createPublicCliRuntimeMcp } from './cli/runtime-mcp.js';
 export {
   applyInvocationControlConfigPatch,
+  applyInvocationControlStagingMappingPatch,
   buildInvocationControlSummary,
   inspectInvocationControlRun,
+  InvocationControlUpdateError,
   listInvocationControlTickets,
+  readInvocationControlRailwayDiscovery,
   readInvocationControlReport,
   runInvocationControlDoctor
 } from './ui/backend.js';
@@ -122,7 +125,11 @@ export type {
   UiDeliveryPolicySummary,
   UiMcpServerSummary,
   UiProviderSummary,
+  UiRailwayDiscoveryResult,
   UiRailwayMappingSummary,
+  UiRailwayMappingUpdateMode,
+  UiRailwayMappingUpdatePatch,
+  UiRailwayMappingUpdateResult,
   UiRepositorySummary,
   UiReportReadResult,
   UiReportSummary,

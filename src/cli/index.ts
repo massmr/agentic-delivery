@@ -10,7 +10,8 @@ async function main(): Promise<void> {
   try {
     process.exitCode = await createCliProgram({
       runtimeMcp: publicRuntimeMcp.runtimeMcp,
-      initRailwayDiscovery: publicRuntimeMcp.createRailwayDiscovery()
+      initRailwayDiscovery: publicRuntimeMcp.createRailwayDiscovery(),
+      uiRailwayDiscovery: publicRuntimeMcp.createRailwayDiscovery()
     }).run(process.argv);
   } catch (error: unknown) {
     process.stderr.write(error instanceof Error ? `${error.message}\n` : `${String(error)}\n`);

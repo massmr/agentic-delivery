@@ -1,5 +1,33 @@
 # Progress Log
 
+## 2026-06-13
+
+Implemented Milestone BG Railway Mapping UI:
+
+- Added a dedicated local `ewokbot ui` Railway staging mapping screen for all controlled repositories in the current workspace.
+- Added a scoped workspace API path for saving `repos.deployments.<repo>.staging` mappings without converting `repos.discovery: sibling-git-directories`, dropping `repos.exclude`, or touching unrelated repository mappings.
+- Supported operator choices `railway_mcp`, `github_only`, and `none`; `railway_mcp` accepts read-only discovered Railway service selections or manual project/environment/service ids, while skip modes omit Railway ids.
+- Re-ran local config parsing and doctor-style deployment validation after saves, returning actionable mapping feedback for the UI.
+- Kept runtime smoke behavior on persisted mappings only. No Railway mutating tools, variable-value reads, raw shell, raw MCP controls, operator-agent chat, hosted dashboard, production merge, or production deploy work was added.
+- Added fake-only backend/API coverage for multi-repo mapping saves, skip modes, read-only discovery injection, manual ids, unsupported/secret-like field rejection, validation errors, and preservation of sibling discovery plus unrelated config.
+
+Resolved BG review blockers:
+
+- Wired the real `ewokbot ui` CLI path to the typed Railway discovery seam so the local UI can use the same read-only Railway MCP discovery adapter as setup when configured, while preserving unavailable behavior without an injected port.
+- Fixed explicit `repos: [...]` staging mapping saves to patch only `deployments.staging`, preserving sibling deployment targets such as production and preview.
+- Added fake-only regression coverage for real CLI UI discovery injection and explicit repo-array deployment preservation, with no live Railway CLI, MCP server, Docker, OAuth, provider API, deployed URL, or network calls.
+
+Verification commands run for BG:
+
+- `lsp_diagnostics` on changed TypeScript/UI files was attempted, but the environment does not have `typescript-language-server` installed; no install was performed.
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm build && node --test dist/test/ui-backend.test.js` (`12/12`) during focused backend verification
+- `pnpm test` (`458/458`)
+- `pnpm exec next build ui`
+- `git diff --check`
+- `gitnexus_detect_changes({ scope: "all", repo: "ewokbot" })` reported HIGH risk because BG touches the shared local UI backend/API summary flow; the affected UI/API paths are covered by the passing UI backend contract tests, full test suite, and Next UI build above.
+
 ## 2026-06-12
 
 Implemented Milestone BF Invocation Control UI v0:

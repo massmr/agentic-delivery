@@ -1,8 +1,13 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
-import { isMap, parseDocument } from 'yaml';
+import { isMap, isSeq, parseDocument } from 'yaml';
 
 import { JsonRunControlStore, type ListedRun } from '../control/index.js';
+import type {
+  RailwayDiscoveryPort,
+  RailwayDiscoveryProject,
+  RailwayDiscoveryService
+} from '../connectors/railway/index.js';
 import type { DeliveryTicket } from '../domain/index.js';
 import type { TicketPort } from '../ports/index.js';
 import { createRuntimeTicketPort, type RuntimeProviderFactoryOptions } from '../providers/index.js';
@@ -20,6 +25,7 @@ export interface InvocationControlBackendOptions {
   readonly workspaceRoot: string;
   readonly ticketPort?: TicketPort | undefined;
   readonly runtimeMcp?: Pick<RuntimeProviderFactoryOptions, 'mcpClients' | 'createMcpClient' | 'mcpAllowlist' | 'mcpAuditSink'> | undefined;
+  readonly railwayDiscoveryPort?: RailwayDiscoveryPort | undefined;
 }
 
 export interface UiWorkspaceConfigStatus {
@@ -122,6 +128,55 @@ export interface UiConfigPatch {
   readonly maxConcurrentTickets?: number | undefined;
 }
 
+export type UiRailwayMappingUpdateMode = 'railway_mcp' | 'github_only' | 'none';
+
+export interface UiRailwayMappingUpdatePatch {
+  readonly provider?: 'railway' | undefined;
+  readonly project_id?: string | undefined;
+  readonly environment_id?: string | undefined;
+  readonly service_id?: string | undefined;
+  readonly branch?: string | undefined;
+  readonly verification?: {
+    readonly mode?: UiRailwayMappingUpdateMode | undefined;
+    readonly smoke_urls?: readonly string[] | undefined;
+  } | undefined;
+}
+
+export interface UiRailwayMappingUpdateResult {
+  readonly mapping: {
+    readonly repo: string;
+    readonly staging: Omit<UiRailwayMappingSummary, 'verification'> & {
+      readonly provider: 'railway';
+      readonly branch: string;
+      readonly verification: {
+        readonly mode: UiRailwayMappingUpdateMode;
+        readonly smokeUrls: readonly string[];
+      };
+    };
+  };
+  readonly config: UiWorkspaceConfigStatus;
+  readonly doctor: DoctorReport;
+}
+
+export interface UiRailwayDiscoveryResult {
+  readonly available: boolean;
+  readonly projects: readonly RailwayDiscoveryProject[];
+  readonly services: readonly RailwayDiscoveryService[];
+  readonly message?: string | undefined;
+}
+
+export class InvocationControlUpdateError extends Error {
+  readonly statusCode: number;
+  readonly payload: Record<string, unknown>;
+
+  constructor(statusCode: number, message: string, payload: Record<string, unknown> = {}) {
+    super(message);
+    this.name = 'InvocationControlUpdateError';
+    this.statusCode = statusCode;
+    this.payload = { error: message, ...payload };
+  }
+}
+
 const reportDefinitions = [
   { id: 'plan', label: 'Plan', fileName: 'plan.md' },
   { id: 'implementation-log', label: 'Implementation Log', fileName: 'implementation-log.md' },
@@ -170,6 +225,25 @@ export async function buildInvocationControlSummary(options: InvocationControlBa
 
 export function runInvocationControlDoctor(workspaceRoot: string): DoctorReport {
   return runLocalDoctor(resolve(workspaceRoot));
+}
+
+export async function readInvocationControlRailwayDiscovery(options: InvocationControlBackendOptions): Promise<UiRailwayDiscoveryResult> {
+  if (options.railwayDiscoveryPort === undefined) {
+    return {
+      available: false,
+      projects: [],
+      services: [],
+      message: 'Railway discovery is not configured for this UI session.'
+    };
+  }
+
+  const snapshot = await options.railwayDiscoveryPort.discover();
+
+  return {
+    available: true,
+    projects: snapshot.projects,
+    services: snapshot.services
+  };
 }
 
 export async function listInvocationControlTickets(options: InvocationControlBackendOptions): Promise<readonly DeliveryTicket[]> {
@@ -252,6 +326,97 @@ export function applyInvocationControlConfigPatch(workspaceRoot: string, patch: 
   return readConfigStatus(root);
 }
 
+export function applyInvocationControlStagingMappingPatch(
+  workspaceRoot: string,
+  repoName: string,
+  patch: UiRailwayMappingUpdatePatch
+): UiRailwayMappingUpdateResult {
+  assertAllowedStagingMappingPatch(patch);
+  const root = resolve(workspaceRoot);
+  const configPath = join(root, ewokbotWorkspaceConfigPath);
+
+  if (!existsSync(configPath)) {
+    throw new InvocationControlUpdateError(404, `${ewokbotWorkspaceConfigPath} does not exist.`);
+  }
+
+  const currentYaml = readFileSync(configPath, 'utf8');
+  const currentConfig = parseWorkspaceConfig(currentYaml, { workspaceRoot: root });
+  const repo = currentConfig.repos.find((candidate) => candidate.name === repoName);
+
+  if (repo === undefined) {
+    throw new InvocationControlUpdateError(404, `Repository '${repoName}' is not controlled by this workspace.`);
+  }
+
+  const mode = patch.verification?.mode ?? repo.deployments?.staging?.verification.mode;
+  if (mode !== 'railway_mcp' && mode !== 'github_only' && mode !== 'none') {
+    throw new InvocationControlUpdateError(400, 'Staging verification mode must be railway_mcp, github_only, or none.', {
+      issues: [`Unsupported verification mode for repository '${repoName}'.`]
+    });
+  }
+
+  const nextStaging = buildStagingMappingPatch(repo.defaultBranch, mode, patch);
+  const missingRailwayIds = mode === 'railway_mcp'
+    ? [
+      nextStaging.project_id === undefined ? 'project_id' : undefined,
+      nextStaging.environment_id === undefined ? 'environment_id' : undefined,
+      nextStaging.service_id === undefined ? 'service_id' : undefined
+    ].filter((field): field is string => field !== undefined)
+    : [];
+
+  if (missingRailwayIds.length > 0) {
+    throw new InvocationControlUpdateError(422, `Railway MCP verification for repository '${repoName}' is missing ${missingRailwayIds.join(', ')}.`, {
+      issues: missingRailwayIds,
+      doctor: buildStagingMappingDoctorFailure(repoName, missingRailwayIds)
+    });
+  }
+
+  const document = parseDocument(currentYaml);
+  const reposNode = document.get('repos', true);
+
+  if (isMap(reposNode)) {
+    document.setIn(['repos', 'deployments', repoName, 'staging'], nextStaging);
+  } else if (isSeq(reposNode)) {
+    const repoNode = reposNode.items.find((item) => isMap(item) && item.get('name') === repoName);
+    if (!isMap(repoNode)) {
+      throw new InvocationControlUpdateError(404, `Repository '${repoName}' is not controlled by this workspace.`);
+    }
+    repoNode.setIn(['deployments', 'staging'], nextStaging);
+  } else {
+    throw new InvocationControlUpdateError(422, `${ewokbotWorkspaceConfigPath} is missing a valid repos section.`);
+  }
+
+  const nextYaml = document.toString();
+  const parsedConfig = parseWorkspaceConfig(nextYaml, { workspaceRoot: root });
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(configPath, nextYaml, 'utf8');
+
+  const updatedRepo = parsedConfig.repos.find((candidate) => candidate.name === repoName);
+  const staging = updatedRepo?.deployments?.staging;
+  if (updatedRepo === undefined || staging === undefined) {
+    throw new InvocationControlUpdateError(500, `Failed to persist staging mapping for repository '${repoName}'.`);
+  }
+
+  return {
+    mapping: {
+      repo: repoName,
+      staging: {
+        provider: 'railway',
+        projectId: staging.projectId,
+        environmentId: staging.environmentId,
+        serviceId: staging.serviceId,
+        branch: staging.branch,
+        verification: {
+          mode: staging.verification.mode as UiRailwayMappingUpdateMode,
+          smokeUrls: staging.verification.smokeUrls
+        },
+        status: summarizeRailwayMapping(updatedRepo).status
+      }
+    },
+    config: readConfigStatus(root),
+    doctor: runInvocationControlDoctor(root)
+  };
+}
+
 function assertAllowedConfigPatch(patch: UiConfigPatch): void {
   const allowed = new Set(['workspaceName', 'autonomy', 'maxConcurrentTickets']);
   const unsupported = Object.keys(patch).filter((key) => !allowed.has(key));
@@ -259,6 +424,81 @@ function assertAllowedConfigPatch(patch: UiConfigPatch): void {
   if (unsupported.length > 0) {
     throw new Error(`Unsupported UI config field(s): ${unsupported.join(', ')}.`);
   }
+}
+
+function assertAllowedStagingMappingPatch(patch: UiRailwayMappingUpdatePatch): void {
+  const allowed = new Set(['provider', 'project_id', 'environment_id', 'service_id', 'branch', 'verification']);
+  const unsupported = Object.keys(patch).filter((key) => !allowed.has(key) || isSecretLikeField(key));
+  const verification = patch.verification;
+
+  if (verification !== undefined) {
+    const allowedVerification = new Set(['mode', 'smoke_urls']);
+    unsupported.push(...Object.keys(verification).filter((key) => !allowedVerification.has(key) || isSecretLikeField(key)).map((key) => `verification.${key}`));
+  }
+
+  if (unsupported.length > 0) {
+    throw new InvocationControlUpdateError(400, `Unsupported or secret-like staging mapping field(s): ${unsupported.join(', ')}.`, {
+      unsupportedFields: unsupported
+    });
+  }
+
+  if (patch.provider !== undefined && patch.provider !== 'railway') {
+    throw new InvocationControlUpdateError(400, 'Staging mappings must use provider railway.');
+  }
+}
+
+function isSecretLikeField(field: string): boolean {
+  return /token|secret|password|variable|service_url/iu.test(field) || field === 'env';
+}
+
+function buildStagingMappingPatch(
+  defaultBranch: string,
+  mode: UiRailwayMappingUpdateMode,
+  patch: UiRailwayMappingUpdatePatch
+): Record<string, unknown> {
+  const branch = normalizeOptionalString(patch.branch) ?? defaultBranch;
+  const smokeUrls = patch.verification?.smoke_urls ?? [];
+
+  if (!Array.isArray(smokeUrls) || smokeUrls.some((value) => typeof value !== 'string')) {
+    throw new InvocationControlUpdateError(400, 'verification.smoke_urls must be an array of strings.');
+  }
+
+  return {
+    provider: 'railway',
+    ...(mode === 'railway_mcp' && normalizeOptionalString(patch.project_id) !== undefined ? { project_id: normalizeOptionalString(patch.project_id) } : {}),
+    ...(mode === 'railway_mcp' && normalizeOptionalString(patch.environment_id) !== undefined ? { environment_id: normalizeOptionalString(patch.environment_id) } : {}),
+    ...(mode === 'railway_mcp' && normalizeOptionalString(patch.service_id) !== undefined ? { service_id: normalizeOptionalString(patch.service_id) } : {}),
+    branch,
+    verification: {
+      mode,
+      smoke_urls: smokeUrls
+    }
+  };
+}
+
+function normalizeOptionalString(value: string | undefined): string | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length === 0 ? undefined : trimmed;
+}
+
+function buildStagingMappingDoctorFailure(repoName: string, missing: readonly string[]): DoctorReport {
+  const check = {
+    status: 'fail' as const,
+    label: `Deployment ${repoName}`,
+    message: `Railway MCP verification is missing ${missing.join(', ')}.`,
+    nextStep: 'Set project_id, environment_id, and service_id, or choose github_only/none.'
+  };
+
+  return {
+    ok: false,
+    lines: ['Doctor checked local files only; no provider, MCP, installer, or network calls were made.'],
+    checks: [check],
+    issues: [{ severity: 'fail', message: `${check.label}: ${check.message}` }]
+  };
 }
 
 async function listUiRuns(workspaceRoot: string): Promise<readonly UiRunSummary[]> {
