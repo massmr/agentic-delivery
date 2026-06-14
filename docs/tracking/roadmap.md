@@ -144,13 +144,13 @@ Status legend:
 - `[x]` Railway MCP discovery and repository mapping in `ewokbot init`
 - `[x]` Invocation control UI v0: local Next.js UI bound to one workspace invocation
 - `[x]` Railway mapping UI for per-repository project/environment/service setup
+- `[x]` Invocation control UI shell refactor: fixed 100vh/100vw operator console layout
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 - `[ ]` Cubic review provider: init, doctor, pre-commit diff review, and PR review verification
 
 ## Future Control Surfaces
 
-- `[ ]` First local/self-hosted web UI for Ewokbot workspace control
-- `[ ]` Railway mapping screen for multi-repository setup
+- `[ ]` Desktop-like local operator shell for Ewokbot workspace control
 - `[ ]` Telegram control plane
 - `[ ]` WhatsApp control plane
 - `[ ]` Mobile-friendly dashboard

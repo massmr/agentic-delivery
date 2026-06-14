@@ -1605,7 +1605,43 @@ Explicit safety constraints:
 - Do not implement operator-agent chat, Cubic, Telegram, WhatsApp, production merge automation, or production deploy in BG.
 - Production merge and production deployment remain human-only.
 
-### Milestone BH: Operator Agent Action Sandbox
+### Milestone BH: Invocation Control UI Shell Refactor
+
+Goal:
+
+Turn the current local invocation UI into a real operator workbench that behaves like configuration software, not a vertically stacked web page. It should fit into `100vh` / `100vw`, avoid global page scrolling, and support dense multi-repo operational work.
+
+Build:
+
+- Refactor the current Next.js UI into a fixed application shell.
+- Add a compact top bar for workspace identity, readiness, and key actions.
+- Add a left navigation/sidebar for views such as Overview, Repositories, Railway, Runs, and Reports.
+- Add a central work surface for the active view.
+- Add a right-side inspector/details panel for the selected repo/run/config object.
+- Add an optional bottom panel for logs, report previews, or output where useful.
+- Remove the current page-like stacked-card layout in favor of compact tables, lists, tabs, inline editors, and inspectors.
+- Ensure the viewport itself does not scroll vertically; only internal panels may scroll.
+- Keep Railway mapping and workspace config editing ergonomically usable in the new shell.
+- Preserve all BF/BG safe boundaries, typed backend/API surfaces, and secret redaction guarantees.
+
+Acceptance:
+
+- The UI is usable at `100vh` / `100vw` on desktop without global vertical scrolling.
+- Operators can navigate workspace readiness, repositories, Railway mappings, runs, and reports inside a compact shell layout.
+- Internal panels scroll where necessary, but the app shell remains fixed.
+- Existing BF/BG functionality remains present after the layout refactor.
+- Tests remain fake-only and do not call live providers, MCP servers, OpenCode, Docker, OAuth, shells, or networks.
+
+Explicit safety constraints:
+
+- Do not expose a raw shell in the UI.
+- Do not expose raw MCP tool calling in the UI.
+- Do not expose provider credentials, OpenCode credentials, Railway variable values, or `.ewokbot/.env` values.
+- Do not implement the conversational operator agent in BH.
+- Do not implement Cubic, Telegram, WhatsApp, production merge automation, or production deploy in BH.
+- Production merge and production deployment remain human-only.
+
+### Milestone BI: Operator Agent Action Sandbox
 
 Goal:
 
@@ -1634,10 +1670,10 @@ Explicit safety constraints:
 - Do not expose a raw shell to the operator agent.
 - Do not expose raw MCP tool calling to the operator agent.
 - Do not expose provider credentials or OpenCode credentials to the operator agent.
-- Do not implement Telegram or WhatsApp in BH.
+- Do not implement Telegram or WhatsApp in BI.
 - Production merge and production deployment remain human-only.
 
-### Milestone BI: Cubic Review Provider
+### Milestone BJ: Cubic Review Provider
 
 Goal:
 

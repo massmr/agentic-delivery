@@ -2,6 +2,31 @@
 
 ## 2026-06-13
 
+Implemented Milestone BH Invocation Control UI Shell Refactor:
+
+- Reworked the local `ewokbot ui` Next.js page from a vertically stacked document into a fixed `100vh` / `100vw` operator console shell with compact top bar, left navigation, central work surface, right inspector, and bottom runs/reports output panel.
+- Kept workspace readiness, safe config editing, provider summaries, delivery policy, repository list, Railway staging mapping, MCP server summaries, doctor checks, runs, and report paths visible through internal panels.
+- Disabled global page scrolling and moved scrolling to shell regions only, preserving the local-only API boundary and existing BF/BG editor props without adding backend/provider behavior.
+- Kept BH scope only: no operator-agent chat, Cubic, Telegram, WhatsApp, hosted dashboard, production merge automation, production deploy, raw shell access, or raw MCP controls were added.
+
+Verification commands run for BH:
+
+- `lsp_diagnostics` on changed UI and tracking files was attempted, but the environment does not have `typescript-language-server` or Biome LSP installed and Markdown has no configured LSP; no install was performed.
+- `pnpm typecheck`
+- `pnpm exec next build ui`
+- `pnpm build`
+- `pnpm test` (`458/458`)
+- `git diff --check`
+- `gitnexus_detect_changes({ scope: "all", repo: "ewokbot" })` reported MEDIUM risk with the changed UI process limited to `Page -> Value`; tracking-file changes include the already-present BH/BG milestone reprioritization diff in `docs/plans/approved-backlog.md`.
+- Browser QA loaded the existing local Next UI at `http://localhost:3000/` after the `--port 3002` launcher reported another dev server was already running. At `1440x900`, `html`, `body`, and `.operator-shell` stayed at viewport height with `overflow: hidden`; `.work-surface` and `.inspector` scrolled internally, and workspace readiness, repositories, Railway mapping, doctor, providers, delivery policy, MCP servers, runs, and reports were reachable. The only console error was a missing `/favicon.ico` asset.
+
+Reprioritized the post-BG UI work:
+
+- Accepted BG Railway Mapping UI.
+- Moved the invocation UI shell redesign ahead of the operator-agent milestone because the current page layout is too vertically expansive for real operator use.
+- Defined BH as Invocation Control UI Shell Refactor: fixed `100vh` / `100vw` operator shell, no global page scrolling, dense internal panels, and software-style configuration ergonomics.
+- Shifted Operator Agent Action Sandbox to BI and Cubic Review Provider to BJ.
+
 Implemented Milestone BG Railway Mapping UI:
 
 - Added a dedicated local `ewokbot ui` Railway staging mapping screen for all controlled repositories in the current workspace.

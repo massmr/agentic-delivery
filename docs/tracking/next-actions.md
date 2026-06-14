@@ -36,9 +36,10 @@
 32. Milestone BE - Railway MCP Discovery And Repository Mapping is implemented in this pass and awaiting acceptance. `ewokbot init` now has a setup-only Railway discovery boundary that reads projects/services through approved read-only MCP tools, maps discovered sibling Git repositories to discovered Railway services or manual IDs, preserves `repos.discovery: sibling-git-directories`, writes per-repo staging overrides, and supports explicit `none`/`github_only` skip choices without changing runtime staging verification.
 33. Next milestone after BE acceptance: BF - Invocation Control UI v0. This creates a local Next.js UI bound to one Ewokbot workspace invocation so operators can inspect config, repos, providers, runs, reports, and safe read-only actions without relying on a giant CLI wizard.
 34. Milestone BF - Invocation Control UI v0 is complete and accepted. The local Next.js UI is bound to one Ewokbot workspace invocation and exposes safe workspace readiness, provider, repository, run, and report views without provider secrets or delivery side effects.
-35. Milestone BG - Railway Mapping UI is implemented in this pass and awaiting acceptance. The invocation UI now lets operators map each controlled repository to `railway_mcp`, `github_only`, or `none`, manually enter Railway project/environment/service ids, persist scoped staging mappings under `repos.deployments.<repo>.staging`, and view local validation feedback after save while preserving sibling repository discovery and unrelated config.
-36. Follow-up milestone after BG: BH - Operator Agent Action Sandbox. This creates the future "Ewokbot agent" control layer that can talk with the operator and invoke only approved Ewokbot commands/ports, without raw shell or raw MCP tool access.
-37. Cubic review provider is deferred after the invocation UI, Railway mapping UI, and operator-agent foundations. It is now planned as BI.
+35. Milestone BG - Railway Mapping UI is complete and accepted. The invocation UI now lets operators map each controlled repository to `railway_mcp`, `github_only`, or `none`, manually enter Railway project/environment/service ids, persist scoped staging mappings under `repos.deployments.<repo>.staging`, and view local validation feedback after save while preserving sibling repository discovery and unrelated config.
+36. Next milestone after BG acceptance: BH - Invocation Control UI Shell Refactor. This turns the current local UI into a real operator console with a fixed `100vh`/`100vw` app shell, dense information layout, internal panel scrolling only, and configuration-first ergonomics.
+37. Follow-up milestone after BH: BI - Operator Agent Action Sandbox. This creates the future "Ewokbot agent" control layer that can talk with the operator and invoke only approved Ewokbot commands/ports, without raw shell or raw MCP tool access.
+38. Cubic review provider is deferred until after the invocation UI shell refactor and operator-agent foundations. It is now planned as BJ.
 
 ## Immediate Real-Smoke Finding
 
@@ -235,9 +236,41 @@ Acceptance:
 
 BG must not implement operator-agent chat, Cubic, Telegram, WhatsApp, production merge automation, or production deploy.
 
+## Invocation Control UI Shell Refactor
+
+Status: Completed on 2026-06-13. The local invocation UI now uses a fixed operator-console shell with internal panel scrolling while preserving the existing safe BF/BG UI surfaces.
+
+Milestone BH should turn the current invocation UI from a vertically stacked page into a true operator workbench that fits inside `100vh` / `100vw` without global page scrolling.
+
+Build:
+
+- Replace the page-like stacked layout with a fixed application shell.
+- Use a dense operator-console structure with:
+  - compact top bar
+  - left navigation/sidebar
+  - central work surface
+  - right inspector/details panel
+  - optional bottom console/report/output panel
+- Keep the viewport itself non-scrolling; only internal panels may scroll.
+- Rework the current large cards/sections into compact tables, lists, tabs, inline controls, and inspectors.
+- Keep Railway mapping and workspace configuration usable inside the shell without pushing content vertically.
+- Make the UI feel like configuration software or an operational console, not a landing page or a long document.
+- Preserve the current safe local-only boundaries, typed backend/API model, and secret redaction behavior.
+- Keep `doctor`, repositories, Railway mappings, runs, and reports accessible through the new shell structure.
+
+Acceptance:
+
+- The UI is usable at `100vh` / `100vw` on desktop without global vertical scrolling.
+- Workspace navigation, Railway mapping, run inspection, and report viewing fit inside internal panels with local scrolling where needed.
+- The layout remains operationally dense and readable for multi-repo workspaces.
+- Existing BF/BG functionality remains available after the layout refactor.
+- Tests remain fake-only and do not call live providers, MCP servers, OpenCode, Docker, OAuth, shells, or networks.
+
+BH must not implement the conversational operator agent, Cubic, Telegram, WhatsApp, production merge automation, or production deploy.
+
 ## Operator Agent Action Sandbox
 
-Milestone BH should introduce the future Ewokbot agent control layer. The agent may converse with the operator, but it must only invoke approved Ewokbot commands and typed ports.
+Milestone BI should introduce the future Ewokbot agent control layer. The agent may converse with the operator, but it must only invoke approved Ewokbot commands and typed ports.
 
 Build:
 
@@ -253,11 +286,11 @@ Acceptance:
 - Tests prove denied actions cannot call raw MCP, shell, git, provider APIs, or production operations.
 - CLI and UI remain primary control planes; the agent is an interface over Ewokbot, not a bypass around it.
 
-BH must not implement Cubic, Telegram, WhatsApp, production merge automation, or production deploy.
+BI must not implement Cubic, Telegram, WhatsApp, production merge automation, or production deploy.
 
 ## Cubic Review Provider
 
-Milestone BI should add Cubic as an optional review provider.
+Milestone BJ should add Cubic as an optional review provider.
 
 Build:
 
