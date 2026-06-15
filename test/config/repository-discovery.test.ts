@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
@@ -12,6 +12,11 @@ function createWorkspace(): string {
 
 function createGitDir(rootPath: string, name: string): void {
   mkdirSync(join(rootPath, name, '.git'), { recursive: true });
+}
+
+function createGitSubmoduleMarker(rootPath: string, name: string): void {
+  mkdirSync(join(rootPath, name), { recursive: true });
+  writeFileSync(join(rootPath, name, '.git'), `gitdir: ../.git/modules/${name}\n`, 'utf8');
 }
 
 test('discovers direct sibling Git repositories deterministically', () => {
@@ -33,7 +38,8 @@ test('discovers direct sibling Git repositories deterministically', () => {
       productionBranch: 'main',
       qualityProfile: 'node',
       hints: ['app-mobile', 'app', 'mobile'],
-      stagingSmokeUrls: []
+      stagingSmokeUrls: [],
+      deployments: undefined
     });
   } finally {
     rmSync(rootPath, { recursive: true, force: true });
@@ -60,6 +66,23 @@ test('ignores hidden directories, .ewokbot, node_modules, non-git, excluded, and
   }
 });
 
+test('discovers direct sibling Git submodules that expose a .git file marker', () => {
+  const rootPath = createWorkspace();
+
+  try {
+    createGitSubmoduleMarker(rootPath, 'koulis');
+    createGitSubmoduleMarker(rootPath, 'koulis.api');
+    createGitDir(rootPath, 'saas_frontend');
+    mkdirSync(join(rootPath, 'docs'), { recursive: true });
+
+    const repos = discoverSiblingGitDirectories(rootPath);
+
+    assert.deepEqual(repos.map((repo) => repo.name), ['koulis', 'koulis.api', 'saas_frontend']);
+  } finally {
+    rmSync(rootPath, { recursive: true, force: true });
+  }
+});
+
 test('creates discovered repository defaults from a folder basename', () => {
   assert.deepEqual(createDiscoveredRepositoryConfig('service-api'), {
     name: 'service-api',
@@ -69,6 +92,7 @@ test('creates discovered repository defaults from a folder basename', () => {
     productionBranch: 'main',
     qualityProfile: 'node',
     hints: ['service-api', 'service', 'api'],
-    stagingSmokeUrls: []
+    stagingSmokeUrls: [],
+    deployments: undefined
   });
 });

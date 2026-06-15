@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { WorkspaceRepositoryConfig } from './workspace-config.js';
@@ -26,7 +26,7 @@ export function discoverSiblingGitDirectories(rootPath: string, options: Reposit
     const candidatePath = join(rootPath, entry.name);
     const gitPath = join(candidatePath, '.git');
 
-    if (!existsSync(gitPath) || !statSync(gitPath).isDirectory()) {
+    if (!isGitRepositoryMarker(gitPath)) {
       continue;
     }
 
@@ -34,6 +34,25 @@ export function discoverSiblingGitDirectories(rootPath: string, options: Reposit
   }
 
   return repositories.sort((left, right) => left.name.localeCompare(right.name));
+}
+
+function isGitRepositoryMarker(gitPath: string): boolean {
+  if (!existsSync(gitPath)) {
+    return false;
+  }
+
+  const stats = statSync(gitPath);
+
+  if (stats.isDirectory()) {
+    return true;
+  }
+
+  if (!stats.isFile()) {
+    return false;
+  }
+
+  const content = readFileSync(gitPath, 'utf8');
+  return /^gitdir:\s*\S+/u.test(content);
 }
 
 export function createDiscoveredRepositoryConfig(name: string): WorkspaceRepositoryConfig {
