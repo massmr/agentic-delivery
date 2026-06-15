@@ -283,6 +283,108 @@ Explicit safety constraints:
 - Do not store credentials or OAuth state in repository files.
 - Production merge and production deploy remain human-only.
 
+### Milestone BK: Canonical Documentation Architecture
+
+Goal:
+
+Freeze the documentation information architecture before the operator-agent step, while preserving the current `docs/` tree as the canonical source of truth for Ewokbot behavior, capabilities, and constraints.
+
+Build:
+
+- Define the documentation taxonomy for:
+  - getting started,
+  - core concepts,
+  - guides,
+  - reference,
+  - architecture/explanations,
+  - runbooks,
+  - roadmap.
+- Add a canonical map describing which existing documents remain source-of-truth inputs for each section.
+- Define the relationship between `README.md`, source docs under `docs/`, and the future public documentation site.
+- Define documentation rules for “implemented”, “supervised”, “experimental”, and “roadmap-only” features.
+- Define documentation rules for provider coverage:
+  - Atlassian/Jira,
+  - GitHub,
+  - Railway,
+  - Vercel,
+  - future providers.
+
+Acceptance:
+
+- `docs/` remains the canonical source of truth.
+- No current planning/spec/reference material is deleted as part of BK.
+- The repository contains a documented structure that OpenCode can follow without inventing product behavior.
+- The future public docs site is explicitly downstream of canonical source docs, not a separate truth source.
+
+### Milestone BL: Full Product Documentation Rewrite
+
+Goal:
+
+Turn the current source material into a coherent, end-to-end documentation set that explains Ewokbot from install through real-provider operation, while preserving the factual content already captured in specs, plans, and references.
+
+Build:
+
+- Rewrite and/or consolidate documentation so the product is understandable from A to Z.
+- Cover:
+  - what Ewokbot is,
+  - the MCP-first model,
+  - the workspace model,
+  - init/doctor/auth,
+  - scan/plan/run/run-dev/smoke,
+  - GitHub handoff,
+  - Railway mapping and staging verification,
+  - UI usage,
+  - policy modes,
+  - safety boundaries,
+  - current limitations,
+  - roadmap boundaries.
+- Add explicit pages for:
+  - “What Ewokbot can do today”
+  - “What Ewokbot does not do yet”
+  - “What still requires human approval”
+- Reduce `README.md` to a concise front door that points into the deeper docs.
+- Preserve detailed technical references for MCP mappings, schemas, and policies.
+
+Acceptance:
+
+- A new reader can understand how Ewokbot works without reading the source code first.
+- Existing product behavior is documented without inventing unsupported capabilities.
+- The docs clearly distinguish current functionality from future milestones.
+- `README.md` is shorter and points readers into the canonical docs structure.
+
+### Milestone BM: Documentation Site And Landing Page
+
+Goal:
+
+Create a public-facing documentation site and landing experience that is generated from or tightly aligned with the canonical repository docs.
+
+Build:
+
+- Add a docs site with navigation for:
+  - overview,
+  - install,
+  - concepts,
+  - guides,
+  - reference,
+  - architecture,
+  - roadmap.
+- Add a landing page that explains Ewokbot as it exists today:
+  - supervised autonomous delivery runtime,
+  - MCP-first,
+  - multi-provider,
+  - local/VPS operator workflow,
+  - current real-provider coverage.
+- Make the landing page a concise product summary, not a replacement for the docs.
+- Ensure the public site does not contradict the canonical repo docs.
+- Keep site copy honest about current status and supervision boundaries.
+
+Acceptance:
+
+- The public site is navigable and grounded in the repo docs.
+- Landing and docs pages describe real, implemented behavior accurately.
+- The site makes it easy for an open-source user to understand install, setup, capabilities, and limits.
+- `docs/` remains the authoritative product source.
+
 ### Milestone X: OpenCode Execution Contract
 
 Goal:

@@ -145,6 +145,9 @@ Status legend:
 - `[x]` Invocation control UI v0: local Next.js UI bound to one workspace invocation
 - `[x]` Railway mapping UI for per-repository project/environment/service setup
 - `[x]` Invocation control UI shell refactor: fixed 100vh/100vw operator console layout
+- `[x]` Canonical documentation architecture: preserve `docs/` as source of truth
+- `[ ]` Full product documentation rewrite from current source docs
+- `[ ]` Documentation site and public landing page
 - `[ ]` Operator agent action sandbox for conversational control without raw shell/MCP access
 - `[ ]` Cubic review provider: init, doctor, pre-commit diff review, and PR review verification
 

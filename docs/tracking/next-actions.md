@@ -40,6 +40,30 @@
 36. Next milestone after BG acceptance: BH - Invocation Control UI Shell Refactor. This turns the current local UI into a real operator console with a fixed `100vh`/`100vw` app shell, dense information layout, internal panel scrolling only, and configuration-first ergonomics.
 37. Follow-up milestone after BH: BI - Operator Agent Action Sandbox. This creates the future "Ewokbot agent" control layer that can talk with the operator and invoke only approved Ewokbot commands/ports, without raw shell or raw MCP tool access.
 38. Cubic review provider is deferred until after the invocation UI shell refactor and operator-agent foundations. It is now planned as BJ.
+39. Before BI, the next approved documentation direction is now BK/BL/BM: preserve the existing `docs/` tree as the canonical source of truth, consolidate current behavior into a complete user/developer documentation set, and only then build the public docs site plus landing from that source material.
+40. Documentation work must not discard current planning/spec/reference material. Existing docs remain authoritative inputs and must be reorganized, indexed, summarized, or linked rather than replaced with thinner marketing copy.
+
+## Immediate Documentation Direction
+
+The next approved sequence is:
+
+1. `BL - Full Product Documentation Rewrite`
+2. `BM - Documentation Site And Landing Page`
+3. `BI - Operator Agent Action Sandbox`
+4. `BJ - Cubic Review Provider`
+
+`BK - Canonical Documentation Architecture` is complete. The docs source map now lives in `docs/README.md`, with the authority model and provider/status rules in `docs/architecture/documentation-architecture.md`.
+
+Documentation-specific rules:
+
+- `docs/` remains the source of truth.
+- The public site must be generated from or tightly aligned to `docs/`, not written as an unrelated parallel narrative.
+- `README.md` should become a concise entrypoint into the deeper documentation, not the only source of product explanation.
+- The docs set must clearly separate:
+  - what Ewokbot can do today,
+  - what remains supervised,
+  - what is experimental,
+  - and what is still roadmap-only.
 
 ## Immediate Real-Smoke Finding
 

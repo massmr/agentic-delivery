@@ -1,5 +1,22 @@
 # Progress Log
 
+## 2026-06-15
+
+Implemented Milestone BK Canonical Documentation Architecture:
+
+- Added `docs/README.md` as the canonical documentation entrypoint and source map for Getting Started, Concepts, Guides, Reference, Architecture, Runbooks, and Roadmap/Limits.
+- Added `docs/architecture/documentation-architecture.md` to define documentation authority order, README role, future public site role, feature status labels, and provider documentation rules.
+- Updated `docs/plans/documentation-site-plan.md` so the future public docs/site work is explicitly downstream of canonical repository docs.
+- Preserved existing specs, plans, reference pages, runbooks, tracking docs, and prompts as authoritative inputs. No operator-agent sandbox, public site, or product behavior work was started.
+
+Verification commands run for BK:
+
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm test`
+- `gitnexus_detect_changes({ scope: "staged", repo: "ewokbot" })`
+
 ## 2026-06-13
 
 Implemented Milestone BH Invocation Control UI Shell Refactor:
