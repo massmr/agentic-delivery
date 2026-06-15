@@ -64,12 +64,28 @@ export class JiraMcpTicketPort implements JiraConnector {
   }
 
   async listBacklog(): Promise<readonly DeliveryTicket[]> {
-    const execution = await this.callJiraTool(this.toolNames.listBacklog, 'listBacklog', {
-      jql: this.buildBacklogJql(),
-      fields: jiraIssueFields
-    });
+    const jql = this.buildBacklogJql();
+    const candidates: readonly JsonObject[] = [
+      { jql, fields: jiraIssueFields },
+      { jql }
+    ];
 
-    return extractIssueList(execution.result.content).map((issue) => this.toDeliveryTicket(issue));
+    let lastError: unknown;
+
+    for (const argumentsObject of candidates) {
+      try {
+        const execution = await this.callJiraTool(this.toolNames.listBacklog, 'listBacklog', argumentsObject);
+        return extractIssueList(execution.result.content).map((issue) => this.toDeliveryTicket(issue));
+      } catch (error) {
+        lastError = error;
+
+        if (!shouldRetryBacklogWithAlternateShape(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Jira MCP backlog search failed for all supported request shapes.');
   }
 
   async getTicket(key: string): Promise<DeliveryTicket> {
@@ -116,7 +132,7 @@ export class JiraMcpTicketPort implements JiraConnector {
 
   private buildBacklogJql(): string {
     if (this.projectKeys.length === 0) {
-      return 'ORDER BY updated DESC';
+      return 'created IS NOT EMPTY ORDER BY updated DESC';
     }
 
     return `project in (${this.projectKeys.join(', ')}) ORDER BY updated DESC`;
@@ -284,4 +300,15 @@ function toTicketPriority(value: string): TicketPriority {
   }
 
   return 'medium';
+}
+
+function shouldRetryBacklogWithAlternateShape(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  return /reading 'map'/iu.test(error.message)
+    || /reading "map"/iu.test(error.message)
+    || /cannot read properties of undefined/iu.test(error.message)
+    || /is not a function/iu.test(error.message);
 }

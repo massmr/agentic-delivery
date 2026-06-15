@@ -146,7 +146,7 @@ test('Jira MCP TicketPort builds safe JQL from multiple valid project keys', asy
   ]);
 });
 
-test('Jira MCP TicketPort leaves backlog unconstrained when project keys are empty', async () => {
+test('Jira MCP TicketPort uses a valid unconstrained JQL when project keys are empty', async () => {
   const client = new MockMcpClient([
     createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, () => ({
       content: { issues: [] },
@@ -166,8 +166,54 @@ test('Jira MCP TicketPort leaves backlog unconstrained when project keys are emp
     {
       toolName: defaultJiraMcpToolNames.listBacklog,
       arguments: {
-        jql: 'ORDER BY updated DESC',
+        jql: 'created IS NOT EMPTY ORDER BY updated DESC',
         fields: 'summary,description,status,priority,labels,assignee,reporter,created,updated'
+      }
+    }
+  ]);
+});
+
+test('Jira MCP TicketPort retries backlog search without fields when Atlassian MCP rejects the optimized call shape', async () => {
+  let calls = 0;
+  const client = new MockMcpClient([
+    createMockMcpTool(serverId, defaultJiraMcpToolNames.listBacklog, (input) => {
+      calls += 1;
+
+      if (calls === 1) {
+        return {
+          content: 'Cannot read properties of undefined (reading \'map\')',
+          isError: true
+        };
+      }
+
+      return {
+        content: { issues: [jiraIssue('LK-333')] },
+        isError: false
+      };
+    })
+  ]);
+  const port: TicketPort = new JiraMcpTicketPort({
+    client,
+    serverId,
+    baseUrl: 'https://jira.example.test',
+    projectKeys: ['LK']
+  });
+
+  const tickets = await port.listBacklog();
+
+  assert.equal(tickets.length, 1);
+  assert.deepEqual(client.toolCallRequests.map((call) => ({ toolName: call.toolName, arguments: call.arguments })), [
+    {
+      toolName: defaultJiraMcpToolNames.listBacklog,
+      arguments: {
+        jql: 'project in (LK) ORDER BY updated DESC',
+        fields: 'summary,description,status,priority,labels,assignee,reporter,created,updated'
+      }
+    },
+    {
+      toolName: defaultJiraMcpToolNames.listBacklog,
+      arguments: {
+        jql: 'project in (LK) ORDER BY updated DESC'
       }
     }
   ]);
