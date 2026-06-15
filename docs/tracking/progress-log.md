@@ -2,6 +2,22 @@
 
 ## 2026-06-15
 
+Prepared Milestone BM Documentation Site And Landing Page inventory without implementing the site:
+
+- Added `docs/plans/docs-site-readiness.md` with the future public navigation, canonical source mapping, landing-page claim inventory, site build expectations, BM gap list, and copy guardrails.
+- Kept `docs/` as the authoritative source and kept BM incomplete because no public docs site, landing page, route tree, framework, hosted deployment, or visual site work was added.
+- Preserved the explicit boundary that production merge/deploy, raw shell/MCP access, Vercel-backed delivery, broad provider parity, and the operator-agent sandbox remain unsupported unless later milestones implement them.
+
+Verification commands run for BM prep:
+
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm test` (`461/461`)
+- `rg -n "operator agent|raw shell|raw MCP|production deploy|production merge|Vercel|autonomous production|deploy to production|merge production" README.md docs` to spot-check high-risk docs claims; matches are framed as human-only, not-yet, or explicitly unsupported.
+- `lsp_diagnostics` on representative Markdown files was attempted, but this environment has no Markdown LSP configured.
+- `gitnexus_detect_changes({ scope: "staged", repo: "ewokbot" })`
+
 Implemented Milestone BL Full Product Documentation Rewrite:
 
 - Replaced the root `README.md` with a concise repository front door that points into canonical docs and states current safety boundaries.

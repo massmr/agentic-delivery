@@ -55,6 +55,8 @@ The next approved sequence is:
 
 `BL - Full Product Documentation Rewrite` is complete in the canonical docs tree. The consolidated entrypoint is `docs/index.md`; root `README.md` is now a concise front door into Getting Started, Concepts, Guides, Reference, Architecture, and Product State docs.
 
+BM preparation is complete in `docs/plans/docs-site-readiness.md`. BM itself remains the next approved milestone because no public docs site or landing page has been implemented yet.
+
 Documentation-specific rules:
 
 - `docs/` remains the source of truth.
