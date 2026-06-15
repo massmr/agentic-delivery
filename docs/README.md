@@ -20,6 +20,9 @@ This `docs/` tree is the canonical source of truth for Ewokbot product behavior,
 
 - `docs/specs/` contains deep product and technical architecture specs.
 - `docs/plans/` contains approved milestone definitions and future implementation plans.
+- `docs/getting-started/` contains install, init, doctor, and auth docs for first-time setup.
+- `docs/concepts/` contains product state, workspace, MCP-first, and safety explanations.
+- `docs/guides/` contains task-oriented workflows for scan, run-dev, smoke, handoff, Railway, and UI use.
 - `docs/reference/` contains detailed provider and MCP tool references.
 - `docs/runbooks/` contains operator procedures.
 - `docs/tracking/` contains current roadmap, next actions, progress, decisions, risks, and blockers.
@@ -45,8 +48,8 @@ Do not describe roadmap-only behavior as current capability.
 - Public docs and landing pages must be generated from or kept tightly aligned to this `docs/` tree.
 - Production merge and production deployment remain human-only unless a future approved milestone changes that constraint.
 
-## Next Docs Milestones
+## Docs Milestone State
 
-- BK establishes this canonical documentation architecture.
+- BK established this canonical documentation architecture.
 - BL adds consolidated product docs for the complete user journey.
-- BM builds the public docs and landing surface from these canonical docs.
+- BM will build the public docs and landing surface from these canonical docs.

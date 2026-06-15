@@ -2,6 +2,27 @@
 
 ## 2026-06-15
 
+Implemented Milestone BL Full Product Documentation Rewrite:
+
+- Replaced the root `README.md` with a concise repository front door that points into canonical docs and states current safety boundaries.
+- Added `docs/index.md` as the consolidated product documentation entrypoint.
+- Added Getting Started docs for install, workspace initialization, doctor, and auth metadata.
+- Added Concepts docs for current product state, safety model, workspace model, and MCP-first runtime boundaries.
+- Added Guides for scan/ticket inspection, run-dev, real-provider smoke, GitHub handoff, Railway mapping, and the local invocation UI.
+- Added CLI and workspace config references backed by current command/config surfaces.
+- Added `docs/architecture/overview.md` as a short architecture orientation that links to deep specs instead of replacing them.
+- Kept unsupported behavior clearly marked as supervised, experimental, or roadmap-only. No operator-agent sandbox, public site, production merge automation, or production deploy work was added.
+
+Verification commands run for BL:
+
+- `git diff --check`
+- `pnpm typecheck`
+- `pnpm build`
+- `pnpm test` (`461/461`)
+- `rg -n "operator agent|raw shell|raw MCP|production deploy|production merge|Vercel|autonomous production|deploy to production|merge production" README.md docs` to spot-check high-risk docs claims; matches are framed as human-only, not-yet, or explicitly unsupported.
+- `lsp_diagnostics` on representative Markdown files was attempted, but this environment has no Markdown LSP configured.
+- `gitnexus_detect_changes({ scope: "staged", repo: "ewokbot" })`
+
 Implemented Milestone BK Canonical Documentation Architecture:
 
 - Added `docs/README.md` as the canonical documentation entrypoint and source map for Getting Started, Concepts, Guides, Reference, Architecture, Runbooks, and Roadmap/Limits.

@@ -47,12 +47,13 @@
 
 The next approved sequence is:
 
-1. `BL - Full Product Documentation Rewrite`
-2. `BM - Documentation Site And Landing Page`
-3. `BI - Operator Agent Action Sandbox`
-4. `BJ - Cubic Review Provider`
+1. `BM - Documentation Site And Landing Page`
+2. `BI - Operator Agent Action Sandbox`
+3. `BJ - Cubic Review Provider`
 
 `BK - Canonical Documentation Architecture` is complete. The docs source map now lives in `docs/README.md`, with the authority model and provider/status rules in `docs/architecture/documentation-architecture.md`.
+
+`BL - Full Product Documentation Rewrite` is complete in the canonical docs tree. The consolidated entrypoint is `docs/index.md`; root `README.md` is now a concise front door into Getting Started, Concepts, Guides, Reference, Architecture, and Product State docs.
 
 Documentation-specific rules:
 
