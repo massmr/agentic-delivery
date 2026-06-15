@@ -64,28 +64,12 @@ export class JiraMcpTicketPort implements JiraConnector {
   }
 
   async listBacklog(): Promise<readonly DeliveryTicket[]> {
-    const jql = this.buildBacklogJql();
-    const candidates: readonly JsonObject[] = [
-      { jql, fields: jiraIssueFields },
-      { jql }
-    ];
+    return this.searchByJql(this.buildBacklogJql());
+  }
 
-    let lastError: unknown;
-
-    for (const argumentsObject of candidates) {
-      try {
-        const execution = await this.callJiraTool(this.toolNames.listBacklog, 'listBacklog', argumentsObject);
-        return extractIssueList(execution.result.content).map((issue) => this.toDeliveryTicket(issue));
-      } catch (error) {
-        lastError = error;
-
-        if (!shouldRetryBacklogWithAlternateShape(error)) {
-          throw error;
-        }
-      }
-    }
-
-    throw lastError instanceof Error ? lastError : new Error('Jira MCP backlog search failed for all supported request shapes.');
+  async searchByJql(jql: string): Promise<readonly DeliveryTicket[]> {
+    const execution = await this.searchIssuesWithFallback(jql);
+    return extractIssueList(execution.result.content).map((issue) => this.toDeliveryTicket(issue));
   }
 
   async getTicket(key: string): Promise<DeliveryTicket> {
@@ -123,6 +107,29 @@ export class JiraMcpTicketPort implements JiraConnector {
       this.recordAudit(readAuditRecords(error));
       throw error;
     }
+  }
+
+  private async searchIssuesWithFallback(jql: string): Promise<McpToolCallExecutionResult> {
+    const candidates: readonly JsonObject[] = [
+      { jql, fields: jiraIssueFields },
+      { jql }
+    ];
+
+    let lastError: unknown;
+
+    for (const argumentsObject of candidates) {
+      try {
+        return await this.callJiraTool(this.toolNames.listBacklog, 'listBacklog', argumentsObject);
+      } catch (error) {
+        lastError = error;
+
+        if (!shouldRetryBacklogWithAlternateShape(error)) {
+          throw error;
+        }
+      }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error('Jira MCP backlog search failed for all supported request shapes.');
   }
 
   private async requireTool(toolName: string): Promise<string> {

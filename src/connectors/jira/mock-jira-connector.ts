@@ -13,6 +13,10 @@ export class MockJiraConnector implements JiraConnector {
     return this.tickets;
   }
 
+  async searchByJql(_jql: string): Promise<readonly DeliveryTicket[]> {
+    return this.tickets;
+  }
+
   async getTicket(key: string): Promise<DeliveryTicket> {
     const ticket = this.tickets.find((candidate) => candidate.ref.key === key);
 

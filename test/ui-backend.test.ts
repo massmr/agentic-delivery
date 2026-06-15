@@ -469,6 +469,7 @@ const fakeTicket: DeliveryTicket = {
 
 const fakeTicketPort: TicketPort = {
   listBacklog: async () => [fakeTicket],
+  searchByJql: async () => [fakeTicket],
   getTicket: async () => fakeTicket,
   comment: async () => {}
 };

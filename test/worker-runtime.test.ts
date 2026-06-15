@@ -272,6 +272,9 @@ function createMemoryTicketPort(tickets: readonly DeliveryTicket[]): TicketPort 
     async listBacklog() {
       return tickets;
     },
+    async searchByJql() {
+      return tickets;
+    },
     async getTicket(key) {
       const ticket = tickets.find((candidate) => candidate.ref.key === key);
       if (ticket === undefined) {

@@ -38,9 +38,9 @@ Run `pnpm ewokbot --help` for exact current help text. This page summarizes publ
 | `ui` | Start local invocation UI. | Pre-wired commands only; no raw shell/MCP/operator sandbox. |
 | `runs` | List local runs. | Reads `.ewokbot/runs/`. |
 | `inspect <run-id>` | Inspect local run state. | Local files only. |
-| `status <run-id>` | Show run status. | Local files only. |
-| `pause <run-id>` | Request local pause. | Local state only. |
-| `resume <run-id>` | Clear local pause. | Local state only. |
+| `status <ticket-key> [--run-id <run-id>]` | Show run status for one ticket. | Local files only. |
+| `pause` | Request workspace pause. | Local state only. |
+| `resume <run-id>` | Record resume intent and clear workspace pause for one run. | Local state only. |
 | `logs <run-id>` | Show local logs. | Local files only. |
 | `approve <run-id>` | Record local human approval. | Does not merge/deploy. |
 | `reject <run-id>` | Record local human rejection. | Does not merge/deploy. |

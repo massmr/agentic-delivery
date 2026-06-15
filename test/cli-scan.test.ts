@@ -57,6 +57,84 @@ test('agentic scan lists Jira MCP backlog tickets when runtime clients are injec
   ]);
 });
 
+test('agentic scan jql passes the provided query through Jira MCP', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithJiraMcp());
+  const captured = createCapturedIO();
+  const client = new MockMcpClient([
+    createMockMcpTool('atlassian', defaultJiraMcpToolNames.listBacklog, (input) => {
+      assert.equal(input.arguments.jql, 'project = AD ORDER BY Rank ASC');
+      return {
+        content: { issues: [jiraIssue('AD-720', 'Run arbitrary Jira JQL through Ewokbot')] },
+        isError: false
+      };
+    }),
+    createMockMcpTool('atlassian', defaultJiraMcpToolNames.getTicket, () => ({ content: { issue: jiraIssue('AD-720', 'unused') }, isError: false })),
+    createMockMcpTool('atlassian', defaultJiraMcpToolNames.comment, () => ({ content: { ok: true }, isError: false }))
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: captured.io,
+    runtimeMcp: { mcpClients: { atlassian: client } }
+  }).run(['node', 'agentic', 'scan', 'jql', 'project = AD ORDER BY Rank ASC']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /Found 1 Jira tickets for JQL/u);
+  assert.match(captured.stdout, /AD-720/u);
+});
+
+test('agentic scan ticket shows child and blocking tickets through obvious Jira JQL variants', async () => {
+  const rootPath = createWorkspaceRoot(workspaceWithJiraMcp());
+  const captured = createCapturedIO();
+  const calls: string[] = [];
+  const issueMap = new Map<string, readonly ReturnType<typeof jiraIssue>[]>([
+    ['"Epic Link" = KK-80 ORDER BY Rank ASC', [jiraIssue('KK-81', 'Epic child task')]],
+    ['parent = KK-80 ORDER BY Rank ASC', [jiraIssue('KK-81', 'Epic child task')]],
+    ['"Parent Link" = KK-80 ORDER BY Rank ASC', []],
+    ['issue in linkedIssues("KK-80", "is blocked by") ORDER BY updated DESC', [jiraIssue('KK-90', 'Blocking dependency')]],
+    ['issue in linkedIssues("KK-80", "blocks") ORDER BY updated DESC', []],
+    ['issue in linkedIssues("KK-80") ORDER BY updated DESC', [jiraIssue('KK-90', 'Blocking dependency')]]
+  ]);
+  const client = new MockMcpClient([
+    createMockMcpTool('atlassian', defaultJiraMcpToolNames.listBacklog, (input) => {
+      const jql = String(input.arguments.jql);
+      calls.push(jql);
+      return {
+        content: { issues: issueMap.get(jql) ?? [] },
+        isError: false
+      };
+    }),
+    createMockMcpTool('atlassian', defaultJiraMcpToolNames.getTicket, (input) => {
+      assert.equal(input.arguments.issueKey, 'KK-80');
+      return { content: { issue: jiraIssue('KK-80', 'Parent work item') }, isError: false };
+    }),
+    createMockMcpTool('atlassian', defaultJiraMcpToolNames.comment, () => ({ content: { ok: true }, isError: false }))
+  ]);
+
+  const exitCode = await createCliProgram({
+    cwd: rootPath,
+    configPath: '.ewokbot/workspace.yml',
+    io: captured.io,
+    runtimeMcp: { mcpClients: { atlassian: client } }
+  }).run(['node', 'agentic', 'scan', 'ticket', 'KK-80']);
+
+  assert.equal(exitCode, 0);
+  assert.match(captured.stdout, /Jira ticket: KK-80/u);
+  assert.match(captured.stdout, /Children \(1\):/u);
+  assert.match(captured.stdout, /KK-81/u);
+  assert.match(captured.stdout, /Potential blockers \(1\):/u);
+  assert.match(captured.stdout, /KK-90/u);
+  assert.deepEqual(calls, [
+    '"Epic Link" = KK-80 ORDER BY Rank ASC',
+    'parent = KK-80 ORDER BY Rank ASC',
+    '"Parent Link" = KK-80 ORDER BY Rank ASC',
+    'issue in linkedIssues("KK-80", "is blocked by") ORDER BY updated DESC',
+    'issue in linkedIssues("KK-80", "blocks") ORDER BY updated DESC',
+    'issue in linkedIssues("KK-80") ORDER BY updated DESC'
+  ]);
+});
+
 test('agentic scan reads Jira MCP from discovered parent workspace without run evidence', async () => {
   const rootPath = createWorkspaceRoot(workspaceWithJiraMcpDiscovery());
   mkdirSync(join(rootPath, 'api', '.git'), { recursive: true });

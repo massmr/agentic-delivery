@@ -220,6 +220,10 @@ class FixtureTicketPort implements TicketPort {
     return [this.toTicket()];
   }
 
+  async searchByJql(_jql: string): Promise<readonly DeliveryTicket[]> {
+    return [this.toTicket()];
+  }
+
   async getTicket(key: string): Promise<DeliveryTicket> {
     if (key !== this.fixture.ticket.key) {
       throw new Error(`Fixture ${this.fixture.id} does not define ticket ${key}.`);

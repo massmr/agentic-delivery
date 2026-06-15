@@ -131,6 +131,9 @@ test('agent worker intake uses typed TicketPort listing and detail fetching', as
         createTicket('AD-202', 'Second queued summary')
       ];
     },
+    async searchByJql() {
+      return [];
+    },
     async getTicket(key: string) {
       getTicketCalls.push(key);
       return createTicket(key, `Detailed summary for ${key}`);

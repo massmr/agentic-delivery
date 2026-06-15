@@ -47,6 +47,9 @@ const HELP_TEXT = [
   '  ewokbot auth list',
   '  ewokbot doctor',
   '  ewokbot scan',
+  '  ewokbot scan jql "<query>"',
+  '  ewokbot scan epic <ticket-key>',
+  '  ewokbot scan ticket <ticket-key>',
   '  ewokbot ui [--port <port>] [--hostname <host>]',
   '  ewokbot plan <ticket-key>',
   '  ewokbot run <ticket-key> [--run-id <run-id>]',
@@ -71,7 +74,7 @@ const HELP_TEXT = [
   `  init        Create ${ewokbotWorkspaceConfigPath}, .ewokbot/.env, and .ewokbot/.env.example for local onboarding.`,
   '  auth        Manage Ewokbot-owned provider auth metadata; OpenCode auth stays external.',
   '  doctor      Validate local setup files without live provider calls.',
-  '  scan        List Jira backlog tickets through the configured typed TicketPort.',
+  '  scan        List backlog tickets, run Jira JQL, or inspect ticket children and blockers through the configured typed TicketPort.',
   '  ui          Start the local invocation control UI for this workspace; no delivery side effects.',
   '  plan        Create a local dry-run plan through the configured typed TicketPort; no delivery side effects.',
   '  run         Execute one ticket through the complete mock delivery lifecycle.',
@@ -194,7 +197,7 @@ export function createCliProgram(options: CliProgramOptions = {}): CliProgram {
       }
 
       if (args[0] === 'scan') {
-        return runScanCommand({ cwd: options.cwd, configPath: options.configPath, io, runtimeMcp: options.runtimeMcp });
+        return runScanCommand({ cwd: options.cwd, configPath: options.configPath, io, runtimeMcp: options.runtimeMcp, args: args.slice(1) });
       }
 
       if (args[0] === 'ui') {

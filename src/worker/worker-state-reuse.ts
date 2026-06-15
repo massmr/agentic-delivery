@@ -42,6 +42,9 @@ export function createStateAwareTicketPort(input: { readonly rootPath: string; r
 
         return processable;
       },
+      searchByJql(jql) {
+        return input.ticketPort.searchByJql(jql);
+      },
       getTicket(key) {
         return input.ticketPort.getTicket(key);
       },
